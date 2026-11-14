@@ -52,7 +52,13 @@ const Golden& golden() {
 }
 
 using TypeAndData = std::pair<int, uint32_t>;
-using Sources = std::map<std::string, std::set<TypeAndData>>;
+
+struct Sources {
+  std::map<std::string, std::set<TypeAndData>> values;  // by "color/name"
+  // Keys with a source pointing outside the app (@android:color/, ?attr/), directly or through
+  // an alias. Their golden values need the framework or a theme, so they are checked in #26.
+  std::set<std::string> leftForLater;
+};
 
 // Every <color> in the golden app's values*/ folders as (type, data), by "color/name". A
 // "@color/x" source takes all of x's values, through aliases of aliases; references are resolved
@@ -69,8 +75,7 @@ Sources loadSources() {
       return;
     }
     if (!text.empty() && (text[0] == '@' || text[0] == '?')) {
-      ADD_FAILURE() << file.string() << ": " << key << " \"" << text
-                    << "\" is a reference this test cannot resolve yet";
+      out.leftForLater.insert(key);
       return;
     }
     auto v = parseLiteral(text, kFormatColor);
@@ -79,20 +84,22 @@ Sources loadSources() {
                     << "\" does not parse to a color";
       return;
     }
-    out[key].insert({static_cast<int>(v->color.format), v->color.argb});
+    out.values[key].insert({static_cast<int>(v->color.format), v->color.argb});
   });
   for (bool changed = true; changed;) {
     changed = false;
     for (const auto& [key, targets] : aliases) {
       for (const std::string& target : targets) {
-        const auto it = out.find(target);
-        if (it == out.end()) continue;
+        if (out.leftForLater.count(target) && out.leftForLater.insert(key).second) changed = true;
+        const auto it = out.values.find(target);
+        if (it == out.values.end()) continue;
         for (const TypeAndData& v : it->second) {
-          if (out[key].insert(v).second) changed = true;
+          if (out.values[key].insert(v).second) changed = true;
         }
       }
     }
   }
+  for (const std::string& key : out.leftForLater) out.values.erase(key);
   return out;
 }
 
@@ -101,18 +108,32 @@ const Sources& sources() {
   return s;
 }
 
+bool leftForLater(const GoldenColor& g) { return sources().leftForLater.count(g.key) != 0; }
+
+// What loadSources leaves for #26. A key is listed here on purpose, so none is skipped unnoticed.
+const std::set<std::string> kLeftForLater = {};
+
+TEST(GoldenColor, OnlyListedKeysAreLeftForLater) {
+  EXPECT_EQ(sources().leftForLater, kLeftForLater);
+}
+
 TEST(GoldenColor, EveryConditionHasEverySource) {
   EXPECT_EQ(golden().conditions, 252u);  // 7 densities × 3 languages × 2 × 2 × 3 widths
-  EXPECT_GT(sources().size(), 0u);
-  EXPECT_EQ(golden().values.size(), golden().conditions * sources().size());
+  EXPECT_GT(sources().values.size(), 0u);
+  size_t checked = 0;
+  for (const GoldenColor& g : golden().values) {
+    if (!leftForLater(g)) checked++;
+  }
+  EXPECT_EQ(checked, golden().conditions * sources().values.size());
 }
 
 TEST(GoldenColor, SourceTextGivesAndroidTypeAndData) {
   for (const GoldenColor& g : golden().values) {
+    if (leftForLater(g)) continue;
     SCOPED_TRACE(g.where);
     // Config matching comes later, so check that one of the resource's sources gives this value.
-    auto it = sources().find(g.key);
-    ASSERT_NE(it, sources().end());
+    auto it = sources().values.find(g.key);
+    ASSERT_NE(it, sources().values.end());
     EXPECT_EQ(it->second.count({g.type, g.data}), 1u)
         << "type " << g.type << ", data 0x" << std::hex << g.data;
   }
