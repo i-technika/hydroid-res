@@ -9,7 +9,7 @@
 namespace hydroid::res {
 
 enum class ValueKind : uint8_t {
-  Null, Empty,                       // @null, @empty: see Value() and Value::empty()
+  Null, Empty,                       // @null, @empty: see Value::null() and Value::empty()
   Reference, AttrRef,                // @type/name, ?attr/name
   String, StyledString,              // StyledString: text with spans such as <b>
   Color, Dimension, Fraction, Float, Int, Bool,
