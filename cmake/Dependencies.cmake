@@ -19,6 +19,7 @@ set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 # pugixml: the only runtime dependency of the core (values, layout, drawable XML).
 if(HYDROID_RES_USE_SYSTEM_DEPS)
   find_package(pugixml 1.14 EXACT REQUIRED CONFIG)
+  set(hydroid_res_fetched_pugixml OFF)
 else()
   set(PUGIXML_NO_EXCEPTIONS OFF)
   set(PUGIXML_BUILD_TESTS OFF)
@@ -26,7 +27,26 @@ else()
     GIT_REPOSITORY https://github.com/zeux/pugixml.git
     GIT_TAG        v1.14
     GIT_SHALLOW    TRUE)
-  FetchContent_MakeAvailable(pugixml)
+  # A parent project that made pugixml first decides its type, and FetchContent_MakeAvailable
+  # would do nothing here, so only a pugixml made here is held static.
+  FetchContent_GetProperties(pugixml)
+  if(pugixml_POPULATED)
+    set(hydroid_res_fetched_pugixml OFF)
+  else()
+    set(hydroid_res_fetched_pugixml ON)
+    # Static whatever BUILD_SHARED_LIBS says, so a shared hydroid-res holds it and needs no
+    # pugixml DLL next to it (#12). pugixml's option(BUILD_SHARED_LIBS) takes this plain variable
+    # under CMP0077. Restoring with an unquoted value unsets it again if it was never set; if it
+    # was only a cache entry, the plain variable left behind has the same value.
+    set(hydroid_build_shared_libs ${BUILD_SHARED_LIBS})
+    set(BUILD_SHARED_LIBS OFF)
+    FetchContent_MakeAvailable(pugixml)
+    set(BUILD_SHARED_LIBS ${hydroid_build_shared_libs})
+    # Nor does a shared hydroid-res export the pugixml it holds, on Linux and macOS.
+    set_target_properties(pugixml-static PROPERTIES
+      CXX_VISIBILITY_PRESET hidden
+      VISIBILITY_INLINES_HIDDEN ON)
+  endif()
 endif()
 
 if(HYDROID_RES_BUILD_TESTS)

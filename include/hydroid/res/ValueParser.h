@@ -4,6 +4,7 @@
 #include <optional>
 #include <string_view>
 
+#include "hydroid/res/Export.h"
 #include "hydroid/res/Value.h"
 
 // Literal value parsers for values XML text and XML attributes. Each follows aapt2: leading and
@@ -43,13 +44,13 @@ enum FormatBits : uint32_t {
 
 // #RGB, #ARGB, #RRGGBB, #AARRGGBB -> Color: 0xAARRGGBB plus which of the four was written
 // (aapt2 keeps it as the Res_value type, TYPE_INT_COLOR_RGB4 ... ARGB8).
-std::optional<Value> parseColor(std::string_view s);
+HYDROID_RES_API std::optional<Value> parseColor(std::string_view s);
 
 // true/True/TRUE, false/False/FALSE -> Bool.
-std::optional<Value> parseBool(std::string_view s);
+HYDROID_RES_API std::optional<Value> parseBool(std::string_view s);
 
 // Decimal int32 ("-12") or hex uint32 ("0x7f010000", no sign, lowercase x) -> Int.
-std::optional<Value> parseInteger(std::string_view s);
+HYDROID_RES_API std::optional<Value> parseInteger(std::string_view s);
 
 // "1.5" -> Float, "16dp" -> Dimension, "50%" / "50%p" -> Fraction. Units are case-sensitive and
 // must follow the number directly ("16 dp" is rejected); "dip" is an alias of "dp". The number is
@@ -57,13 +58,13 @@ std::optional<Value> parseInteger(std::string_view s);
 // encoding (see Complex.h), so "0.1dp" reads back as 0.100000024. Text longer than 126
 // characters after trimming is rejected, as in aapt2. See the top of this file for the inputs
 // aapt2 takes and this rejects.
-std::optional<Value> parseFloatValue(std::string_view s);
+HYDROID_RES_API std::optional<Value> parseFloatValue(std::string_view s);
 
 // Tries the literal parsers allowed by `formats` in aapt2's order: color, bool, integer, then
 // float/dimension/fraction. When `formats` allows more than float/dimension/fraction, a plain
 // float that is 1 or more off the same text read as a double is rejected, as aapt2 keeps such
 // text as a string: "9638178525" and "-2147483649" under kFormatAny, but not "2147483648", which
 // a float holds exactly. References and strings are handled by the values parser (step 4).
-std::optional<Value> parseLiteral(std::string_view s, uint32_t formats);
+HYDROID_RES_API std::optional<Value> parseLiteral(std::string_view s, uint32_t formats);
 
 }  // namespace hydroid::res

@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <optional>
 
+#include "hydroid/res/Export.h"
 #include "hydroid/res/Value.h"
 
 // Android's "complex" encoding of dimensions and fractions (Res_value data of TYPE_DIMENSION and
@@ -35,10 +36,10 @@ constexpr uint32_t kComplexUnitFractionParent = 1;  // "%p"
 // ResTable::stringToFloat does, including its precision loss and the mantissa wrapping around
 // past +/-2^23 (9000000dp reads back as -7777216). nullopt where aapt2 is undefined: non-finite
 // values and |value| >= 2^41.
-std::optional<uint32_t> floatToComplex(float value, uint32_t unit);
+HYDROID_RES_API std::optional<uint32_t> floatToComplex(float value, uint32_t unit);
 
 // TypedValue.complexToFloat: the number without its unit.
-float complexToFloat(uint32_t data);
+HYDROID_RES_API float complexToFloat(uint32_t data);
 
 constexpr uint32_t complexUnit(uint32_t data) {
   return (data >> kComplexUnitShift) & kComplexUnitMask;
@@ -61,12 +62,12 @@ struct DisplayMetrics {
 
 // TypedValue.applyDimension. Linear sp only: Android 14+ scales sp non-linearly from fontScale
 // 1.03 up.
-float applyDimension(DimUnit unit, float value, const DisplayMetrics& metrics);
+HYDROID_RES_API float applyDimension(DimUnit unit, float value, const DisplayMetrics& metrics);
 
 // TypedValue.complexToDimension (what Resources.getDimension returns). 0 for an unknown unit.
-float complexToDimension(uint32_t data, const DisplayMetrics& metrics);
+HYDROID_RES_API float complexToDimension(uint32_t data, const DisplayMetrics& metrics);
 
 // TypedValue.complexToFraction: "%" scales `base`, "%p" scales `parentBase`, else 0.
-float complexToFraction(uint32_t data, float base, float parentBase);
+HYDROID_RES_API float complexToFraction(uint32_t data, float base, float parentBase);
 
 }  // namespace hydroid::res

@@ -16,6 +16,16 @@ option(HYDROID_RES_WARNINGS_AS_ERRORS "Treat compiler warnings as errors" OFF)
 option(HYDROID_RES_REQUIRE_LOCALE_TESTS
   "Fail, rather than skip, tests that need a decimal-comma locale where none is installed" OFF)
 
+# A shared build puts DLLs next to the executables that load them, as Windows has no rpath. Set
+# before the dependencies so a shared GoogleTest lands there too.
+if(PROJECT_IS_TOP_LEVEL AND NOT DEFINED CMAKE_RUNTIME_OUTPUT_DIRECTORY)
+  set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/bin)
+endif()
+
+# BUILD_SHARED_LIBS as hydroid-res was asked for it, as a plain variable or a cache entry, so
+# CMake.LibraryTypes catches one that Dependencies.cmake failed to restore.
+set(hydroid_res_shared_requested "${BUILD_SHARED_LIBS}")
+
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 include(CompilerWarnings)
 include(Dependencies)
