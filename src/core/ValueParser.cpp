@@ -269,13 +269,30 @@ constexpr UnitName kUnits[] = {
     {"%p", ValueKind::Fraction, kComplexUnitFractionParent, 1.0f / 100},
 };
 
+// The format a value from parseFloatValue needs. Every kind is listed, so a new ValueKind that
+// parseFloatValue can make doesn't silently get 0 (-Wswitch, C4062).
 uint32_t formatOf(ValueKind kind) {
   switch (kind) {
     case ValueKind::Float: return kFormatFloat;
     case ValueKind::Dimension: return kFormatDimension;
     case ValueKind::Fraction: return kFormatFraction;
-    default: return 0;
+    case ValueKind::Null:
+    case ValueKind::Reference:
+    case ValueKind::AttrRef:
+    case ValueKind::String:
+    case ValueKind::StyledString:
+    case ValueKind::Color:
+    case ValueKind::Int:
+    case ValueKind::Bool:
+    case ValueKind::File:
+    case ValueKind::Style:
+    case ValueKind::Array:
+    case ValueKind::Plurals:
+    case ValueKind::AttrDecl:
+    case ValueKind::StyleableDecl:
+      return 0;
   }
+  return 0;
 }
 
 constexpr uint32_t kFloatFormats = kFormatFloat | kFormatDimension | kFormatFraction;
