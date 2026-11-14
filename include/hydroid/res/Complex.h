@@ -50,11 +50,12 @@ struct DisplayMetrics {
   float scaledDensity;  // sp → px
   float xdpi;           // pt, in, mm → px
 
-  // As ResourcesImpl derives them from Configuration. Android takes xdpi from the physical
-  // display, so it defaults to densityDpi here; set the real one if pt/in/mm matter.
+  // As ResourcesImpl derives them from Configuration, where a fontScale of 0 (unset) means 1.
+  // Android takes xdpi from the physical display, so it defaults to densityDpi here; set the
+  // real one if pt/in/mm matter.
   static DisplayMetrics forDensity(uint32_t densityDpi, float fontScale = 1.0f) {
     const float scale = static_cast<float>(densityDpi) * (1.0f / 160);  // DENSITY_DEFAULT_SCALE
-    return {scale, scale * fontScale, static_cast<float>(densityDpi)};
+    return {scale, scale * (fontScale != 0 ? fontScale : 1.0f), static_cast<float>(densityDpi)};
   }
 };
 

@@ -163,14 +163,25 @@ TEST(DisplayMetrics, ForDensity) {
   EXPECT_EQ(DisplayMetrics::forDensity(320, 1.5f).scaledDensity, 3.0f);
 }
 
+TEST(DisplayMetrics, ZeroFontScaleMeansOne) {
+  // ResourcesImpl: scaledDensity = density * (fontScale != 0 ? fontScale : 1.0f).
+  EXPECT_EQ(DisplayMetrics::forDensity(320, 0).scaledDensity, 2.0f);
+  EXPECT_EQ(DisplayMetrics::forDensity(320, -0.0f).scaledDensity, 2.0f);
+  EXPECT_EQ(complexToDimension(0xe02, DisplayMetrics::forDensity(320, 0)), 28.0f);  // 14sp
+}
+
 TEST(ComplexToDimension, Units) {
   const DisplayMetrics m = DisplayMetrics::forDensity(320, 1.5f);
   EXPECT_EQ(complexToDimension(0x100, m), 1.0f);     // 1px
   EXPECT_EQ(complexToDimension(0x1001, m), 32.0f);   // 16dp × 2
   EXPECT_EQ(complexToDimension(0xe02, m), 42.0f);    // 14sp × 3
-  EXPECT_FLOAT_EQ(complexToDimension(0x4803, m), 320.0f);  // 72pt = 1in
-  EXPECT_EQ(complexToDimension(0x104, m), 320.0f);   // 1in
-  EXPECT_FLOAT_EQ(complexToDimension(0x105, m), 320 / 25.4f);  // 1mm
+  // pt and mm in TypedValue.applyDimension's order: value * xdpi * (1.0f/72). For 5pt and 7mm
+  // at xdpi 320, value * xdpi / 72 (or / 25.4f) differs in the last bit.
+  EXPECT_EQ(complexToDimension(0x503, m), 5.0f * 320.0f * (1.0f / 72));     // 5pt
+  EXPECT_NE(complexToDimension(0x503, m), 5.0f * 320.0f / 72);
+  EXPECT_EQ(complexToDimension(0x104, m), 320.0f);                          // 1in
+  EXPECT_EQ(complexToDimension(0x705, m), 7.0f * 320.0f * (1.0f / 25.4f));  // 7mm
+  EXPECT_NE(complexToDimension(0x705, m), 7.0f * 320.0f / 25.4f);
   EXPECT_EQ(complexToDimension(0x106, m), 0.0f);     // unknown unit
 }
 
