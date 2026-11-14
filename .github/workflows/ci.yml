@@ -85,6 +85,11 @@ jobs:
         run: >
           cmake --preset debug -B build/installed -DHYDROID_RES_USE_SYSTEM_DEPS=ON
           -DCMAKE_PREFIX_PATH="$HOME/pinned" -DHYDROID_RES_REQUIRE_LOCALE_TESTS=ON
+      - name: Check that the pinned installs were found, not Ubuntu's
+        run: |
+          # Ubuntu's pugixml and nlohmann/json are the pinned versions too, so only the paths tell.
+          grep -E '^(pugixml|GTest|nlohmann_json)_DIR:' build/installed/CMakeCache.txt
+          test "$(grep -cE "^(pugixml|GTest|nlohmann_json)_DIR:PATH=$HOME/pinned/" build/installed/CMakeCache.txt)" -eq 3
       - name: Build
         run: cmake --build build/installed --parallel
       - name: Test

@@ -23,8 +23,10 @@ resolves values exactly as Android does, for UIKit, GTK4 and WinUI 3. Design and
 Needs CMake 3.24+ and a C++17 compiler. pugixml 1.14, plus GoogleTest 1.15.2 and nlohmann/json
 3.11.3 for the tests, are fetched at configure time, even when they are installed. To use
 installed packages instead, configure with `-DHYDROID_RES_USE_SYSTEM_DEPS=ON`: they must be
-exactly those versions, found through their CMake package configs (point `CMAKE_PREFIX_PATH`
-at them if needed), and on MSVC GoogleTest must be built against the shared CRT.
+exactly those versions, built with their default options (pugixml's `PUGIXML_WCHAR_MODE`, for
+one, changes its API), and found through their CMake package configs (point
+`CMAKE_PREFIX_PATH` at them if needed). On MSVC they must also be built against the shared CRT,
+in the configuration you build (Debug or Release).
 
 On Windows, Visual Studio 2026 needs a CMake that knows its generator (CMake 4.3 does); with an
 older CMake, configure with `-G Ninja` from a developer prompt.
