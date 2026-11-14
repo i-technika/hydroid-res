@@ -1,5 +1,6 @@
 #include "hydroid/res/Value.h"
 
+#include <cstring>
 #include <iomanip>
 #include <limits>
 #include <locale>
@@ -45,6 +46,12 @@ const char* formatName(ColorFormat format) {
   return "?";
 }
 
+uint32_t bitsOf(float f) {
+  uint32_t bits;
+  std::memcpy(&bits, &f, sizeof bits);
+  return bits;
+}
+
 }  // namespace
 
 bool operator==(const Value& a, const Value& b) {
@@ -65,7 +72,8 @@ bool operator==(const Value& a, const Value& b) {
     case ValueKind::Fraction:
       return a.complex == b.complex;
     case ValueKind::Float:
-      return a.f == b.f;
+      // By bits, as Res_value data holds it: -0 is not 0 (0x80000000), and a NaN equals itself.
+      return bitsOf(a.f) == bitsOf(b.f);
     case ValueKind::String:
     case ValueKind::StyledString:
     case ValueKind::File:

@@ -3,6 +3,7 @@
 
 #include <gtest/gtest.h>
 
+#include <limits>
 #include <sstream>
 #include <string>
 
@@ -59,6 +60,13 @@ TEST(ValueEquality, ReferenceAndNull) {
   EXPECT_NE(ref, other);
   EXPECT_NE(ref, attr);
   EXPECT_EQ(Value(), Value());
+}
+
+TEST(ValueEquality, FloatComparesBits) {
+  EXPECT_EQ(Value::floating(1.5f), Value::floating(1.5f));
+  EXPECT_NE(Value::floating(-0.0f), Value::floating(0.0f));
+  const Value nan = Value::floating(std::numeric_limits<float>::quiet_NaN());
+  EXPECT_EQ(nan, nan);
 }
 
 TEST(PrintValue, IsWhatGtestShows) {

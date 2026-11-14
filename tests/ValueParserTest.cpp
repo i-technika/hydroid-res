@@ -5,7 +5,6 @@
 #include <gtest/gtest.h>
 
 #include <cfloat>
-#include <cmath>
 #include <string>
 #include <string_view>
 
@@ -101,10 +100,8 @@ TEST(ParseFloatValue, NoUnitIsFloat) {
 
 TEST(ParseFloatValue, NegativeZero) {
   // aapt2 keeps the sign of a float (0x80000000) but not of a dimension or fraction.
-  const auto f = parseFloatValue("-0");
-  ASSERT_TRUE(f);
-  EXPECT_EQ(f->kind, ValueKind::Float);
-  EXPECT_TRUE(std::signbit(f->f));  // Value's == has -0 equal to 0
+  EXPECT_EQ(parseFloatValue("-0"), Value::floating(-0.0f));
+  EXPECT_NE(parseFloatValue("-0"), Value::floating(0.0f));
   EXPECT_EQ(parseFloatValue("-0dp"), Value::dimensionFromComplex(0x1));
   EXPECT_EQ(parseFloatValue("-0%"), Value::fractionFromComplex(0x0));
 }
