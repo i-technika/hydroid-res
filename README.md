@@ -21,7 +21,9 @@ resolves values exactly as Android does, for UIKit, GTK4 and WinUI 3. Design and
 ## Build and test
 
 Needs CMake 3.24+ and a C++17 compiler. pugixml, plus GoogleTest and nlohmann/json for the
-tests, are fetched at configure time.
+tests, are fetched at configure time. On Windows, Visual Studio 2026 needs a CMake that knows
+its generator (CMake 4.3 does); with an older CMake, configure with `-G Ninja` from a
+developer prompt.
 
 ```sh
 cmake --preset debug
