@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <iosfwd>
 #include <type_traits>
 
 #include "hydroid/res/ResId.h"
@@ -93,6 +94,11 @@ struct Value {
 
 bool operator==(const Value& a, const Value& b);
 inline bool operator!=(const Value& a, const Value& b) { return !(a == b); }
+
+// For logs and test failures: Dimension(16dp, 0x00001001), Color(0xff6200ee, Rgb8). Floats get
+// every digit, so values one ulp apart print differently. Declared here rather than in the tests
+// so that every file that sees Value sees it too, and gtest prints Values the same way in all.
+std::ostream& operator<<(std::ostream& os, const Value& v);
 
 const char* toString(DimUnit unit);  // "px", "dp", ...
 

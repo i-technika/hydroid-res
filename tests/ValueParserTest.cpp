@@ -9,7 +9,6 @@
 #include <string>
 #include <string_view>
 
-#include "ValuePrinter.h"
 #include "hydroid/res/Complex.h"
 #include "hydroid/res/ValueParser.h"
 
@@ -17,12 +16,6 @@ namespace hydroid::res {
 namespace {
 
 using namespace std::string_view_literals;
-
-// Also fails if some test file compares Values without ValuePrinter.h (see there).
-TEST(ValuePrinter, BoolIsTrueOrFalse) {
-  EXPECT_EQ(testing::PrintToString(Value::boolean(true)), "Bool(true)");
-  EXPECT_EQ(testing::PrintToString(Value::boolean(false)), "Bool(false)");
-}
 
 // ---- color ---------------------------------------------------------------------------------
 
@@ -177,7 +170,8 @@ TEST(ParseFloatValue, AtMost126Characters) {
   EXPECT_EQ(parseLiteral(padded, kFormatInteger), Value::integerValue(42));
   EXPECT_EQ(parseLiteral(padded, kFormatAny), Value::integerValue(42));
   EXPECT_FALSE(parseLiteral(padded, kFormatFloat));
-  EXPECT_FALSE(parseLiteral("0." + zeros + "0001", kFormatAny));  // 127
+  EXPECT_EQ(parseLiteral("0." + zeros + "001", kFormatAny), Value::floating(0));  // 126
+  EXPECT_FALSE(parseLiteral("0." + zeros + "0001", kFormatAny));                 // 127
 }
 
 // ---- integer -------------------------------------------------------------------------------
