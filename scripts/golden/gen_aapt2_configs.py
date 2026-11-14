@@ -82,6 +82,8 @@ EDGE_CASES = [
     # Minor versions, which aapt2 takes from v36 on.
     "v21.1", "v35.1", "v36.0", "v36.1", "v36.01", "v37.2", "v36.-hdpi", "v.1", "v36.1.1",
     "v36.65535", "v36.65536", "v36.x", "v36-1", "hdpi-v36.1", "anydpi-v36.2", "watch-v36.1",
+    # Once in AOSP's framework res/ (the GitHub mirror's last commit), but in no release branch.
+    "watch-v36",
     # Locales: the legacy form, BCP 47 with b+, and what each rejects.
     "eng", "e", "abcd", "en-US", "en-r419", "en-rUSA", "en-r1", "en-r12", "en-rus-rgb",
     "ca", "cat", "car", "ca-car", "en-car", "b+", "b+e", "b+english", "b+en+US", "b+en+abc",

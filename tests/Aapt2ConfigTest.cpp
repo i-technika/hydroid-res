@@ -180,7 +180,7 @@ std::vector<std::string> aospFrameworkDirs() {
 
 TEST(AospFrameworkRes, EveryFolderParses) {
   const std::vector<std::string> dirs = aospFrameworkDirs();
-  EXPECT_EQ(dirs.size(), 2826u);
+  EXPECT_EQ(dirs.size(), 2849u);
   const std::set<std::string> kTypes = {"anim",         "animator",   "color",  "drawable",
                                         "interpolator", "layout",     "menu",   "mipmap",
                                         "raw",          "transition", "values", "xml"};
@@ -191,8 +191,8 @@ TEST(AospFrameworkRes, EveryFolderParses) {
     EXPECT_TRUE(kTypes.count(d->type)) << dir;
     types[d->type]++;
   }
-  EXPECT_EQ(types["values"], 2742);
-  EXPECT_EQ(types["drawable"], 24);
+  EXPECT_EQ(types["values"], 2763);
+  EXPECT_EQ(types["drawable"], 28);
 }
 
 // A few of them as aapt2 writes them; ParsesLikeAapt2 checks all.
@@ -208,7 +208,10 @@ TEST(AospFrameworkRes, Samples) {
   EXPECT_EQ(canonical("values-fr-feminine"), "values fr-feminine-v34");
   EXPECT_EQ(canonical("layout-round-watch"), "layout round-watch-v23");
   EXPECT_EQ(canonical("mipmap-watch-anydpi"), "mipmap watch-anydpi-v21");
-  EXPECT_EQ(canonical("color-watch-v36"), "color watch-v36");
+  EXPECT_EQ(canonical("values-mcc334-mnc020-fr-rCA-feminine"),
+            "values mcc334-mnc20-fr-rCA-feminine-v34");
+  EXPECT_EQ(canonical("values-sw1500dp-110dpi"), "values sw1500dp-110dpi-v13");
+  EXPECT_EQ(canonical("drawable-w240dp"), "drawable w240dp-v13");
   EXPECT_EQ(canonical("values-en-rXC-watch"), "values en-rXC-watch-v8");
 }
 

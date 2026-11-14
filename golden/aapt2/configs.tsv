@@ -5,7 +5,6 @@ ldrtl	ldrtl
 watch	watch-v8
 car	car-v8
 night	night-v8
-watch-v36	watch-v36
 en-hdpi	en-hdpi-v4
 en-ldpi	en-ldpi-v4
 en-mdpi	en-mdpi-v4
@@ -23,6 +22,11 @@ sw600dp-mdpi	sw600dp-mdpi-v13
 sw600dp-nodpi	sw600dp-nodpi-v13
 sw600dp-xhdpi	sw600dp-xhdpi-v13
 sw720dp-nodpi	sw720dp-nodpi-v13
+w192dp	w192dp-v13
+w204dp	w204dp-v13
+w216dp	w216dp-v13
+w228dp	w228dp-v13
+w240dp	w240dp-v13
 xhdpi	xhdpi-v4
 xxhdpi	xxhdpi-v4
 xxxhdpi	xxxhdpi-v4
@@ -100,6 +104,9 @@ cs-watch	cs-watch-v8
 da-rDK	da-rDK
 da-television	da-television-v8
 da-watch	da-watch-v8
+de-feminine	de-feminine-v34
+de-masculine	de-masculine-v34
+de-neuter	de-neuter-v34
 de-rAT	de-rAT
 de-rCH	de-rCH
 de-rDE	de-rDE
@@ -129,6 +136,9 @@ en-rXC	en-rXC
 en-rXC-television	en-rXC-television-v8
 en-rXC-watch	en-rXC-watch-v8
 en-rZA	en-rZA
+es-feminine	es-feminine-v34
+es-masculine	es-masculine-v34
+es-neuter	es-neuter-v34
 es-rCO	es-rCO
 es-rCR	es-rCR
 es-rEC	es-rEC
@@ -141,6 +151,9 @@ es-rPA	es-rPA
 es-rPE	es-rPE
 es-rSV	es-rSV
 es-rUS	es-rUS
+es-rUS-feminine	es-rUS-feminine-v34
+es-rUS-masculine	es-rUS-masculine-v34
+es-rUS-neuter	es-rUS-neuter-v34
 es-rUS-television	es-rUS-television-v8
 es-rUS-watch	es-rUS-watch-v8
 es-television	es-television-v8
@@ -164,6 +177,9 @@ fr-masculine	fr-masculine-v34
 fr-neuter	fr-neuter-v34
 fr-rBE	fr-rBE
 fr-rCA	fr-rCA
+fr-rCA-feminine	fr-rCA-feminine-v34
+fr-rCA-masculine	fr-rCA-masculine-v34
+fr-rCA-neuter	fr-rCA-neuter-v34
 fr-rCA-television	fr-rCA-television-v8
 fr-rCA-watch	fr-rCA-watch-v8
 fr-rCH	fr-rCH
@@ -200,6 +216,9 @@ in-watch	in-watch-v8
 is	is
 is-television	is-television-v8
 is-watch	is-watch-v8
+it-feminine	it-feminine-v34
+it-masculine	it-masculine-v34
+it-neuter	it-neuter-v34
 it-rCH	it-rCH
 it-rIT	it-rIT
 it-television	it-television-v8
@@ -2506,6 +2525,9 @@ mcc334-mnc020-fr-feminine	mcc334-mnc20-fr-feminine-v34
 mcc334-mnc020-fr-masculine	mcc334-mnc20-fr-masculine-v34
 mcc334-mnc020-fr-neuter	mcc334-mnc20-fr-neuter-v34
 mcc334-mnc020-fr-rCA	mcc334-mnc20-fr-rCA
+mcc334-mnc020-fr-rCA-feminine	mcc334-mnc20-fr-rCA-feminine-v34
+mcc334-mnc020-fr-rCA-masculine	mcc334-mnc20-fr-rCA-masculine-v34
+mcc334-mnc020-fr-rCA-neuter	mcc334-mnc20-fr-rCA-neuter-v34
 mcc334-mnc020-gl	mcc334-mnc20-gl
 mcc334-mnc020-gu	mcc334-mnc20-gu
 mcc334-mnc020-hi	mcc334-mnc20-hi
@@ -2689,6 +2711,8 @@ sw	sw
 sw-rTZ	sw-rTZ
 sw-television	sw-television-v8
 sw-watch	sw-watch-v8
+sw1500dp-110dpi	sw1500dp-110dpi-v13
+sw1900dp-90dpi	sw1900dp-90dpi-v13
 sw360dp	sw360dp-v13
 sw372dp	sw372dp-v13
 sw600dp-land	sw600dp-land-v13
@@ -2732,7 +2756,6 @@ vi-television	vi-television-v8
 vi-watch	vi-watch-v8
 w170dp-notround-watch	w170dp-notround-watch-v23
 w180dp-notround-watch	w180dp-notround-watch-v23
-w192dp	w192dp-v13
 w192dp-round-watch	w192dp-round-watch-v23
 w195dp	w195dp-v13
 w198dp	w198dp-v13
@@ -2745,8 +2768,6 @@ w213dp	w213dp-v13
 w213dp-round-watch	w213dp-round-watch-v23
 w225dp	w225dp-v13
 w227dp	w227dp-v13
-w228dp	w228dp-v13
-w240dp	w240dp-v13
 w320dp	w320dp-v13
 w320dp-h426dp	w320dp-h426dp-v13
 w426dp-h320dp	w426dp-h320dp-v13
@@ -2916,6 +2937,7 @@ v36-1	-
 hdpi-v36.1	hdpi-v36.1
 anydpi-v36.2	anydpi-v36.2
 watch-v36.1	watch-v36.1
+watch-v36	watch-v36
 eng	eng
 e	-
 abcd	-
