@@ -289,10 +289,12 @@ TEST(PrintValue, EveryKindShowsItsData) {
 TEST(PrintValue, LeavesTheStreamAsItWas) {
   std::ostringstream os;
   os << std::hex << std::showpos;
+  os.precision(3);  // taken, Float(0.1f) would print as Float(0.1)
   const auto flags = os.flags();
-  os << Value::integer(16) << ' ' << 16;
-  EXPECT_EQ(os.str(), "Int(16) 10");
+  os << Value::integer(16) << ' ' << 16 << ' ' << Value::floating(0.1f);
+  EXPECT_EQ(os.str(), "Int(16) 10 Float(0.100000001)");
   EXPECT_EQ(os.flags(), flags);
+  EXPECT_EQ(os.precision(), 3);
 }
 
 TEST(PrintValue, IgnoresTheGlobalLocale) {
@@ -317,8 +319,10 @@ TEST(PrintValue, IgnoresTheStreamsLocale) {
   // it; IgnoresTheGlobalLocale shows it does not take the global one.
   const test::DecimalCommaLocale locale;
   HYDROID_NEED_DECIMAL_COMMA(locale);
-  std::ostringstream os;  // takes the decimal-comma locale
+  std::ostringstream os;                        // takes the decimal-comma locale
   std::locale::global(std::locale::classic());  // the guard puts the old one back
+  // The locale bites: the stream keeps the ','.
+  ASSERT_EQ(std::use_facet<std::numpunct<char>>(os.getloc()).decimal_point(), ',') << locale.name();
   const std::string comma = os.getloc().name();
   os << Value::floating(0.1f) << ' ' << 1.5f;
   EXPECT_EQ(os.str(), "Float(0.100000001) 1,5");
