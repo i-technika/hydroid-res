@@ -41,17 +41,17 @@ enum FormatBits : uint32_t {
   kFormatFlags     = 1u << 17,
 };
 
-// #RGB, #ARGB, #RRGGBB, #AARRGGBB → Color: 0xAARRGGBB plus which of the four was written
+// #RGB, #ARGB, #RRGGBB, #AARRGGBB -> Color: 0xAARRGGBB plus which of the four was written
 // (aapt2 keeps it as the Res_value type, TYPE_INT_COLOR_RGB4 ... ARGB8).
 std::optional<Value> parseColor(std::string_view s);
 
-// true/True/TRUE, false/False/FALSE → Bool.
+// true/True/TRUE, false/False/FALSE -> Bool.
 std::optional<Value> parseBool(std::string_view s);
 
-// Decimal int32 ("-12") or hex uint32 ("0x7f010000", no sign, lowercase x) → Int.
+// Decimal int32 ("-12") or hex uint32 ("0x7f010000", no sign, lowercase x) -> Int.
 std::optional<Value> parseInteger(std::string_view s);
 
-// "1.5" → Float, "16dp" → Dimension, "50%" / "50%p" → Fraction. Units are case-sensitive and
+// "1.5" -> Float, "16dp" -> Dimension, "50%" / "50%p" -> Fraction. Units are case-sensitive and
 // must follow the number directly ("16 dp" is rejected); "dip" is an alias of "dp". The number is
 // rounded to the nearest float like strtof; dimensions and fractions then keep aapt2's complex
 // encoding (see Complex.h), so "0.1dp" reads back as 0.100000024. Text longer than 126

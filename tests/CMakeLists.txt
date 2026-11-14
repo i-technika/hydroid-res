@@ -5,6 +5,7 @@ add_executable(hydroid-res-tests
   ComplexTest.cpp
   GoldenColorTest.cpp
   GoldenComplexTest.cpp
+  PublicHeaderTest.cpp
   SmokeTest.cpp
   ValueParserTest.cpp
   ValueTest.cpp)
@@ -13,6 +14,7 @@ target_link_libraries(hydroid-res-tests PRIVATE
 target_compile_definitions(hydroid-res-tests PRIVATE
   HYDROID_AAPT2_VALUES="${PROJECT_SOURCE_DIR}/golden/aapt2/values.tsv"
   HYDROID_GOLDEN_DIR="${PROJECT_SOURCE_DIR}/golden/data"
+  HYDROID_INCLUDE_DIR="${PROJECT_SOURCE_DIR}/include"
   HYDROID_TEST_RES_DIR="${PROJECT_SOURCE_DIR}/golden/app/src/main/res")
 hydroid_set_warnings(hydroid-res-tests)
 

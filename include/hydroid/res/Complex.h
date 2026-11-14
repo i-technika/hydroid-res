@@ -33,8 +33,8 @@ constexpr uint32_t kComplexUnitFractionParent = 1;  // "%p"
 
 // Encodes `value` (already scaled: "50%" is 0.5) with `unit`, bit for bit as aapt2's
 // ResTable::stringToFloat does, including its precision loss and the mantissa wrapping around
-// past ±2^23 (9000000dp reads back as -7777216). nullopt where aapt2 is undefined: non-finite
-// values and |value| ≥ 2^41.
+// past +/-2^23 (9000000dp reads back as -7777216). nullopt where aapt2 is undefined: non-finite
+// values and |value| >= 2^41.
 std::optional<uint32_t> floatToComplex(float value, uint32_t unit);
 
 // TypedValue.complexToFloat: the number without its unit.
@@ -46,9 +46,9 @@ constexpr uint32_t complexUnit(uint32_t data) {
 
 // The subset of android.util.DisplayMetrics that unit conversion reads.
 struct DisplayMetrics {
-  float density;        // dp → px
-  float scaledDensity;  // sp → px
-  float xdpi;           // pt, in, mm → px
+  float density;        // dp -> px
+  float scaledDensity;  // sp -> px
+  float xdpi;           // pt, in, mm -> px
 
   // As ResourcesImpl derives them from Configuration, where a fontScale of 0 (unset) means 1.
   // Android takes xdpi from the physical display, so it defaults to densityDpi here; set the
