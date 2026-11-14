@@ -1,5 +1,7 @@
 #include "hydroid/res/Value.h"
 
+#include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <iomanip>
 #include <limits>
@@ -54,37 +56,35 @@ uint32_t bitsOf(float f) {
 
 }  // namespace
 
+void Value::kindMismatch([[maybe_unused]] const char* what) {
+#ifndef NDEBUG
+  std::fprintf(stderr, "hydroid::res::Value: %s\n", what);
+  std::abort();
+#endif
+}
+
 bool operator==(const Value& a, const Value& b) {
-  if (a.kind != b.kind) return false;
-  switch (a.kind) {
-    case ValueKind::Null:
+  if (a.kind() != b.kind()) return false;
+  switch (Value::payloadOf(a.kind())) {
+    case Value::Payload::None:
       return true;
-    case ValueKind::Reference:
-    case ValueKind::AttrRef:
-      return a.ref == b.ref;
-    case ValueKind::Color:
-      return a.color.argb == b.color.argb && a.color.format == b.color.format;
-    case ValueKind::Int:
-      return a.integer.v == b.integer.v && a.integer.hex == b.integer.hex;
-    case ValueKind::Bool:
-      return a.b == b.b;
-    case ValueKind::Dimension:
-    case ValueKind::Fraction:
-      return a.complex == b.complex;
-    case ValueKind::Float:
+    case Value::Payload::Ref:
+      return a.ref() == b.ref();
+    case Value::Payload::Color:
+      return a.argb() == b.argb() && a.colorFormat() == b.colorFormat();
+    case Value::Payload::Int:
+      return a.intValue() == b.intValue() && a.intFormat() == b.intFormat();
+    case Value::Payload::Bool:
+      return a.boolValue() == b.boolValue();
+    case Value::Payload::Complex:
+      return a.complexData() == b.complexData();
+    case Value::Payload::Float:
       // By bits, as Res_value data holds it: -0 is not 0 (0x80000000), and a NaN equals itself.
-      return bitsOf(a.f) == bitsOf(b.f);
-    case ValueKind::String:
-    case ValueKind::StyledString:
-    case ValueKind::File:
-    case ValueKind::Style:
-    case ValueKind::Array:
-    case ValueKind::Plurals:
-    case ValueKind::AttrDecl:
-    case ValueKind::StyleableDecl:
-      return a.index == b.index;
+      return bitsOf(a.floatValue()) == bitsOf(b.floatValue());
+    case Value::Payload::Index:
+      return a.index() == b.index();
   }
-  return false;
+  return false;  // unreachable: payloadOf returns one of the above
 }
 
 std::ostream& operator<<(std::ostream& os, const Value& v) {
@@ -97,46 +97,40 @@ std::ostream& operator<<(std::ostream& os, const Value& v) {
     out << "0x" << std::hex << std::setw(8) << std::setfill('0') << x << std::dec;
   };
 
-  out << kindName(v.kind) << '(';
-  switch (v.kind) {
-    case ValueKind::Null:
+  out << kindName(v.kind()) << '(';
+  switch (Value::payloadOf(v.kind())) {
+    case Value::Payload::None:
       break;
-    case ValueKind::Reference:
-    case ValueKind::AttrRef:
-      hex(v.ref);
+    case Value::Payload::Ref:
+      hex(v.ref());
       break;
-    case ValueKind::Color:
-      hex(v.color.argb);
-      out << ", " << formatName(v.color.format);
+    case Value::Payload::Color:
+      hex(v.argb());
+      out << ", " << formatName(v.colorFormat());
       break;
-    case ValueKind::Int:
-      out << v.integer.v << (v.integer.hex ? ", hex" : "");
+    case Value::Payload::Int:
+      out << v.intValue() << (v.intFormat() == IntFormat::Hex ? ", hex" : "");
       break;
-    case ValueKind::Bool:
-      out << (v.b ? "true" : "false");
+    case Value::Payload::Bool:
+      out << (v.boolValue() ? "true" : "false");
       break;
-    case ValueKind::Dimension:
-      out << complexToFloat(v.complex) << toString(static_cast<DimUnit>(complexUnit(v.complex)))
-          << ", ";
-      hex(v.complex);
+    case Value::Payload::Complex: {
+      const uint32_t data = v.complexData();
+      out << complexToFloat(data);
+      if (v.kind() == ValueKind::Dimension) {
+        out << toString(static_cast<DimUnit>(complexUnit(data)));
+      } else if (complexUnit(data) == kComplexUnitFractionParent) {
+        out << ", parent";
+      }
+      out << ", ";
+      hex(data);
       break;
-    case ValueKind::Fraction:
-      out << complexToFloat(v.complex)
-          << (complexUnit(v.complex) == kComplexUnitFractionParent ? ", parent" : "") << ", ";
-      hex(v.complex);
+    }
+    case Value::Payload::Float:
+      out << v.floatValue();
       break;
-    case ValueKind::Float:
-      out << v.f;
-      break;
-    case ValueKind::String:
-    case ValueKind::StyledString:
-    case ValueKind::File:
-    case ValueKind::Style:
-    case ValueKind::Array:
-    case ValueKind::Plurals:
-    case ValueKind::AttrDecl:
-    case ValueKind::StyleableDecl:
-      out << "index " << v.index;
+    case Value::Payload::Index:
+      out << "index " << v.index();
       break;
   }
   out << ')';
