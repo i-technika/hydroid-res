@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Dimensions and fractions that exercise the complex encoding (issue #3): every radix, precision
+     loss, mantissa wrap-around, negatives, and every unit, so the dump pins both aapt2's packing
+     and TypedValue's unpacking. -->
+<resources>
+    <dimen name="complex_tenth">0.1dp</dimen>             <!-- radix 0p23, rounds up -->
+    <dimen name="complex_negative">-1.5dp</dimen>         <!-- radix 8p15 -->
+    <dimen name="complex_mixed">1234.5678dp</dimen>       <!-- radix 16p7, loses 0.0053 -->
+    <dimen name="complex_fraction_dropped">300000.5dp</dimen>  <!-- radix 23p0 -->
+    <dimen name="complex_wrap">9000000dp</dimen>          <!-- mantissa wraps to -7777216 -->
+    <dimen name="complex_px">0.5px</dimen>
+    <dimen name="complex_sp">13.7sp</dimen>
+    <dimen name="complex_pt">12.5pt</dimen>
+    <dimen name="complex_in">0.3in</dimen>
+    <dimen name="complex_mm">1.7mm</dimen>
+
+    <fraction name="complex_percent">30%</fraction>       <!-- 0.3 scaled in float -->
+    <fraction name="complex_percent_parent">18%p</fraction>
+    <fraction name="complex_percent_negative">-12.5%</fraction>
+    <fraction name="complex_percent_large">250%p</fraction>
+</resources>
