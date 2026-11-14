@@ -3,8 +3,8 @@
 #include <gtest/gtest.h>
 #include <pugixml.hpp>
 
-#include <cstring>
 #include <filesystem>
+#include <string>
 
 #include "hydroid/res/ResId.h"
 #include "hydroid/res/Version.h"
@@ -13,8 +13,20 @@
 namespace hydroid::res {
 namespace {
 
+// The headers, and the library built from them, carry the version project() gives (#13).
+TEST(Smoke, VersionMatchesProject) {
+  EXPECT_STREQ(HYDROID_RES_VERSION, HYDROID_PROJECT_VERSION);
+  EXPECT_EQ(std::to_string(HYDROID_RES_VERSION_MAJOR) + "." +
+                std::to_string(HYDROID_RES_VERSION_MINOR) + "." +
+                std::to_string(HYDROID_RES_VERSION_PATCH),
+            HYDROID_RES_VERSION);
+}
+
+// In one build the library, through either API, is the version of its headers. (A consumer of
+// a shared library needs only a compatible one: README.md says when it is.)
 TEST(Smoke, VersionMatchesCApi) {
-  EXPECT_STREQ(version(), hydroid_res_version());
+  EXPECT_STREQ(version(), HYDROID_RES_VERSION);
+  EXPECT_STREQ(hydroid_res_version(), HYDROID_RES_VERSION);
 }
 
 TEST(Smoke, ResIdLayout) {

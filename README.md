@@ -20,12 +20,48 @@ resolves values exactly as Android does, for UIKit, GTK4 and WinUI 3. Design and
 
 ## Build and test
 
-Needs CMake 3.21+ and a C++17 compiler. pugixml and GoogleTest are fetched at configure time.
+Needs CMake 3.24+ and a C++17 compiler. pugixml 1.14, plus GoogleTest 1.15.2 and nlohmann/json
+3.11.3 for the tests, are fetched at configure time, even when they are installed. To use
+installed packages instead, configure with `-DHYDROID_RES_USE_SYSTEM_DEPS=ON`: they must be
+exactly those versions, built with their default options (pugixml's `PUGIXML_WCHAR_MODE`, for
+one, changes its API), and found through their CMake package configs (point
+`CMAKE_PREFIX_PATH` at them if needed). On MSVC they must also be built against the shared CRT,
+in the configuration you build (Debug or Release).
+
+hydroid-res is a static library unless `BUILD_SHARED_LIBS` is on. A shared build exports only the
+public API, links the fetched pugixml statically without exporting it, and, as the top-level
+project, puts its DLL next to the executables in `build/<preset>/bin` (`bin/<config>` with a
+multi-config generator such as Visual Studio). A project that uses the shared library without
+CMake must define `HYDROID_RES_SHARED` when it includes the headers.
+
+The version is `project()` in `CMakeLists.txt` and nowhere else. CMake generates
+`hydroid/res/VersionNumber.h` from it into `build/<preset>/include`, which a project that uses
+the headers without CMake must also put on its include path. Its `HYDROID_RES_VERSION` is the
+version of the headers, and `hydroid_res_version()` that of the library. The shared library's
+ABI version (its soname on Linux) is `major.minor` until 1.0, as a 0.x minor release may break
+the ABI, and the major alone after. A library is compatible with the headers when its ABI
+version is the same and, from 1.0, its minor is no older; the patch may differ either way. On
+Windows the DLL name carries no version, so a consumer of the shared library should check this
+when it starts.
+
+On Windows, Visual Studio 2026 needs a CMake that knows its generator (CMake 4.3 does); with an
+older CMake, configure with `-G Ninja` from a developer prompt.
 
 ```sh
 cmake --preset debug
 cmake --build --preset debug
 ctest --preset debug
+```
+
+With GCC or Clang, the `sanitize` preset does the same under AddressSanitizer and
+UndefinedBehaviorSanitizer, and stops at the first error; CI runs it with Clang on Linux. It is
+not offered on Windows, where MSVC would ignore its flags.
+
+The C++ sources follow `.clang-format`, as clang-format 23.1.5 applies it (`pipx install
+clang-format==23.1.5`); CI fails on any other formatting. To reformat:
+
+```sh
+git ls-files -z -- '*.h' '*.cpp' | xargs -0 clang-format -i
 ```
 
 ## Golden data

@@ -15,12 +15,232 @@ jobs:
         os: [ubuntu-24.04, macos-15, windows-2022]
     steps:
       - uses: actions/checkout@v5
+      - name: Name the dependency cache after the runner image and CMake
+        id: deps
+        shell: bash
+        run: echo "key=deps-${ImageOS:?}-${{ github.job }}-$(cmake --version | awk 'NR == 1 { print $3 }')" >> "$GITHUB_OUTPUT"
+      - name: Cache the fetched dependencies
+        uses: actions/cache@v6
+        with:
+          # The sources, and the sub-builds whose stamps tell FetchContent they are already there.
+          # A sub-build belongs to the generator and CMake that made it, hence the image and CMake in
+          # the key: restored under another generator, it stops the configure.
+          path: |
+            build/debug/_deps/*-src
+            build/debug/_deps/*-subbuild
+          key: ${{ steps.deps.outputs.key }}-${{ hashFiles('cmake/Dependencies.cmake') }}
+      - name: Install a decimal-comma locale
+        if: runner.os == 'Linux'
+        run: sudo locale-gen de_DE.UTF-8
       - name: Configure
-        run: cmake --preset debug
+        run: cmake --preset debug -DHYDROID_RES_REQUIRE_LOCALE_TESTS=ON
       - name: Build
         run: cmake --build --preset debug --parallel
       - name: Test
         run: ctest --preset debug
+
+  shared:
+    name: core (${{ matrix.os }}, shared)
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15, windows-2022]
+    steps:
+      - uses: actions/checkout@v5
+      - name: Name the dependency cache after the runner image and CMake
+        id: deps
+        shell: bash
+        run: echo "key=deps-${ImageOS:?}-${{ github.job }}-$(cmake --version | awk 'NR == 1 { print $3 }')" >> "$GITHUB_OUTPUT"
+      - name: Cache the fetched dependencies
+        uses: actions/cache@v6
+        with:
+          # The sources, and the sub-builds whose stamps tell FetchContent they are already there.
+          # A sub-build belongs to the generator and CMake that made it, hence the image and CMake in
+          # the key: restored under another generator, it stops the configure.
+          path: |
+            build/debug/_deps/*-src
+            build/debug/_deps/*-subbuild
+          key: ${{ steps.deps.outputs.key }}-${{ hashFiles('cmake/Dependencies.cmake') }}
+      - name: Install a decimal-comma locale
+        if: runner.os == 'Linux'
+        run: sudo locale-gen de_DE.UTF-8
+      - name: Configure
+        run: cmake --preset debug -DBUILD_SHARED_LIBS=ON -DHYDROID_RES_REQUIRE_LOCALE_TESTS=ON
+      - name: Build
+        run: cmake --build --preset debug --parallel
+      - name: Test
+        run: ctest --preset debug
+      - name: Check that the pugixml inside is not exported
+        if: runner.os != 'Windows'
+        run: |
+          if [ "$RUNNER_OS" = Linux ]; then
+            nm -D --defined-only build/debug/src/libhydroid-res.so > exports.txt
+          else
+            nm -gU build/debug/src/libhydroid-res.dylib > exports.txt
+          fi
+          # With nothing exported, the pugixml check below would pass vacuously.
+          grep -q hydroid_res_version exports.txt
+          if grep -i pugi exports.txt; then exit 1; fi
+      - name: Check that the library names its ABI version
+        if: runner.os != 'Windows'
+        run: |
+          # CMake.LibraryVersion checks the SOVERSION; this checks it reached the file.
+          if [ "$RUNNER_OS" = Linux ]; then
+            objdump -p build/debug/src/libhydroid-res.so | grep -E 'SONAME +libhydroid-res\.so\.[0-9]'
+          else
+            otool -D build/debug/src/libhydroid-res.dylib | grep -E 'libhydroid-res\.[0-9.]+\.dylib$'
+          fi
+
+  oldest-cmake:
+    name: core (CMake 3.24)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install CMake 3.24.0, the oldest README and CMakeLists.txt allow
+        run: |
+          pipx install cmake==3.24.0
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Check the CMake version
+        run: cmake --version | grep -qx 'cmake version 3.24.0'
+      - name: Name the dependency cache after the runner image and CMake
+        id: deps
+        shell: bash
+        run: echo "key=deps-${ImageOS:?}-${{ github.job }}-$(cmake --version | awk 'NR == 1 { print $3 }')" >> "$GITHUB_OUTPUT"
+      - name: Cache the fetched dependencies
+        uses: actions/cache@v6
+        with:
+          # The sources, and the sub-builds whose stamps tell FetchContent they are already there.
+          # A sub-build belongs to the generator and CMake that made it, hence the image and CMake in
+          # the key: restored under another generator, it stops the configure.
+          path: |
+            build/debug/_deps/*-src
+            build/debug/_deps/*-subbuild
+          key: ${{ steps.deps.outputs.key }}-${{ hashFiles('cmake/Dependencies.cmake') }}
+      - name: Install a decimal-comma locale
+        run: sudo locale-gen de_DE.UTF-8
+      - name: Configure
+        run: cmake --preset debug -DHYDROID_RES_REQUIRE_LOCALE_TESTS=ON
+      - name: Build
+        run: cmake --build --preset debug --parallel
+      - name: Test
+        run: ctest --preset debug
+
+  installed-deps:
+    name: core (installed dependencies)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Name the dependency cache after the runner image and CMake
+        id: deps
+        shell: bash
+        run: echo "key=deps-${ImageOS:?}-${{ github.job }}-$(cmake --version | awk 'NR == 1 { print $3 }')" >> "$GITHUB_OUTPUT"
+      - name: Cache the fetched dependencies
+        uses: actions/cache@v6
+        with:
+          # The sources, and the sub-builds whose stamps tell FetchContent they are already there.
+          # A sub-build belongs to the generator and CMake that made it, hence the image and CMake in
+          # the key: restored under another generator, it stops the configure.
+          path: |
+            build/debug/_deps/*-src
+            build/debug/_deps/*-subbuild
+          key: ${{ steps.deps.outputs.key }}-${{ hashFiles('cmake/Dependencies.cmake') }}
+      - name: Install Ubuntu's pugixml, GoogleTest and nlohmann/json, which the default build must ignore
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libpugixml-dev libgtest-dev nlohmann-json3-dev
+      - name: Install a decimal-comma locale
+        run: sudo locale-gen de_DE.UTF-8
+      - name: Configure, fetching the dependencies
+        run: cmake --preset debug -DHYDROID_RES_REQUIRE_LOCALE_TESTS=ON
+      - name: Build
+        run: cmake --build --preset debug --parallel
+      - name: Test
+        run: ctest --preset debug
+      - name: Refuse Ubuntu's GoogleTest, which is not the pinned version
+        run: |
+          if cmake --preset debug -B build/mismatch -DHYDROID_RES_USE_SYSTEM_DEPS=ON > mismatch.log 2>&1; then
+            cat mismatch.log; exit 1
+          fi
+          cat mismatch.log
+          # CMake wraps the message, so its two halves are on separate lines.
+          grep -q 'package "GTest" that exactly' mismatch.log
+          grep -q 'matches requested version "1.15.2"' mismatch.log
+      - name: Install the pinned versions from the fetched sources
+        run: |
+          deps=build/debug/_deps
+          cmake -S $deps/pugixml-src -B build/pinned/pugixml -DCMAKE_INSTALL_PREFIX="$HOME/pinned"
+          cmake -S $deps/googletest-src -B build/pinned/googletest -DCMAKE_INSTALL_PREFIX="$HOME/pinned" -DBUILD_GMOCK=OFF
+          cmake -S $deps/nlohmann_json-src -B build/pinned/nlohmann_json -DCMAKE_INSTALL_PREFIX="$HOME/pinned" -DJSON_BuildTests=OFF
+          for dep in pugixml googletest nlohmann_json; do
+            cmake --build build/pinned/$dep --parallel
+            cmake --install build/pinned/$dep
+          done
+      - name: Configure with HYDROID_RES_USE_SYSTEM_DEPS=ON
+        run: >
+          cmake --preset debug -B build/installed -DHYDROID_RES_USE_SYSTEM_DEPS=ON
+          -DCMAKE_PREFIX_PATH="$HOME/pinned" -DHYDROID_RES_REQUIRE_LOCALE_TESTS=ON
+      - name: Check that the pinned installs were found, not Ubuntu's
+        run: |
+          # Ubuntu's pugixml and nlohmann/json are the pinned versions too, so only the paths tell.
+          grep -E '^(pugixml|GTest|nlohmann_json)_DIR:' build/installed/CMakeCache.txt
+          test "$(grep -cE "^(pugixml|GTest|nlohmann_json)_DIR:PATH=$HOME/pinned/" build/installed/CMakeCache.txt)" -eq 3
+      - name: Build
+        run: cmake --build build/installed --parallel
+      - name: Test
+        run: ctest --test-dir build/installed --output-on-failure
+
+  sanitize:
+    name: core (Clang, ASan and UBSan)
+    runs-on: ubuntu-24.04
+    env:
+      CC: clang
+      CXX: clang++
+    steps:
+      - uses: actions/checkout@v5
+      - name: Name the dependency cache after the runner image and CMake
+        id: deps
+        shell: bash
+        run: echo "key=deps-${ImageOS:?}-${{ github.job }}-$(cmake --version | awk 'NR == 1 { print $3 }')" >> "$GITHUB_OUTPUT"
+      - name: Cache the fetched dependencies
+        uses: actions/cache@v6
+        with:
+          # The sources, and the sub-builds whose stamps tell FetchContent they are already there.
+          # A sub-build belongs to the generator and CMake that made it, hence the image and CMake in
+          # the key: restored under another generator, it stops the configure.
+          path: |
+            build/sanitize/_deps/*-src
+            build/sanitize/_deps/*-subbuild
+          key: ${{ steps.deps.outputs.key }}-${{ hashFiles('cmake/Dependencies.cmake') }}
+      - name: Install a decimal-comma locale
+        run: sudo locale-gen de_DE.UTF-8
+      - name: Configure
+        run: cmake --preset sanitize -DHYDROID_RES_REQUIRE_LOCALE_TESTS=ON
+      - name: Build
+        run: cmake --build --preset sanitize --parallel
+      - name: Check that the tests are built by Clang with both sanitizers
+        run: |
+          # Flags that never reached the build would let the tests below pass vacuously.
+          grep -E '^CMAKE_CXX_COMPILER:FILEPATH=.*clang\+\+' build/sanitize/CMakeCache.txt
+          nm build/sanitize/bin/hydroid-res-tests > symbols.txt
+          grep -q __asan_init symbols.txt
+          grep -q __ubsan_handle symbols.txt
+      - name: Test
+        run: ctest --preset sanitize
+
+  format:
+    name: clang-format
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install clang-format 23.1.5, the version the code is formatted with
+        run: |
+          pipx install clang-format==23.1.5
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Check the clang-format version
+        run: clang-format --version | grep -q 'clang-format version 23\.1\.5$'
+      - name: Check the formatting
+        run: git ls-files -z -- '*.h' '*.cpp' | xargs -0 clang-format --dry-run --Werror
 
   golden-app:
     name: golden app builds
