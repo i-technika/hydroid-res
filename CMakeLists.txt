@@ -13,6 +13,8 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 option(HYDROID_RES_BUILD_TESTS "Build hydroid-res unit and golden tests" ${PROJECT_IS_TOP_LEVEL})
 option(HYDROID_RES_BUILD_TOOLS "Build the hydroid-rc resource compiler" ${PROJECT_IS_TOP_LEVEL})
 option(HYDROID_RES_WARNINGS_AS_ERRORS "Treat compiler warnings as errors" OFF)
+option(HYDROID_RES_REQUIRE_LOCALE_TESTS
+  "Fail, rather than skip, tests that need a decimal-comma locale where none is installed" OFF)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 include(CompilerWarnings)

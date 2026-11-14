@@ -19,7 +19,7 @@ jobs:
         if: runner.os == 'Linux'
         run: sudo locale-gen de_DE.UTF-8
       - name: Configure
-        run: cmake --preset debug
+        run: cmake --preset debug -DHYDROID_RES_REQUIRE_LOCALE_TESTS=ON
       - name: Build
         run: cmake --build --preset debug --parallel
       - name: Test

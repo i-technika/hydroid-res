@@ -16,6 +16,9 @@ target_compile_definitions(hydroid-res-tests PRIVATE
   HYDROID_GOLDEN_DIR="${PROJECT_SOURCE_DIR}/golden/data"
   HYDROID_INCLUDE_DIR="${PROJECT_SOURCE_DIR}/include"
   HYDROID_TEST_RES_DIR="${PROJECT_SOURCE_DIR}/golden/app/src/main/res")
+if(HYDROID_RES_REQUIRE_LOCALE_TESTS)
+  target_compile_definitions(hydroid-res-tests PRIVATE HYDROID_REQUIRE_LOCALE_TESTS)
+endif()
 hydroid_set_warnings(hydroid-res-tests)
 
 gtest_discover_tests(hydroid-res-tests DISCOVERY_MODE PRE_TEST)

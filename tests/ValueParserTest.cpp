@@ -173,10 +173,17 @@ class DecimalCommaLocale {
 };
 
 TEST(ParseFloatValue, IgnoresDecimalCommaLocale) {
-  // aapt2's decimal point is '.' whatever the locale; "1,5dp" in Rejects fails at the ',' in any
-  // locale, so it does not show this.
+  // hydroid reads '.' as aapt2 does in the C locale, whatever locale the host app sets; "1,5dp"
+  // in Rejects fails at the ',' in any locale, so it does not show this.
   const DecimalCommaLocale locale;
-  if (!locale.name()) GTEST_SKIP() << "no locale with a decimal comma is installed";
+  if (!locale.name()) {
+    // CI turns the skip into a failure, so that losing the locale does not pass unseen.
+#ifdef HYDROID_REQUIRE_LOCALE_TESTS
+    FAIL() << "no locale with a decimal comma is installed";
+#else
+    GTEST_SKIP() << "no locale with a decimal comma is installed";
+#endif
+  }
   // The locale bites: strtof stops at the '.' and reads the ','.
   ASSERT_EQ(std::strtof("1.5", nullptr), 1.0f) << locale.name();
   ASSERT_EQ(std::strtof("1,5", nullptr), 1.5f) << locale.name();
@@ -188,6 +195,9 @@ TEST(ParseFloatValue, IgnoresDecimalCommaLocale) {
   EXPECT_EQ(parseFloatValue("1234.5678dp"), Value::dimensionFromComplex(0x02694811));
   EXPECT_EQ(parseFloatValue("1.0000000596046447753906251"), Value::floating(1.00000012f));
   EXPECT_EQ(parseLiteral("1.5", kFormatAny), Value::floating(1.5f));
+  // Past 2^24, so parseLiteral reads it again as a double (closeToDouble). A strtod there would
+  // stop at the '.', read 16777217 and reject the float 16777218 as 1 away.
+  EXPECT_EQ(parseLiteral("16777217.5", kFormatAny), Value::floating(16777218.0f));
   for (const char* s : {"1,5", "1,5dp", "1,5%", "0,5"}) {
     EXPECT_FALSE(parseFloatValue(s)) << '"' << s << '"';
     EXPECT_FALSE(parseLiteral(s, kFormatFloat)) << '"' << s << '"';
