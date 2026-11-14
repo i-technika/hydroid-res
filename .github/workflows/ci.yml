@@ -45,6 +45,56 @@ jobs:
       - name: Test
         run: ctest --preset debug
 
+  installed-deps:
+    name: core (installed dependencies)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install Ubuntu's pugixml, GoogleTest and nlohmann/json, which the default build must ignore
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libpugixml-dev libgtest-dev nlohmann-json3-dev
+      - name: Install a decimal-comma locale
+        run: sudo locale-gen de_DE.UTF-8
+      - name: Configure, fetching the dependencies
+        run: cmake --preset debug -DHYDROID_RES_REQUIRE_LOCALE_TESTS=ON
+      - name: Build
+        run: cmake --build --preset debug --parallel
+      - name: Test
+        run: ctest --preset debug
+      - name: Refuse Ubuntu's GoogleTest, which is not the pinned version
+        run: |
+          if cmake --preset debug -B build/mismatch -DHYDROID_RES_USE_SYSTEM_DEPS=ON > mismatch.log 2>&1; then
+            cat mismatch.log; exit 1
+          fi
+          cat mismatch.log
+          # CMake wraps the message, so its two halves are on separate lines.
+          grep -q 'package "GTest" that exactly' mismatch.log
+          grep -q 'matches requested version "1.15.2"' mismatch.log
+      - name: Install the pinned versions from the fetched sources
+        run: |
+          deps=build/debug/_deps
+          cmake -S $deps/pugixml-src -B build/pinned/pugixml -DCMAKE_INSTALL_PREFIX="$HOME/pinned"
+          cmake -S $deps/googletest-src -B build/pinned/googletest -DCMAKE_INSTALL_PREFIX="$HOME/pinned" -DBUILD_GMOCK=OFF
+          cmake -S $deps/nlohmann_json-src -B build/pinned/nlohmann_json -DCMAKE_INSTALL_PREFIX="$HOME/pinned" -DJSON_BuildTests=OFF
+          for dep in pugixml googletest nlohmann_json; do
+            cmake --build build/pinned/$dep --parallel
+            cmake --install build/pinned/$dep
+          done
+      - name: Configure with HYDROID_RES_USE_SYSTEM_DEPS=ON
+        run: >
+          cmake --preset debug -B build/installed -DHYDROID_RES_USE_SYSTEM_DEPS=ON
+          -DCMAKE_PREFIX_PATH="$HOME/pinned" -DHYDROID_RES_REQUIRE_LOCALE_TESTS=ON
+      - name: Check that the pinned installs were found, not Ubuntu's
+        run: |
+          # Ubuntu's pugixml and nlohmann/json are the pinned versions too, so only the paths tell.
+          grep -E '^(pugixml|GTest|nlohmann_json)_DIR:' build/installed/CMakeCache.txt
+          test "$(grep -cE "^(pugixml|GTest|nlohmann_json)_DIR:PATH=$HOME/pinned/" build/installed/CMakeCache.txt)" -eq 3
+      - name: Build
+        run: cmake --build build/installed --parallel
+      - name: Test
+        run: ctest --test-dir build/installed --output-on-failure
+
   golden-app:
     name: golden app builds
     runs-on: ubuntu-24.04

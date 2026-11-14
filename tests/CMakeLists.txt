@@ -29,3 +29,17 @@ add_test(NAME CMake.PugixmlStaysPrivate
     "-DCONSUMER_INCLUDES=$<JOIN:$<TARGET_PROPERTY:hydroid-res,INTERFACE_INCLUDE_DIRECTORIES>,|>"
     "-DPUGIXML_INCLUDES=$<JOIN:$<TARGET_PROPERTY:pugixml::pugixml,INTERFACE_INCLUDE_DIRECTORIES>,|>"
     -P ${CMAKE_CURRENT_SOURCE_DIR}/CheckPrivateDeps.cmake)
+
+# The dependencies come from where HYDROID_RES_USE_SYSTEM_DEPS says, never silently from the
+# system (#11).
+set(dependency_sources "")
+foreach(dep IN ITEMS pugixml::pugixml GTest::gtest_main nlohmann_json::nlohmann_json)
+  get_target_property(imported ${dep} IMPORTED)
+  list(APPEND dependency_sources "${dep}=${imported}")
+endforeach()
+string(JOIN "|" dependency_sources ${dependency_sources})
+add_test(NAME CMake.DependenciesFollowOption
+  COMMAND ${CMAKE_COMMAND}
+    -DUSE_SYSTEM_DEPS=${HYDROID_RES_USE_SYSTEM_DEPS}
+    "-DDEPENDENCIES=${dependency_sources}"
+    -P ${CMAKE_CURRENT_SOURCE_DIR}/CheckDependencySource.cmake)
