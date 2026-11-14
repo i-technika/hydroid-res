@@ -6,6 +6,7 @@
 
 #include <cstring>
 #include <limits>
+#include <locale>
 #include <optional>
 #include <sstream>
 #include <string>
@@ -13,6 +14,7 @@
 #include <utility>
 #include <vector>
 
+#include "DecimalCommaLocale.h"
 #include "hydroid/res/Complex.h"
 #include "hydroid/res/ValueParser.h"
 
@@ -291,6 +293,36 @@ TEST(PrintValue, LeavesTheStreamAsItWas) {
   os << Value::integer(16) << ' ' << 16;
   EXPECT_EQ(os.str(), "Int(16) 10");
   EXPECT_EQ(os.flags(), flags);
+}
+
+TEST(PrintValue, IgnoresTheGlobalLocale) {
+  // The global locale is what a default-constructed stream takes, gtest's own included.
+  const test::DecimalCommaLocale locale;
+  HYDROID_NEED_DECIMAL_COMMA(locale);
+  // The locale bites: a plain stream writes a ','.
+  std::ostringstream plain;
+  plain << 0.5f;
+  ASSERT_EQ(plain.str(), "0,5") << locale.name();
+
+  EXPECT_EQ(print(Value::floating(0.1f)), "Float(0.100000001)");
+  EXPECT_EQ(print(Value::floating(16777216)), "Float(16777216)");
+  EXPECT_EQ(print(*parseFloatValue("0.1dp")), "Dimension(0.100000024dp, 0x0ccccd31)");
+  EXPECT_EQ(print(*parseFloatValue("50%p")), "Fraction(0.5, parent, 0x40000031)");
+  EXPECT_EQ(print(Value::integer(1234567)), "Int(1234567)");
+  EXPECT_EQ(testing::PrintToString(Value::floating(1.5f)), "Float(1.5)");
+}
+
+TEST(PrintValue, IgnoresTheStreamsLocale) {
+  // Only the caller's stream has the decimal comma, so this shows operator<< does not format on
+  // it; IgnoresTheGlobalLocale shows it does not take the global one.
+  const test::DecimalCommaLocale locale;
+  HYDROID_NEED_DECIMAL_COMMA(locale);
+  std::ostringstream os;  // takes the decimal-comma locale
+  std::locale::global(std::locale::classic());  // the guard puts the old one back
+  const std::string comma = os.getloc().name();
+  os << Value::floating(0.1f) << ' ' << 1.5f;
+  EXPECT_EQ(os.str(), "Float(0.100000001) 1,5");
+  EXPECT_EQ(os.getloc().name(), comma);
 }
 
 }  // namespace
