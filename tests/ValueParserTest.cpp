@@ -5,13 +5,11 @@
 #include <gtest/gtest.h>
 
 #include <cfloat>
-#include <clocale>
 #include <cstdlib>
-#include <locale>
-#include <stdexcept>
 #include <string>
 #include <string_view>
 
+#include "DecimalCommaLocale.h"
 #include "hydroid/res/Complex.h"
 #include "hydroid/res/ValueParser.h"
 
@@ -131,59 +129,11 @@ TEST(ParseFloatValue, Rejects) {
   }
 }
 
-// Sets a locale whose decimal point is a comma, as a host app may, for both C (strtof, printf)
-// and C++ (default-constructed streams), and puts both back when it goes.
-class DecimalCommaLocale {
- public:
-  DecimalCommaLocale() {
-    // Spelled as glibc, macOS and the Windows CRT name them.
-    for (const char* name :
-         {"de_DE.UTF-8", "de_DE.utf8", "de_DE", "de-DE", "fr_FR.UTF-8", "fr_FR", "fr-FR"}) {
-      if (!std::setlocale(LC_ALL, name)) continue;
-      try {
-        std::locale::global(std::locale(name));
-      } catch (const std::runtime_error&) {
-        restore();
-        continue;
-      }
-      if (*std::localeconv()->decimal_point == ',' &&
-          std::use_facet<std::numpunct<char>>(std::locale()).decimal_point() == ',') {
-        name_ = name;
-        return;
-      }
-      restore();
-    }
-  }
-  ~DecimalCommaLocale() { restore(); }
-  DecimalCommaLocale(const DecimalCommaLocale&) = delete;
-  DecimalCommaLocale& operator=(const DecimalCommaLocale&) = delete;
-
-  // nullptr if no such locale is installed.
-  const char* name() const { return name_; }
-
- private:
-  void restore() {
-    std::locale::global(oldCpp_);
-    std::setlocale(LC_ALL, oldC_.c_str());
-  }
-
-  std::locale oldCpp_;  // default-constructed: a copy of the global locale
-  std::string oldC_ = std::setlocale(LC_ALL, nullptr);
-  const char* name_ = nullptr;
-};
-
 TEST(ParseFloatValue, IgnoresDecimalCommaLocale) {
   // hydroid reads '.' as aapt2 does in the C locale, whatever locale the host app sets; "1,5dp"
   // in Rejects fails at the ',' in any locale, so it does not show this.
-  const DecimalCommaLocale locale;
-  if (!locale.name()) {
-    // CI turns the skip into a failure, so that losing the locale does not pass unseen.
-#ifdef HYDROID_REQUIRE_LOCALE_TESTS
-    FAIL() << "no locale with a decimal comma is installed";
-#else
-    GTEST_SKIP() << "no locale with a decimal comma is installed";
-#endif
-  }
+  const test::DecimalCommaLocale locale;
+  HYDROID_NEED_DECIMAL_COMMA(locale);
   // The locale bites: strtof stops at the '.' and reads the ','.
   ASSERT_EQ(std::strtof("1.5", nullptr), 1.0f) << locale.name();
   ASSERT_EQ(std::strtof("1,5", nullptr), 1.5f) << locale.name();
