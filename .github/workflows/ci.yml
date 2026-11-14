@@ -25,6 +25,26 @@ jobs:
       - name: Test
         run: ctest --preset debug
 
+  oldest-cmake:
+    name: core (CMake 3.24)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install CMake 3.24.0, the oldest README and CMakeLists.txt allow
+        run: |
+          pipx install cmake==3.24.0
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Check the CMake version
+        run: cmake --version | grep -qx 'cmake version 3.24.0'
+      - name: Install a decimal-comma locale
+        run: sudo locale-gen de_DE.UTF-8
+      - name: Configure
+        run: cmake --preset debug -DHYDROID_RES_REQUIRE_LOCALE_TESTS=ON
+      - name: Build
+        run: cmake --build --preset debug --parallel
+      - name: Test
+        run: ctest --preset debug
+
   golden-app:
     name: golden app builds
     runs-on: ubuntu-24.04
