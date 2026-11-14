@@ -1,8 +1,12 @@
 // Step 2 completion check: color, dimen, integer, bool, fraction text → Value, as aapt2 parses it.
+// Aapt2ValueTest checks the same parsers against aapt2's own output (golden/aapt2/values.tsv);
+// these tests name the cases. Where hydroid rejects on purpose what aapt2 takes, the test says so.
 
 #include <gtest/gtest.h>
 
+#include <cfloat>
 #include <ostream>
+#include <string>
 
 #include "hydroid/res/Complex.h"
 #include "hydroid/res/ValueParser.h"
@@ -130,12 +134,48 @@ TEST(ParseFloatValue, FractionScalesInFloatLikeAapt) {
 }
 
 TEST(ParseFloatValue, Rejects) {
-  // 3e12dp and up overflow aapt2's 64-bit intermediate (undefined there).
+  // aapt2 rejects these too ("inf" and "nan" fail its first-character check).
   for (const char* s : {"", "dp", "16 dp", "16DP", "16Dp", "16dpx", "16em", "16px5", ".dp",
-                        "-dp", "1e", "1e+dp", "16%%", "1,5dp", "1e39dp", "1e39%", "3e12dp",
-                        "inf", "nan"}) {
+                        "-dp", "1e", "1e+dp", "16%%", "1,5dp", "inf", "nan", "1.5f"}) {
     EXPECT_FALSE(parseFloatValue(s)) << '"' << s << '"';
   }
+}
+
+TEST(ParseFloatValue, RejectsWhatAaptOnlyTakesThroughStrtof) {
+  // aapt2 accepts all of these; see the top of ValueParser.h for why hydroid does not.
+  // inf/NaN, hex floats, past FLT_MAX, and dimensions of 2^41 and up (undefined in aapt2).
+  for (const char* s : {"-inf", "+nan", "-infinity", "-infdp", "0x10px", "-0x1p4", "0X10",
+                        "1e39", "1e39dp", "-1e39dp", "1e39%", "-1e39%", "3.4028236e38", "3e12dp",
+                        "2199023255552dp"}) {
+    EXPECT_FALSE(parseFloatValue(s)) << '"' << s << '"';
+  }
+  // Just under 2^41 is still defined.
+  EXPECT_TRUE(parseFloatValue("2199023124480dp"));
+}
+
+TEST(ParseFloatValue, RoundsToNearestFloatOnce) {
+  // A hair above the midpoint of 1 and 1 + 2^-23. Its nearest double is the midpoint itself,
+  // so double then float would tie down to 1; aapt2's strtof gives 0x3f800001.
+  EXPECT_EQ(parseFloatValue("1.0000000596046447753906251"), Value::floating(1.00000012f));
+  EXPECT_EQ(parseFloatValue("1.0000000596046447753906250"), Value::floating(1.0f));  // tie, even
+  EXPECT_EQ(parseFloatValue("1.0000000596046447753906249"), Value::floating(1.0f));
+  EXPECT_EQ(parseFloatValue("1.000000059604644775390625001"), Value::floating(1.00000012f));  // #6
+  // In 8p15 the extra bit is lost, but the radix is not: 1.0 would be 23p0, 0x100.
+  EXPECT_EQ(parseFloatValue("1.0000000596046447753906251px"),
+            Value::dimensionFromComplex(0x800020));
+  // FLT_MAX, the smallest subnormal, and below half of it.
+  EXPECT_EQ(parseFloatValue("3.4028235677973366e38"), Value::floating(FLT_MAX));
+  EXPECT_EQ(parseFloatValue("1.4e-45"), Value::floating(FLT_TRUE_MIN));
+  EXPECT_EQ(parseFloatValue("7e-46"), Value::floating(0));
+  EXPECT_EQ(parseFloatValue("1e-400"), Value::floating(0));
+}
+
+TEST(ParseFloatValue, AtMost126Characters) {
+  // aapt2 copies at most 126 characters into its strtof buffer.
+  const std::string zeros(121, '0');
+  EXPECT_EQ(parseFloatValue("0." + zeros + "1dp").has_value(), true);       // 126
+  EXPECT_EQ(parseFloatValue("0." + zeros + "01dp").has_value(), false);     // 127
+  EXPECT_EQ(parseFloatValue("  0." + zeros + "1dp  ").has_value(), true);  // trimmed first
 }
 
 // ---- integer -------------------------------------------------------------------------------
@@ -203,6 +243,33 @@ TEST(ParseLiteral, AaptOrder) {
   EXPECT_EQ(parseLiteral("#fff", kFormatAny), Value::colorValue(0xffffffff, ColorFormat::Rgb4));
   EXPECT_EQ(parseLiteral("true", kFormatAny), Value::boolean(true));
   EXPECT_FALSE(parseLiteral("hello", kFormatAny));
+}
+
+TEST(ParseLiteral, FloatThatMissesTheDoubleByOneIsAStringWhenOtherFormatsAreAllowed) {
+  // aapt2 keeps these as strings under kFormatAny: 9638178525's nearest float is 9638178816.
+  EXPECT_FALSE(parseLiteral("9638178525", kFormatAny));
+  EXPECT_FALSE(parseLiteral("-2147483649", kFormatAny));
+  // A float holds 2^31 exactly, and 0.1 is off by far less than 1.
+  EXPECT_EQ(parseLiteral("2147483648", kFormatAny), Value::floating(2147483648.0f));
+  EXPECT_EQ(parseLiteral("0.1", kFormatAny), Value::floating(0.1f));
+  // Any other format asks for the check, even one with no string to fall back to: aapt2 36.1.0
+  // fails a style item of a float|reference, float|integer, float|color, float|boolean, or
+  // float enum/flags attr with this text, and keeps it as a string for float|string.
+  for (uint32_t other : {kFormatReference, kFormatString, kFormatInteger, kFormatBoolean,
+                         kFormatColor, kFormatEnum, kFormatFlags}) {
+    EXPECT_FALSE(parseLiteral("9638178525", kFormatFloat | other)) << other;
+    EXPECT_FALSE(parseLiteral("-2147483649", kFormatFloat | other)) << other;
+  }
+  // Floats only: no check, as for <dimen> or a float attr.
+  EXPECT_EQ(parseLiteral("9638178525", kFormatFloat), Value::floating(9638178816.0f));
+  EXPECT_EQ(parseLiteral("9638178525", kDimenTag), Value::floating(9638178816.0f));
+  // Off by exactly 1 fails; less than 1 passes, however large the float.
+  EXPECT_FALSE(parseLiteral("16777217.0", kFormatAny));
+  EXPECT_EQ(parseLiteral("16777216.5", kFormatAny), Value::floating(16777216.0f));
+  EXPECT_EQ(parseLiteral("16777218.0", kFormatAny), Value::floating(16777218.0f));
+  EXPECT_EQ(parseLiteral("1e10", kFormatAny), Value::floating(1e10f));
+  // Dimensions are never checked.
+  EXPECT_EQ(parseLiteral("9638178525px", kFormatAny), parseFloatValue("9638178525px"));
 }
 
 }  // namespace
