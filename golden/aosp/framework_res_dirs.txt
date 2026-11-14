@@ -1,8 +1,9 @@
-# The directories under frameworks/base/core/res/res in AOSP, platform_frameworks_base
-# 1cdfff555f4a21f71ccc978290e2e212e2f8b168 (2025-03-27, the last commit of the GitHub mirror),
-# one per line. Listed with:
-#   gh api repos/aosp-mirror/platform_frameworks_base/git/trees/fb980303267f13ede0477135a31b9a1be9f2c96e \
-#     --jq '.tree[] | select(.type == "tree") | .path'
+# The directories under frameworks/base/core/res/res in AOSP, android17-release at
+# 94b4c163b7dfe5ce3607f7bb8456f9573f7de57d (2026-05-21), one per line. android16-release at
+# 99b01a65cc4c104933788b3143285ab6bae65827 (2025-05-07) has 2838 of them and none of its own.
+# Listed with:
+#   curl -s 'https://android.googlesource.com/platform/frameworks/base/+/94b4c163b7dfe5ce3607f7bb8456f9573f7de57d/core/res/res/?format=JSON' \
+#     | python3 -c 'import json, sys; sys.stdin.readline(); print(*sorted(e["name"] for e in json.load(sys.stdin)["entries"] if e["type"] == "tree"), sep="\n")'
 anim
 anim-ldrtl
 anim-watch
@@ -11,7 +12,6 @@ color
 color-car
 color-night
 color-watch
-color-watch-v36
 drawable
 drawable-car
 drawable-en-hdpi
@@ -31,8 +31,12 @@ drawable-sw600dp-mdpi
 drawable-sw600dp-nodpi
 drawable-sw600dp-xhdpi
 drawable-sw720dp-nodpi
+drawable-w192dp
+drawable-w204dp
+drawable-w216dp
+drawable-w228dp
+drawable-w240dp
 drawable-watch
-drawable-watch-v36
 drawable-xhdpi
 drawable-xxhdpi
 drawable-xxxhdpi
@@ -48,7 +52,6 @@ layout-round-watch
 layout-sw600dp
 layout-television
 layout-watch
-layout-watch-v36
 layout-xlarge
 menu
 mipmap-hdpi
@@ -131,6 +134,9 @@ values-da-rDK
 values-da-television
 values-da-watch
 values-de
+values-de-feminine
+values-de-masculine
+values-de-neuter
 values-de-rAT
 values-de-rCH
 values-de-rDE
@@ -162,6 +168,9 @@ values-en-rXC-television
 values-en-rXC-watch
 values-en-rZA
 values-es
+values-es-feminine
+values-es-masculine
+values-es-neuter
 values-es-rCO
 values-es-rCR
 values-es-rEC
@@ -174,6 +183,9 @@ values-es-rPA
 values-es-rPE
 values-es-rSV
 values-es-rUS
+values-es-rUS-feminine
+values-es-rUS-masculine
+values-es-rUS-neuter
 values-es-rUS-television
 values-es-rUS-watch
 values-es-television
@@ -199,6 +211,9 @@ values-fr-masculine
 values-fr-neuter
 values-fr-rBE
 values-fr-rCA
+values-fr-rCA-feminine
+values-fr-rCA-masculine
+values-fr-rCA-neuter
 values-fr-rCA-television
 values-fr-rCA-watch
 values-fr-rCH
@@ -237,6 +252,9 @@ values-is
 values-is-television
 values-is-watch
 values-it
+values-it-feminine
+values-it-masculine
+values-it-neuter
 values-it-rCH
 values-it-rIT
 values-it-television
@@ -2548,6 +2566,9 @@ values-mcc334-mnc020-fr-feminine
 values-mcc334-mnc020-fr-masculine
 values-mcc334-mnc020-fr-neuter
 values-mcc334-mnc020-fr-rCA
+values-mcc334-mnc020-fr-rCA-feminine
+values-mcc334-mnc020-fr-rCA-masculine
+values-mcc334-mnc020-fr-rCA-neuter
 values-mcc334-mnc020-gl
 values-mcc334-mnc020-gu
 values-mcc334-mnc020-hi
@@ -2739,6 +2760,8 @@ values-sw
 values-sw-rTZ
 values-sw-television
 values-sw-watch
+values-sw1500dp-110dpi
+values-sw1900dp-90dpi
 values-sw360dp
 values-sw372dp
 values-sw600dp
@@ -2790,6 +2813,7 @@ values-w192dp
 values-w192dp-round-watch
 values-w195dp
 values-w198dp
+values-w204dp
 values-w204dp-round-watch
 values-w205dp
 values-w208dp
@@ -2797,6 +2821,7 @@ values-w210dp-round-watch
 values-w211dp
 values-w213dp
 values-w213dp-round-watch
+values-w216dp
 values-w225dp
 values-w227dp
 values-w228dp
@@ -2808,7 +2833,6 @@ values-w480dp
 values-w640dp
 values-w720dp
 values-watch
-values-watch-v36
 values-xlarge
 values-xlarge-land
 values-zh-rCN

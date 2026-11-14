@@ -1,7 +1,7 @@
 // Every reference hydroid is checked against comes from the API level of kEmulatedSdkVersion
-// (#14): the golden dump's emulator, the golden app's compileSdk and targetSdk, and the
-// build-tools and platform the aapt2 golden files were made with. Raising one without the rest
-// fails here.
+// (#14): the golden dump's emulator, the golden app's compileSdk and targetSdk, the build-tools
+// and platform the aapt2 golden files were made with, and the release the AOSP framework res/
+// folder list comes from. Raising one without the rest fails here.
 
 #include <gtest/gtest.h>
 
@@ -62,6 +62,17 @@ TEST(SdkBaseline, Aapt2GoldenUsesEmulatedLevel) {
     EXPECT_EQ(m[1].str(), kLevel) << path << ": build-tools";
     EXPECT_EQ(m[2].str(), "android-" + kLevel + ".0") << path << ": platform";
   }
+}
+
+// "... in AOSP, android17-release at <commit> ...": API 37 is Android 17.
+TEST(SdkBaseline, AospFolderListIsOfEmulatedLevel) {
+  std::ifstream in(HYDROID_AOSP_RES_DIRS);
+  ASSERT_TRUE(in) << "cannot open " << HYDROID_AOSP_RES_DIRS;
+  std::string header;
+  std::getline(in, header);
+  std::smatch m;
+  ASSERT_TRUE(std::regex_search(header, m, std::regex(R"(android(\d+)-release at)"))) << header;
+  EXPECT_EQ(std::stoi(m[1].str()) + 20, kEmulatedSdkVersion) << header;
 }
 
 }  // namespace

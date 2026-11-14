@@ -180,7 +180,7 @@ std::vector<std::string> aospFrameworkDirs() {
 
 TEST(AospFrameworkRes, EveryFolderParses) {
   const std::vector<std::string> dirs = aospFrameworkDirs();
-  EXPECT_EQ(dirs.size(), 2826u);
+  EXPECT_EQ(dirs.size(), 2849u);
   const std::set<std::string> kTypes = {"anim",         "animator",   "color",  "drawable",
                                         "interpolator", "layout",     "menu",   "mipmap",
                                         "raw",          "transition", "values", "xml"};
@@ -191,9 +191,27 @@ TEST(AospFrameworkRes, EveryFolderParses) {
     EXPECT_TRUE(kTypes.count(d->type)) << dir;
     types[d->type]++;
   }
-  EXPECT_EQ(types["values"], 2742);
-  EXPECT_EQ(types["drawable"], 24);
+  EXPECT_EQ(types["values"], 2763);
+  EXPECT_EQ(types["drawable"], 28);
 }
+
+// Each folder is a row of configs.tsv that aapt2 took, so ParsesLikeAapt2 has checked it: a list
+// updated without rerunning gen_aapt2_configs.py fails here.
+void expectInAapt2Golden(const std::vector<std::string>& dirs) {
+  std::map<std::string, const Row*> byQualifiers;
+  for (const Row& row : rows()) byQualifiers.emplace(row.qualifiers, &row);
+  for (const std::string& dir : dirs) {
+    const size_t dash = dir.find('-');
+    const auto it = byQualifiers.find(dash == std::string::npos ? "" : dir.substr(dash + 1));
+    if (it == byQualifiers.end()) {
+      ADD_FAILURE() << dir << " is not in configs.tsv";
+    } else {
+      EXPECT_TRUE(it->second->aapt2) << dir << ": aapt2 rejects it";
+    }
+  }
+}
+
+TEST(AospFrameworkRes, EveryFolderIsInAapt2Golden) { expectInAapt2Golden(aospFrameworkDirs()); }
 
 // A few of them as aapt2 writes them; ParsesLikeAapt2 checks all.
 TEST(AospFrameworkRes, Samples) {
@@ -208,7 +226,10 @@ TEST(AospFrameworkRes, Samples) {
   EXPECT_EQ(canonical("values-fr-feminine"), "values fr-feminine-v34");
   EXPECT_EQ(canonical("layout-round-watch"), "layout round-watch-v23");
   EXPECT_EQ(canonical("mipmap-watch-anydpi"), "mipmap watch-anydpi-v21");
-  EXPECT_EQ(canonical("color-watch-v36"), "color watch-v36");
+  EXPECT_EQ(canonical("values-mcc334-mnc020-fr-rCA-feminine"),
+            "values mcc334-mnc20-fr-rCA-feminine-v34");
+  EXPECT_EQ(canonical("values-sw1500dp-110dpi"), "values sw1500dp-110dpi-v13");
+  EXPECT_EQ(canonical("drawable-w240dp"), "drawable w240dp-v13");
   EXPECT_EQ(canonical("values-en-rXC-watch"), "values en-rXC-watch-v8");
 }
 
@@ -221,6 +242,15 @@ TEST(GoldenAppRes, EveryFolderParses) {
     EXPECT_TRUE(parseResDir(entry.path().filename().string())) << entry.path().filename().string();
   }
   EXPECT_GT(count, 10);
+}
+
+TEST(GoldenAppRes, EveryFolderIsInAapt2Golden) {
+  std::vector<std::string> dirs;
+  for (const auto& entry : std::filesystem::directory_iterator(HYDROID_TEST_RES_DIR)) {
+    if (entry.is_directory()) dirs.push_back(entry.path().filename().string());
+  }
+  EXPECT_GT(dirs.size(), 10u);
+  expectInAapt2Golden(dirs);
 }
 
 }  // namespace
