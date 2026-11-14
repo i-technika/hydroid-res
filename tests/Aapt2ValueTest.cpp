@@ -29,6 +29,10 @@ constexpr int kTypeIntDec = 0x10;
 constexpr int kTypeIntHex = 0x11;
 constexpr int kTypeIntBoolean = 0x12;
 
+// toResValue writes these as the Res_value type, as it does ColorFormat.
+static_assert(static_cast<int>(IntFormat::Dec) == kTypeIntDec);
+static_assert(static_cast<int>(IntFormat::Hex) == kTypeIntHex);
+
 using ResValue = std::pair<int, uint32_t>;  // type, data
 
 struct Row {

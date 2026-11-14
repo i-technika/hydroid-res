@@ -69,10 +69,28 @@ std::vector<ValueKind> everyKind() {
 // Detection traits: whether an expression on V compiles. V stays a template parameter so an
 // ill-formed one is a substitution failure, not a hard error.
 
+// Access is checked during substitution, so a private member is a substitution failure too. The
+// names are Value.h's: renaming a member there means renaming it here, or these pass vacuously.
 template <typename V, typename = void>
-struct KindIsAssignable : std::false_type {};
+struct KindIsAccessible : std::false_type {};
 template <typename V>
-struct KindIsAssignable<V, std::void_t<decltype(std::declval<V&>().kind = ValueKind::Int)>>
+struct KindIsAccessible<V, std::void_t<decltype(std::declval<V&>().kind_)>> : std::true_type {};
+
+template <typename V, typename = void>
+struct UnionIsAccessible : std::false_type {};
+template <typename V>
+struct UnionIsAccessible<V, std::void_t<decltype(std::declval<V&>().color_)>> : std::true_type {};
+
+template <typename V, typename T, typename = void>
+struct IntegerTakesValue : std::false_type {};
+template <typename V, typename T>
+struct IntegerTakesValue<V, T, std::void_t<decltype(V::integer(std::declval<T>()))>>
+    : std::true_type {};
+
+template <typename V, typename T, typename = void>
+struct BooleanTakes : std::false_type {};
+template <typename V, typename T>
+struct BooleanTakes<V, T, std::void_t<decltype(V::boolean(std::declval<T>()))>>
     : std::true_type {};
 
 template <typename V, typename Format, typename = void>
@@ -93,11 +111,21 @@ template <typename V>
 struct HasOldIntegerValue<V, std::void_t<decltype(V::integerValue(0))>> : std::true_type {};
 
 // v.kind = ValueKind::Dimension used to compile and leave the union holding something else.
-static_assert(!KindIsAssignable<Value>::value);
+static_assert(!KindIsAccessible<Value>::value);
+static_assert(!UnionIsAccessible<Value>::value);
 // integerValue(16, true) did not say what true meant.
 static_assert(IntegerTakes<Value, IntFormat>::value);
 static_assert(!IntegerTakes<Value, bool>::value);
 static_assert(!IntegerTakes<Value, int>::value);
+// integer(true) and boolean(42) would convert silently.
+static_assert(IntegerTakesValue<Value, int32_t>::value);
+static_assert(IntegerTakesValue<Value, uint32_t>::value);
+static_assert(!IntegerTakesValue<Value, bool>::value);
+static_assert(!IntegerTakesValue<Value, float>::value);
+static_assert(!IntegerTakesValue<Value, double>::value);
+static_assert(BooleanTakes<Value, bool>::value);
+static_assert(!BooleanTakes<Value, int>::value);
+static_assert(!BooleanTakes<Value, float>::value);
 static_assert(!HasOldColorValue<Value>::value);
 static_assert(!HasOldIntegerValue<Value>::value);
 // Still a 32-bit payload plus tags, cheap to copy.
@@ -127,13 +155,8 @@ TEST(ValueFactory, AccessorsReturnWhatTheFactoryTook) {
   EXPECT_EQ(Value::styleableDecl(7).index(), 7u);
 }
 
-TEST(ValueFactory, IntFormatIsTheResValueType) {
-  // TypedValue.TYPE_INT_DEC and TYPE_INT_HEX, as ColorFormat is TYPE_INT_COLOR_*.
-  EXPECT_EQ(static_cast<int>(IntFormat::Dec), 0x10);
-  EXPECT_EQ(static_cast<int>(IntFormat::Hex), 0x11);
-}
-
-// assert() only runs in debug builds; in release the accessors read the union unchecked.
+// Only a debug build of the library checks; in release the accessors read the union unchecked.
+// The tests are built with the library, so their NDEBUG is the library's.
 #ifndef NDEBUG
 TEST(ValueAccessorDeathTest, WrongKindStopsADebugBuild) {
   EXPECT_DEATH(Value().argb(), "not a Color");
@@ -148,6 +171,18 @@ TEST(ValueAccessorDeathTest, WrongKindStopsADebugBuild) {
   EXPECT_DEATH(Value().index(), "not a pooled kind");
 }
 #endif
+
+// Value is trivially copyable, so bytes can hold a kind no factory makes.
+TEST(ValueBytes, KindOutOfRangeHoldsNothing) {
+  Value v = Value::integer(1);
+  const auto kind = static_cast<uint8_t>(0x40);
+  static_assert(sizeof(ValueKind) == sizeof kind);
+  std::memcpy(static_cast<void*>(&v), &kind, sizeof kind);  // kind_ is the first member
+  ASSERT_EQ(static_cast<int>(v.kind()), 0x40);
+  EXPECT_EQ(v, v);
+  EXPECT_NE(v, Value());
+  EXPECT_EQ(print(v), "?()");
+}
 
 // ---- operator== -----------------------------------------------------------------------------
 

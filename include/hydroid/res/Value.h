@@ -1,6 +1,5 @@
 #pragma once
 
-#include <cassert>
 #include <cstdint>
 #include <iosfwd>
 #include <type_traits>
@@ -39,10 +38,11 @@ enum class IntFormat : uint8_t {
 // Factories are named for the kind they make: color, integer, boolean, floating (Int, Bool and
 // Float are C++ keywords), reference, string, ... Each takes the value itself, except the
 // *FromComplex ones, which take Res_value data. Accessors are named for what they return and
-// assert the kind: argb() of a Dimension stops a debug build.
+// check the kind: argb() of a Dimension stops a debug build of the library. A release build of
+// the library doesn't check, and reads the union as it is.
 class Value {
  public:
-  Value() : kind_(ValueKind::Null), index_(0) {}
+  Value() : Value(ValueKind::Null) {}
 
   static Value reference(ResId id) { return withRef(ValueKind::Reference, id); }
   static Value attrRef(ResId id) { return withRef(ValueKind::AttrRef, id); }
@@ -62,6 +62,13 @@ class Value {
     v.bool_ = value;
     return v;
   }
+  // These convert silently: integer(true) would be Int(1), integer(1.5f) Int(1), boolean(42)
+  // Bool(true).
+  template <typename T,
+            std::enable_if_t<std::is_same_v<T, bool> || std::is_floating_point_v<T>, int> = 0>
+  static Value integer(T, IntFormat = IntFormat::Dec) = delete;
+  template <typename T, std::enable_if_t<!std::is_same_v<T, bool>, int> = 0>
+  static Value boolean(T) = delete;
   static Value floating(float value) {
     Value v(ValueKind::Float);
     v.float_ = value;
@@ -95,50 +102,89 @@ class Value {
 
   // Reference, AttrRef
   ResId ref() const {
-    assert((kind_ == ValueKind::Reference || kind_ == ValueKind::AttrRef) && "not a reference");
+    expect(Payload::Ref, "not a reference");
     return ref_;
   }
   // Color
   uint32_t argb() const {
-    assert(kind_ == ValueKind::Color && "not a Color");
+    expect(Payload::Color, "not a Color");
     return color_.argb;
   }
   ColorFormat colorFormat() const {
-    assert(kind_ == ValueKind::Color && "not a Color");
+    expect(Payload::Color, "not a Color");
     return color_.format;
   }
   // Int
   int32_t intValue() const {
-    assert(kind_ == ValueKind::Int && "not an Int");
+    expect(Payload::Int, "not an Int");
     return integer_.value;
   }
   IntFormat intFormat() const {
-    assert(kind_ == ValueKind::Int && "not an Int");
+    expect(Payload::Int, "not an Int");
     return integer_.format;
   }
   // Bool
   bool boolValue() const {
-    assert(kind_ == ValueKind::Bool && "not a Bool");
+    expect(Payload::Bool, "not a Bool");
     return bool_;
   }
   // Float
   float floatValue() const {
-    assert(kind_ == ValueKind::Float && "not a Float");
+    expect(Payload::Float, "not a Float");
     return float_;
   }
   // Dimension, Fraction: Res_value data, see Complex.h
   uint32_t complexData() const {
-    assert((kind_ == ValueKind::Dimension || kind_ == ValueKind::Fraction) &&
-           "not a Dimension or Fraction");
+    expect(Payload::Complex, "not a Dimension or Fraction");
     return complex_;
   }
   // String, StyledString, File, Style, Array, Plurals, AttrDecl, StyleableDecl
   uint32_t index() const {
-    assert(holdsIndex(kind_) && "not a pooled kind");
+    expect(Payload::Index, "not a pooled kind");
     return index_;
   }
 
  private:
+  friend bool operator==(const Value& a, const Value& b);
+  friend std::ostream& operator<<(std::ostream& os, const Value& v);
+
+  // The union member a kind holds. This is the one place that sorts kinds into members; the
+  // accessors, operator== and operator<< all go through it.
+  enum class Payload : uint8_t { None, Ref, Color, Int, Bool, Float, Complex, Index };
+  static constexpr Payload payloadOf(ValueKind kind) {
+    switch (kind) {
+      case ValueKind::Null: return Payload::None;
+      case ValueKind::Reference:
+      case ValueKind::AttrRef: return Payload::Ref;
+      case ValueKind::Color: return Payload::Color;
+      case ValueKind::Int: return Payload::Int;
+      case ValueKind::Bool: return Payload::Bool;
+      case ValueKind::Float: return Payload::Float;
+      case ValueKind::Dimension:
+      case ValueKind::Fraction: return Payload::Complex;
+      case ValueKind::String:
+      case ValueKind::StyledString:
+      case ValueKind::File:
+      case ValueKind::Style:
+      case ValueKind::Array:
+      case ValueKind::Plurals:
+      case ValueKind::AttrDecl:
+      case ValueKind::StyleableDecl: return Payload::Index;
+    }
+    // The factories never set a kind out of range, but a raw byte copy (memcpy, bit_cast) can,
+    // since Value is trivially copyable. Such a Value holds nothing, so it equals one with the
+    // same kind byte, and every accessor but kind() fails on it.
+    return Payload::None;
+  }
+
+  // The check is inline but its failure is not: an assert() here would compile differently in
+  // each file that includes this header, by that file's NDEBUG, and break the one definition rule
+  // for every accessor. kindMismatch stops only when the library itself is a debug build.
+  void expect(Payload payload, const char* what) const {
+    if (payloadOf(kind_) != payload) kindMismatch(what);
+  }
+  static void kindMismatch(const char* what);
+
   // Named so they can sit in the anonymous union (unnamed structs there are an extension).
   struct ColorData { uint32_t argb; ColorFormat format; };  // argb is always 0xAARRGGBB
   struct IntData { int32_t value; IntFormat format; };
@@ -160,7 +206,6 @@ class Value {
     v.index_ = index;
     return v;
   }
-  static bool holdsIndex(ValueKind kind);
 
   ValueKind kind_;
   union {
