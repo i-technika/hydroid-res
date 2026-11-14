@@ -16,16 +16,21 @@ enum class ValueKind : uint8_t {
 
 enum class DimUnit : uint8_t { Px, Dp, Sp, Pt, In, Mm };
 
+// Named so they can sit in Value's anonymous union (unnamed structs there are an extension).
+struct IntData { int32_t v; bool hex; };         // hex = written as 0x.. (TYPE_INT_HEX)
+struct DimData { float v; DimUnit unit; };
+struct FractionData { float v; bool parent; };  // "50%" → 0.5, "%p" sets parent
+
 struct Value {
   ValueKind kind = ValueKind::Null;
   union {
-    ResId    ref;                               // Reference, AttrRef
-    uint32_t argb;                              // Color
-    struct { int32_t v; bool hex; } integer;    // Int; hex = written as 0x.. (TYPE_INT_HEX)
-    bool     b;                                 // Bool
-    struct { float v; DimUnit unit; } dim;      // Dimension
-    struct { float v; bool parent; } fraction;  // Fraction: "50%" → 0.5, "%p" sets parent
-    float    f;                                 // Float
+    ResId        ref;                           // Reference, AttrRef
+    uint32_t     argb;                          // Color
+    IntData      integer;                       // Int
+    bool         b;                             // Bool
+    DimData      dim;                           // Dimension
+    FractionData fraction;                      // Fraction
+    float        f;                             // Float
     uint32_t index;                             // 문자열 풀 또는 복합값 풀 위치
   };
 
