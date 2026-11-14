@@ -1,4 +1,5 @@
-// Value's operator<<, which is also what gtest shows for a Value in failure messages.
+// Value's operator== for the kinds the parser tests don't build, and its operator<<, which is also
+// what gtest shows for a Value in failure messages.
 
 #include <gtest/gtest.h>
 
@@ -22,6 +23,40 @@ Value withIndex(ValueKind kind, uint32_t index) {
   v.kind = kind;
   v.index = index;
   return v;
+}
+
+constexpr ValueKind kIndexKinds[] = {
+    ValueKind::String, ValueKind::StyledString, ValueKind::File,     ValueKind::Style,
+    ValueKind::Array,  ValueKind::Plurals,      ValueKind::AttrDecl, ValueKind::StyleableDecl};
+
+TEST(ValueEquality, IndexKindsCompareTheirIndex) {
+  for (ValueKind kind : kIndexKinds) {
+    SCOPED_TRACE(testing::PrintToString(withIndex(kind, 0)));
+    EXPECT_EQ(withIndex(kind, 3), withIndex(kind, 3));
+    EXPECT_NE(withIndex(kind, 3), withIndex(kind, 4));
+  }
+}
+
+TEST(ValueEquality, SameIndexDifferentKindDiffers) {
+  for (ValueKind a : kIndexKinds) {
+    for (ValueKind b : kIndexKinds) {
+      if (a != b) EXPECT_NE(withIndex(a, 3), withIndex(b, 3));
+    }
+  }
+}
+
+TEST(ValueEquality, ReferenceAndNull) {
+  Value ref;
+  ref.kind = ValueKind::Reference;
+  ref.ref = 0x7f010001;
+  Value attr = ref;
+  attr.kind = ValueKind::AttrRef;
+  Value other = ref;
+  other.ref = 0x7f010002;
+  EXPECT_EQ(ref, ref);
+  EXPECT_NE(ref, other);
+  EXPECT_NE(ref, attr);
+  EXPECT_EQ(Value(), Value());
 }
 
 TEST(PrintValue, IsWhatGtestShows) {

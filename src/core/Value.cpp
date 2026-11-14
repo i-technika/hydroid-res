@@ -66,9 +66,17 @@ bool operator==(const Value& a, const Value& b) {
       return a.complex == b.complex;
     case ValueKind::Float:
       return a.f == b.f;
-    default:
+    case ValueKind::String:
+    case ValueKind::StyledString:
+    case ValueKind::File:
+    case ValueKind::Style:
+    case ValueKind::Array:
+    case ValueKind::Plurals:
+    case ValueKind::AttrDecl:
+    case ValueKind::StyleableDecl:
       return a.index == b.index;
   }
+  return false;
 }
 
 std::ostream& operator<<(std::ostream& os, const Value& v) {
