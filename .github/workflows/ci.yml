@@ -68,7 +68,9 @@ jobs:
             cat mismatch.log; exit 1
           fi
           cat mismatch.log
-          grep -q '"GTest" that exactly matches requested version "1.15.2"' mismatch.log
+          # CMake wraps the message, so its two halves are on separate lines.
+          grep -q 'package "GTest" that exactly' mismatch.log
+          grep -q 'matches requested version "1.15.2"' mismatch.log
       - name: Install the pinned versions from the fetched sources
         run: |
           deps=build/debug/_deps
