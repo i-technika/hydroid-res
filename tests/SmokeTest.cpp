@@ -3,7 +3,6 @@
 #include <gtest/gtest.h>
 #include <pugixml.hpp>
 
-#include <cstring>
 #include <filesystem>
 
 #include "hydroid/res/ResId.h"
