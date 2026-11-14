@@ -1,8 +1,10 @@
 include(GoogleTest)
 
 add_executable(hydroid-res-tests
+  Aapt2ConfigTest.cpp
   Aapt2ValueTest.cpp
   ComplexTest.cpp
+  ConfigParserTest.cpp
   GoldenColorTest.cpp
   GoldenComplexTest.cpp
   PublicHeaderTest.cpp
@@ -14,7 +16,9 @@ target_link_libraries(hydroid-res-tests PRIVATE
 # Every directory a consumer of hydroid::res includes from, for PublicHeaders.AreAscii.
 set(public_include_dirs "$<JOIN:$<TARGET_PROPERTY:hydroid-res,INTERFACE_INCLUDE_DIRECTORIES>,|>")
 target_compile_definitions(hydroid-res-tests PRIVATE
+  HYDROID_AAPT2_CONFIGS="${PROJECT_SOURCE_DIR}/golden/aapt2/configs.tsv"
   HYDROID_AAPT2_VALUES="${PROJECT_SOURCE_DIR}/golden/aapt2/values.tsv"
+  HYDROID_AOSP_RES_DIRS="${PROJECT_SOURCE_DIR}/golden/aosp/framework_res_dirs.txt"
   HYDROID_GOLDEN_DIR="${PROJECT_SOURCE_DIR}/golden/data"
   HYDROID_PROJECT_VERSION="${PROJECT_VERSION}"
   HYDROID_PUBLIC_INCLUDE_DIRS="${public_include_dirs}"

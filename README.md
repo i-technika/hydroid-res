@@ -16,7 +16,9 @@ resolves values exactly as Android does, for UIKit, GTK4 and WinUI 3. Design and
 | `tests/` | GoogleTest unit and golden tests |
 | `golden/` | Android test app + instrumentation test that dumps Android's answers |
 | `golden/data/` | The dumped golden JSON the C++ tests compare against |
-| `scripts/golden/` | Runs the dump on a device and pulls the JSON |
+| `golden/aapt2/` | What the SDK's aapt2 makes of literal values and resource folder names |
+| `golden/aosp/` | The folder names of AOSP's framework `res/`, which must all parse |
+| `scripts/golden/` | Runs the dump on a device and pulls the JSON; runs aapt2 for `golden/aapt2/` |
 
 ## Build and test
 
@@ -75,3 +77,10 @@ python scripts/golden/pull_golden.py
 
 This runs `GoldenDumpTest` over 252 conditions (7 densities × 3 languages × night × orientation ×
 3 smallest widths) and writes `golden/data/*.json`.
+
+The aapt2 files need only the SDK (build-tools and a platform), no device:
+
+```sh
+python scripts/golden/gen_aapt2_values.py    # golden/aapt2/values.tsv
+python scripts/golden/gen_aapt2_configs.py   # golden/aapt2/configs.tsv
+```
