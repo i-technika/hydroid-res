@@ -11,7 +11,10 @@ namespace hydroid::res {
 
 void PrintTo(const Value& v, std::ostream* os) {
   switch (v.kind) {
-    case ValueKind::Color: *os << "Color(0x" << std::hex << v.argb << std::dec << ")"; break;
+    case ValueKind::Color:
+      *os << "Color(0x" << std::hex << v.color.argb << std::dec << ", type "
+          << static_cast<int>(v.color.format) << ")";
+      break;
     case ValueKind::Int: *os << "Int(" << v.integer.v << (v.integer.hex ? ", hex)" : ")"); break;
     case ValueKind::Bool: *os << "Bool(" << v.b << ")"; break;
     case ValueKind::Dimension:
@@ -34,21 +37,39 @@ namespace {
 // ---- color ---------------------------------------------------------------------------------
 
 TEST(ParseColor, FourFormats) {
-  EXPECT_EQ(parseColor("#f80"), Value::color(0xffff8800));
-  EXPECT_EQ(parseColor("#8f80"), Value::color(0x88ff8800));
-  EXPECT_EQ(parseColor("#6200ee"), Value::color(0xff6200ee));
-  EXPECT_EQ(parseColor("#806200ee"), Value::color(0x806200ee));
+  EXPECT_EQ(parseColor("#f80"), Value::colorValue(0xffff8800, ColorFormat::Rgb4));
+  EXPECT_EQ(parseColor("#8f80"), Value::colorValue(0x88ff8800, ColorFormat::Argb4));
+  EXPECT_EQ(parseColor("#6200ee"), Value::colorValue(0xff6200ee, ColorFormat::Rgb8));
+  EXPECT_EQ(parseColor("#806200ee"), Value::colorValue(0x806200ee, ColorFormat::Argb8));
+}
+
+TEST(ParseColor, FormatIsTheResValueType) {
+  // Issue #4: the golden app has accent (#6200EE) as type 29 and surface (#FFFFFFFF) as 28.
+  EXPECT_EQ(static_cast<int>(ColorFormat::Argb8), 28);  // TYPE_INT_COLOR_ARGB8
+  EXPECT_EQ(static_cast<int>(ColorFormat::Rgb8), 29);   // TYPE_INT_COLOR_RGB8
+  EXPECT_EQ(static_cast<int>(ColorFormat::Argb4), 30);  // TYPE_INT_COLOR_ARGB4
+  EXPECT_EQ(static_cast<int>(ColorFormat::Rgb4), 31);   // TYPE_INT_COLOR_RGB4
+}
+
+TEST(ParseColor, SameColorInAnotherFormatIsAnotherValue) {
+  // Opaque white four ways: equal argb, but Android keeps four different types.
+  EXPECT_EQ(parseColor("#fff"), Value::colorValue(0xffffffff, ColorFormat::Rgb4));
+  EXPECT_EQ(parseColor("#ffff"), Value::colorValue(0xffffffff, ColorFormat::Argb4));
+  EXPECT_EQ(parseColor("#ffffff"), Value::colorValue(0xffffffff, ColorFormat::Rgb8));
+  EXPECT_EQ(parseColor("#ffffffff"), Value::colorValue(0xffffffff, ColorFormat::Argb8));
+  EXPECT_NE(parseColor("#fff"), parseColor("#ffffffff"));
+  EXPECT_NE(parseColor("#ffffff"), parseColor("#ffffffff"));
 }
 
 TEST(ParseColor, HexIsCaseInsensitiveAndWhitespaceIsTrimmed) {
-  EXPECT_EQ(parseColor("#FF6200EE"), Value::color(0xff6200ee));
-  EXPECT_EQ(parseColor("#aBcDeF"), Value::color(0xffabcdef));
-  EXPECT_EQ(parseColor("  #fff\n"), Value::color(0xffffffff));
+  EXPECT_EQ(parseColor("#FF6200EE"), Value::colorValue(0xff6200ee, ColorFormat::Argb8));
+  EXPECT_EQ(parseColor("#aBcDeF"), Value::colorValue(0xffabcdef, ColorFormat::Rgb8));
+  EXPECT_EQ(parseColor("  #fff\n"), Value::colorValue(0xffffffff, ColorFormat::Rgb4));
 }
 
 TEST(ParseColor, ZeroAlphaIsKept) {
-  EXPECT_EQ(parseColor("#0000"), Value::color(0x00000000));
-  EXPECT_EQ(parseColor("#00ffffff"), Value::color(0x00ffffff));
+  EXPECT_EQ(parseColor("#0000"), Value::colorValue(0x00000000, ColorFormat::Argb4));
+  EXPECT_EQ(parseColor("#00ffffff"), Value::colorValue(0x00ffffff, ColorFormat::Argb8));
 }
 
 TEST(ParseColor, Rejects) {
@@ -181,7 +202,7 @@ TEST(ParseLiteral, MaskFiltersFloatKinds) {
 TEST(ParseLiteral, AaptOrder) {
   // Integer is tried before float, color before everything.
   EXPECT_EQ(parseLiteral("5", kFormatInteger | kFormatFloat), Value::integerValue(5));
-  EXPECT_EQ(parseLiteral("#fff", kFormatAny), Value::color(0xffffffff));
+  EXPECT_EQ(parseLiteral("#fff", kFormatAny), Value::colorValue(0xffffffff, ColorFormat::Rgb4));
   EXPECT_EQ(parseLiteral("true", kFormatAny), Value::boolean(true));
   EXPECT_FALSE(parseLiteral("hello", kFormatAny));
 }

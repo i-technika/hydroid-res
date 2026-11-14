@@ -11,7 +11,7 @@ bool operator==(const Value& a, const Value& b) {
     case ValueKind::AttrRef:
       return a.ref == b.ref;
     case ValueKind::Color:
-      return a.argb == b.argb;
+      return a.color.argb == b.color.argb && a.color.format == b.color.format;
     case ValueKind::Int:
       return a.integer.v == b.integer.v && a.integer.hex == b.integer.hex;
     case ValueKind::Bool:
