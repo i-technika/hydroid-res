@@ -53,8 +53,9 @@ const std::vector<Row>& rows() {
 // still be accepted by aapt2 and rejected by hydroid, so the list cannot go stale.
 // clang-format off
 const std::set<std::string> kDeliberateRejects = {
-    // Past 16 bits, which aapt2 wraps: sw65536dp is sw0dp.
-    "sw65536dp", "sw99999999999dp", "w65536dp", "h65536dp", "65536dpi", "99999999999dpi",
+    // Past 16 bits, which aapt2 wraps: sw65536dp is sw0dp. Past 0x7fffffff it stops there first.
+    "sw65536dp", "sw2147483647dp", "sw2147483648dp", "sw4294967296dp", "sw99999999999dp",
+    "w65536dp", "h65536dp", "65536dpi", "99999999999dpi",
     // b+ with an empty subtag.
     "b+", "b++en", "b+sr+Latn+RS+", "b+sr+Latn++x", "b+zh+Hant+TW+", "b+zh+Hant++",
     // A language of 1 or of 4 and more letters, or not of letters.

@@ -8,6 +8,7 @@ add_executable(hydroid-res-tests
   GoldenColorTest.cpp
   GoldenComplexTest.cpp
   PublicHeaderTest.cpp
+  SdkBaselineTest.cpp
   SmokeTest.cpp
   ValueParserTest.cpp
   ValueTest.cpp)
@@ -19,6 +20,7 @@ target_compile_definitions(hydroid-res-tests PRIVATE
   HYDROID_AAPT2_CONFIGS="${PROJECT_SOURCE_DIR}/golden/aapt2/configs.tsv"
   HYDROID_AAPT2_VALUES="${PROJECT_SOURCE_DIR}/golden/aapt2/values.tsv"
   HYDROID_AOSP_RES_DIRS="${PROJECT_SOURCE_DIR}/golden/aosp/framework_res_dirs.txt"
+  HYDROID_GOLDEN_APP_GRADLE="${PROJECT_SOURCE_DIR}/golden/app/build.gradle.kts"
   HYDROID_GOLDEN_DIR="${PROJECT_SOURCE_DIR}/golden/data"
   HYDROID_PROJECT_VERSION="${PROJECT_VERSION}"
   HYDROID_PUBLIC_INCLUDE_DIRS="${public_include_dirs}"
