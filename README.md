@@ -30,8 +30,8 @@ ctest --preset debug
 
 ## Golden data
 
-Needs an emulator or device and the Android SDK. Open `golden/` in Android Studio once (or run
-`gradle wrapper` there) to create the Gradle wrapper, then:
+Needs an emulator or device, the Android SDK and JDK 17+ (Android Studio's bundled JDK works).
+Open `golden/` in Android Studio, or build it with `golden/gradlew`. Then:
 
 ```sh
 python scripts/golden/pull_golden.py

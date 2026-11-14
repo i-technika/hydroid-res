@@ -11,6 +11,7 @@ CMakeUserPresets.json
 
 # Android / Gradle (golden app)
 golden/.gradle/
+golden/.kotlin/
 golden/build/
 golden/app/build/
 golden/local.properties

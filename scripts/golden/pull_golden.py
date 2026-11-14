@@ -22,12 +22,15 @@ def find_adb() -> str:
     adb = shutil.which("adb")
     if adb:
         return adb
-    for env in ("ANDROID_HOME", "ANDROID_SDK_ROOT"):
-        sdk = os.environ.get(env)
-        if sdk:
-            candidate = Path(sdk) / "platform-tools" / ("adb.exe" if os.name == "nt" else "adb")
-            if candidate.exists():
-                return str(candidate)
+    sdks = [os.environ.get(env) for env in ("ANDROID_HOME", "ANDROID_SDK_ROOT")]
+    # Android Studio's default SDK locations on Windows, macOS and Linux.
+    sdks += [os.path.join(os.environ.get("LOCALAPPDATA", ""), "Android", "Sdk"),
+             str(Path.home() / "Library" / "Android" / "sdk"),
+             str(Path.home() / "Android" / "Sdk")]
+    for sdk in filter(None, sdks):
+        candidate = Path(sdk) / "platform-tools" / ("adb.exe" if os.name == "nt" else "adb")
+        if candidate.exists():
+            return str(candidate)
     sys.exit("adb not found: add platform-tools to PATH or set ANDROID_HOME")
 
 
@@ -41,8 +44,19 @@ def main() -> None:
 
     if not args.skip_run:
         gradlew = GOLDEN_PROJECT / ("gradlew.bat" if os.name == "nt" else "gradlew")
-        task = ":app:connectedDebugAndroidTest"
-        subprocess.run([str(gradlew), task], cwd=GOLDEN_PROJECT, check=True)
+        # Not connectedDebugAndroidTest: it uninstalls the app afterwards, deleting the dump.
+        env = dict(os.environ)
+        if args.serial:
+            env["ANDROID_SERIAL"] = args.serial  # otherwise Gradle installs on every connected device
+        subprocess.run([str(gradlew), ":app:installDebug", ":app:installDebugAndroidTest"],
+                       cwd=GOLDEN_PROJECT, env=env, check=True)
+        result = subprocess.run(
+            adb + ["shell", "am", "instrument", "-w",
+                   f"{PACKAGE}.test/androidx.test.runner.AndroidJUnitRunner"],
+            check=True, capture_output=True, text=True)
+        print(result.stdout.strip())
+        if "OK (" not in result.stdout:
+            sys.exit("golden dump test failed")
 
     listing = subprocess.run(
         adb + ["shell", "run-as", PACKAGE, "ls", "files/golden"],
@@ -51,9 +65,9 @@ def main() -> None:
     if not names:
         sys.exit("no golden JSON on device; run the dump first")
 
-    if OUT_DIR.exists():
-        shutil.rmtree(OUT_DIR)
-    OUT_DIR.mkdir(parents=True)
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
+    for old in OUT_DIR.glob("*.json"):  # keep README.md and anything else checked in
+        old.unlink()
     for name in names:
         data = subprocess.run(
             adb + ["exec-out", "run-as", PACKAGE, "cat", f"files/golden/{name}"],
