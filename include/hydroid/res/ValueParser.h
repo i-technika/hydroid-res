@@ -26,7 +26,8 @@ enum FormatBits : uint32_t {
   kFormatFlags     = 1u << 17,
 };
 
-// #RGB, #ARGB, #RRGGBB, #AARRGGBB → Color (always stored as 0xAARRGGBB).
+// #RGB, #ARGB, #RRGGBB, #AARRGGBB → Color: 0xAARRGGBB plus which of the four was written
+// (aapt2 keeps it as the Res_value type, TYPE_INT_COLOR_RGB4 ... ARGB8).
 std::optional<Value> parseColor(std::string_view s);
 
 // true/True/TRUE, false/False/FALSE → Bool.

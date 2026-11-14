@@ -2,16 +2,13 @@
 // getFraction() against what Android stored and returned on the emulator (golden/data).
 
 #include <gtest/gtest.h>
-#include <nlohmann/json.hpp>
-#include <pugixml.hpp>
 
-#include <filesystem>
-#include <fstream>
 #include <map>
 #include <set>
 #include <string>
 #include <vector>
 
+#include "GoldenUtil.h"
 #include "hydroid/res/Complex.h"
 #include "hydroid/res/ValueParser.h"
 
@@ -19,6 +16,8 @@ namespace hydroid::res {
 namespace {
 
 namespace fs = std::filesystem;
+using test::forEachGoldenCondition;
+using test::forEachValuesNode;
 
 constexpr int kTypeDimension = 5;  // TypedValue.TYPE_DIMENSION
 constexpr int kTypeFraction = 6;   // TypedValue.TYPE_FRACTION
@@ -51,10 +50,7 @@ float floatAt(const nlohmann::json& j, const char* key) {
 
 Golden loadGolden() {
   Golden out;
-  for (const auto& file : fs::directory_iterator(HYDROID_GOLDEN_DIR)) {
-    if (file.path().extension() != ".json") continue;
-    std::ifstream in(file.path());
-    const nlohmann::json golden = nlohmann::json::parse(in);
+  forEachGoldenCondition([&](const std::string& condition, const nlohmann::json& golden) {
     const auto dpi = golden.at("condition").at("densityDpi").get<uint32_t>();
     const nlohmann::json& m = golden.at("metrics");
     const DisplayMetrics metrics{floatAt(m, "density"), floatAt(m, "scaledDensity"),
@@ -64,7 +60,7 @@ Golden loadGolden() {
       const bool dimen = key.rfind("dimen/", 0) == 0;
       const bool fraction = key.rfind("fraction/", 0) == 0;
       if (!dimen && !fraction) continue;
-      out.values.push_back({file.path().stem().string() + " " + key, key,
+      out.values.push_back({condition + " " + key, key,
                             static_cast<uint32_t>(v.at("data").get<int64_t>()),
                             v.at("type").get<int>(), v.at("string").get<std::string>(),
                             floatAt(v, dimen ? "px" : "fraction"),
@@ -72,7 +68,7 @@ Golden loadGolden() {
                             fraction ? floatAt(v, "parentBase") : 0.0f, dpi,
                             floatAt(m, "fontScale"), metrics});
     }
-  }
+  });
   return out;
 }
 
@@ -81,47 +77,45 @@ const Golden& golden() {
   return g;
 }
 
+using Sources = std::map<std::string, std::set<uint32_t>>;
+
 // Every <dimen> and <fraction> text in the golden app's values*/ folders, parsed by hydroid, by
 // "type/name". A source hydroid fails to parse is recorded as a failure.
-std::map<std::string, std::set<uint32_t>> parsedSources() {
-  std::map<std::string, std::set<uint32_t>> out;
-  for (const auto& dir : fs::directory_iterator(HYDROID_TEST_RES_DIR)) {
-    if (dir.path().filename().string().rfind("values", 0) != 0) continue;
-    for (const auto& file : fs::directory_iterator(dir.path())) {
-      pugi::xml_document doc;
-      if (file.path().extension() != ".xml" || !doc.load_file(file.path().c_str())) continue;
-      for (pugi::xml_node node : doc.child("resources").children()) {
-        const std::string tag = node.name();
-        if (tag != "dimen" && tag != "fraction") continue;
-        const std::string key = tag + "/" + node.attribute("name").value();
-        auto v = parseLiteral(node.child_value(), kComplexTag);
-        if (!v || (v->kind != ValueKind::Dimension && v->kind != ValueKind::Fraction)) {
-          ADD_FAILURE() << file.path().string() << ": " << key << " \"" << node.child_value()
-                        << "\" does not parse to a dimension or fraction";
-          continue;
-        }
-        out[key].insert(v->complex);
-      }
+Sources loadSources() {
+  Sources out;
+  forEachValuesNode([&](const fs::path& file, pugi::xml_node node) {
+    const std::string tag = node.name();
+    if (tag != "dimen" && tag != "fraction") return;
+    const std::string key = tag + "/" + node.attribute("name").value();
+    auto v = parseLiteral(node.child_value(), kComplexTag);
+    if (!v || (v->kind != ValueKind::Dimension && v->kind != ValueKind::Fraction)) {
+      ADD_FAILURE() << file.string() << ": " << key << " \"" << node.child_value()
+                    << "\" does not parse to a dimension or fraction";
+      return;
     }
-  }
+    out[key].insert(v->complex);
+  });
   return out;
 }
 
+const Sources& sources() {
+  static const Sources s = loadSources();
+  return s;
+}
+
 TEST(GoldenComplex, EveryConditionHasEverySource) {
-  const auto sources = parsedSources();
   EXPECT_EQ(golden().conditions, 252u);  // 7 densities × 3 languages × 2 × 2 × 3 widths
-  EXPECT_GT(sources.size(), 0u);
-  EXPECT_EQ(golden().values.size(), golden().conditions * sources.size());
+  EXPECT_GT(sources().size(), 0u);
+  EXPECT_EQ(golden().values.size(), golden().conditions * sources().size());
 }
 
 TEST(GoldenComplex, SourceTextEncodesToAndroidData) {
-  const auto sources = parsedSources();
   for (const GoldenComplex& g : golden().values) {
     SCOPED_TRACE(g.where);
     EXPECT_EQ(g.type, g.key.rfind("dimen/", 0) == 0 ? kTypeDimension : kTypeFraction);
     // Config matching comes later, so check that one of the resource's sources gives this data.
-    auto it = sources.find(g.key);
-    ASSERT_NE(it, sources.end());
+    auto it = sources().find(g.key);
+    ASSERT_NE(it, sources().end());
     EXPECT_EQ(it->second.count(g.data), 1u) << "data 0x" << std::hex << g.data;
   }
 }

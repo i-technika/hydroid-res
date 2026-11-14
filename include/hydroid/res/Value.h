@@ -18,14 +18,23 @@ enum class ValueKind : uint8_t {
 // Same values as Android's TypedValue.COMPLEX_UNIT_PX ... COMPLEX_UNIT_MM.
 enum class DimUnit : uint8_t { Px = 0, Dp = 1, Sp = 2, Pt = 3, In = 4, Mm = 5 };
 
-// Named so it can sit in Value's anonymous union (unnamed structs there are an extension).
+// How a color was written; same values as Android's TypedValue.TYPE_INT_COLOR_*.
+enum class ColorFormat : uint8_t {
+  Argb8 = 28,  // #AARRGGBB
+  Rgb8 = 29,   // #RRGGBB
+  Argb4 = 30,  // #ARGB
+  Rgb4 = 31,   // #RGB
+};
+
+// Named so they can sit in Value's anonymous union (unnamed structs there are an extension).
 struct IntData { int32_t v; bool hex; };         // hex = written as 0x.. (TYPE_INT_HEX)
+struct ColorData { uint32_t argb; ColorFormat format; };  // argb is always 0xAARRGGBB
 
 struct Value {
   ValueKind kind = ValueKind::Null;
   union {
     ResId        ref;                           // Reference, AttrRef
-    uint32_t     argb;                          // Color
+    ColorData    color;                         // Color
     IntData      integer;                       // Int
     bool         b;                             // Bool
     uint32_t     complex;                       // Dimension, Fraction: Res_value data, see Complex.h
@@ -35,10 +44,11 @@ struct Value {
 
   Value() : index(0) {}
 
-  static Value color(uint32_t value) {
+  // `argb` is 0xAARRGGBB whatever the format: #f80 is colorValue(0xffff8800, ColorFormat::Rgb4).
+  static Value colorValue(uint32_t argb, ColorFormat format) {
     Value v;
     v.kind = ValueKind::Color;
-    v.argb = value;
+    v.color = {argb, format};
     return v;
   }
   static Value integerValue(int32_t value, bool isHex = false) {

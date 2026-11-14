@@ -117,16 +117,15 @@ std::optional<Value> parseColor(std::string_view s) {
     nibbles[i] = static_cast<uint32_t>(d);
   }
 
-  uint32_t argb = 0;
   if (hex.size() <= 4) {
     // #RGB / #ARGB: each digit is doubled, #f80 → #ff8800. Missing alpha is opaque.
-    argb = hex.size() == 3 ? 0xffu : nibbles[0] * 0x11u;
+    uint32_t argb = hex.size() == 3 ? 0xffu : nibbles[0] * 0x11u;
     for (size_t i = hex.size() - 3; i < hex.size(); i++) argb = (argb << 8) | (nibbles[i] * 0x11u);
-  } else {
-    argb = hex.size() == 6 ? 0xffu : 0u;
-    for (size_t i = 0; i < hex.size(); i++) argb = (argb << 4) | nibbles[i];
+    return Value::colorValue(argb, hex.size() == 3 ? ColorFormat::Rgb4 : ColorFormat::Argb4);
   }
-  return Value::color(argb);
+  uint32_t argb = hex.size() == 6 ? 0xffu : 0u;
+  for (size_t i = 0; i < hex.size(); i++) argb = (argb << 4) | nibbles[i];
+  return Value::colorValue(argb, hex.size() == 6 ? ColorFormat::Rgb8 : ColorFormat::Argb8);
 }
 
 std::optional<Value> parseBool(std::string_view s) {

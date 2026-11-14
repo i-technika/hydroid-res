@@ -3,6 +3,7 @@ include(GoogleTest)
 add_executable(hydroid-res-tests
   Aapt2ComplexTest.cpp
   ComplexTest.cpp
+  GoldenColorTest.cpp
   GoldenComplexTest.cpp
   SmokeTest.cpp
   ValueParserTest.cpp)
