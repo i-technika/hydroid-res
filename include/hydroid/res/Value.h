@@ -11,9 +11,9 @@ namespace hydroid::res {
 enum class ValueKind : uint8_t {
   Null, Empty,                       // @null, @empty: see Value() and Value::empty()
   Reference, AttrRef,                // @type/name, ?attr/name
-  String, StyledString,              // <b> 등 서식 있는 문자열은 span 목록 포함
+  String, StyledString,              // StyledString: text with spans such as <b>
   Color, Dimension, Fraction, Float, Int, Bool,
-  File,                              // layout/foo.xml, drawable/bg.png 같은 파일
+  File,                              // a file such as layout/foo.xml or drawable/bg.png
   Style, Array, Plurals, AttrDecl, StyleableDecl
 };
 
@@ -84,7 +84,7 @@ class Value {
     v.float_ = value;
     return v;
   }
-  // `data` is Res_value data with its unit bits, as aapt2 writes it (16dp → 0x1001, not 16): get
+  // `data` is Res_value data with its unit bits, as aapt2 writes it (16dp is 0x1001, not 16): get
   // it from parseFloatValue or floatToComplex. Units are not checked; like Android, an unknown
   // one is kept and converts to 0.
   static Value dimensionFromComplex(uint32_t data) {
@@ -227,7 +227,7 @@ class Value {
     bool      bool_;     // Bool
     uint32_t  complex_;  // Dimension, Fraction
     float     float_;    // Float
-    uint32_t  index_;    // 문자열 풀 또는 복합값 풀 위치
+    uint32_t  index_;    // pooled kinds: position in the string or compound value pool
   };
 };
 
