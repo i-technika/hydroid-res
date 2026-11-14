@@ -15,6 +15,15 @@ jobs:
         os: [ubuntu-24.04, macos-15, windows-2022]
     steps:
       - uses: actions/checkout@v5
+      - name: Cache the fetched dependencies
+        uses: actions/cache@v6
+        with:
+          # The sources, and the sub-builds whose stamps tell FetchContent they are already there.
+          # The sub-builds belong to the job's CMake and generator, hence the job in the key.
+          path: |
+            build/debug/_deps/*-src
+            build/debug/_deps/*-subbuild
+          key: deps-${{ runner.os }}-${{ github.job }}-${{ hashFiles('cmake/Dependencies.cmake') }}
       - name: Install a decimal-comma locale
         if: runner.os == 'Linux'
         run: sudo locale-gen de_DE.UTF-8
@@ -34,6 +43,15 @@ jobs:
         os: [ubuntu-24.04, macos-15, windows-2022]
     steps:
       - uses: actions/checkout@v5
+      - name: Cache the fetched dependencies
+        uses: actions/cache@v6
+        with:
+          # The sources, and the sub-builds whose stamps tell FetchContent they are already there.
+          # The sub-builds belong to the job's CMake and generator, hence the job in the key.
+          path: |
+            build/debug/_deps/*-src
+            build/debug/_deps/*-subbuild
+          key: deps-${{ runner.os }}-${{ github.job }}-${{ hashFiles('cmake/Dependencies.cmake') }}
       - name: Install a decimal-comma locale
         if: runner.os == 'Linux'
         run: sudo locale-gen de_DE.UTF-8
@@ -69,6 +87,15 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
+      - name: Cache the fetched dependencies
+        uses: actions/cache@v6
+        with:
+          # The sources, and the sub-builds whose stamps tell FetchContent they are already there.
+          # The sub-builds belong to the job's CMake and generator, hence the job in the key.
+          path: |
+            build/debug/_deps/*-src
+            build/debug/_deps/*-subbuild
+          key: deps-${{ runner.os }}-${{ github.job }}-${{ hashFiles('cmake/Dependencies.cmake') }}
       - name: Install CMake 3.24.0, the oldest README and CMakeLists.txt allow
         run: |
           pipx install cmake==3.24.0
@@ -89,6 +116,15 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
+      - name: Cache the fetched dependencies
+        uses: actions/cache@v6
+        with:
+          # The sources, and the sub-builds whose stamps tell FetchContent they are already there.
+          # The sub-builds belong to the job's CMake and generator, hence the job in the key.
+          path: |
+            build/debug/_deps/*-src
+            build/debug/_deps/*-subbuild
+          key: deps-${{ runner.os }}-${{ github.job }}-${{ hashFiles('cmake/Dependencies.cmake') }}
       - name: Install Ubuntu's pugixml, GoogleTest and nlohmann/json, which the default build must ignore
         run: |
           sudo apt-get update
@@ -133,6 +169,53 @@ jobs:
         run: cmake --build build/installed --parallel
       - name: Test
         run: ctest --test-dir build/installed --output-on-failure
+
+  sanitize:
+    name: core (Clang, ASan and UBSan)
+    runs-on: ubuntu-24.04
+    env:
+      CC: clang
+      CXX: clang++
+    steps:
+      - uses: actions/checkout@v5
+      - name: Cache the fetched dependencies
+        uses: actions/cache@v6
+        with:
+          # The sources, and the sub-builds whose stamps tell FetchContent they are already there.
+          # The sub-builds belong to the job's CMake and generator, hence the job in the key.
+          path: |
+            build/sanitize/_deps/*-src
+            build/sanitize/_deps/*-subbuild
+          key: deps-${{ runner.os }}-${{ github.job }}-${{ hashFiles('cmake/Dependencies.cmake') }}
+      - name: Install a decimal-comma locale
+        run: sudo locale-gen de_DE.UTF-8
+      - name: Configure
+        run: cmake --preset sanitize -DHYDROID_RES_REQUIRE_LOCALE_TESTS=ON
+      - name: Build
+        run: cmake --build --preset sanitize --parallel
+      - name: Check that the tests are built by Clang with both sanitizers
+        run: |
+          # Flags that never reached the build would let the tests below pass vacuously.
+          grep -E '^CMAKE_CXX_COMPILER:FILEPATH=.*clang\+\+' build/sanitize/CMakeCache.txt
+          nm build/sanitize/bin/hydroid-res-tests > symbols.txt
+          grep -q __asan_init symbols.txt
+          grep -q __ubsan_handle symbols.txt
+      - name: Test
+        run: ctest --preset sanitize
+
+  format:
+    name: clang-format
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install clang-format 23.1.5, the version the code is formatted with
+        run: |
+          pipx install clang-format==23.1.5
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Check the clang-format version
+        run: clang-format --version | grep -q 'clang-format version 23\.1\.5$'
+      - name: Check the formatting
+        run: git ls-files -z -- '*.h' '*.cpp' | xargs -0 clang-format --dry-run --Werror
 
   golden-app:
     name: golden app builds

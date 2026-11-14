@@ -53,6 +53,16 @@ cmake --build --preset debug
 ctest --preset debug
 ```
 
+With GCC or Clang, the `sanitize` preset does the same under AddressSanitizer and
+UndefinedBehaviorSanitizer, and stops at the first error; CI runs it with Clang on Linux.
+
+The C++ sources follow `.clang-format`, as clang-format 23.1.5 applies it (`pip install
+clang-format==23.1.5`); CI fails on any other formatting. To reformat:
+
+```sh
+git ls-files -z -- '*.h' '*.cpp' | xargs -0 clang-format -i
+```
+
 ## Golden data
 
 Needs an emulator or device, the Android SDK and JDK 17+ (Android Studio's bundled JDK works).
