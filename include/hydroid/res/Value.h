@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <type_traits>
 
 #include "hydroid/res/ResId.h"
 
@@ -52,19 +53,26 @@ struct Value {
     v.b = value;
     return v;
   }
-  // `data` is the complex value with its unit bits, as aapt2 writes it (16dp → 0x1001).
-  static Value dimension(uint32_t data) {
+  // `data` is Res_value data with its unit bits, as aapt2 writes it (16dp → 0x1001, not 16): get
+  // it from parseFloatValue or floatToComplex. Units are not checked; like Android, an unknown
+  // one is kept and converts to 0.
+  static Value dimensionFromComplex(uint32_t data) {
     Value v;
     v.kind = ValueKind::Dimension;
     v.complex = data;
     return v;
   }
-  static Value fractionValue(uint32_t data) {
+  static Value fractionFromComplex(uint32_t data) {
     Value v;
     v.kind = ValueKind::Fraction;
     v.complex = data;
     return v;
   }
+  // A float is a number, not complex data: dimensionFromComplex(1.5f) would store 0x1 (0px).
+  template <typename F, std::enable_if_t<std::is_floating_point_v<F>, int> = 0>
+  static Value dimensionFromComplex(F) = delete;
+  template <typename F, std::enable_if_t<std::is_floating_point_v<F>, int> = 0>
+  static Value fractionFromComplex(F) = delete;
   static Value floating(float value) {
     Value v;
     v.kind = ValueKind::Float;

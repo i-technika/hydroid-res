@@ -190,7 +190,8 @@ std::optional<Value> parseFloatValue(std::string_view s) {
     // aapt2 scales in float (f *= 1.0f/100), then packs into the complex format.
     std::optional<uint32_t> data = floatToComplex(*f * u.scale, u.unit);
     if (!data) return std::nullopt;
-    return u.kind == ValueKind::Fraction ? Value::fractionValue(*data) : Value::dimension(*data);
+    return u.kind == ValueKind::Fraction ? Value::fractionFromComplex(*data)
+                                         : Value::dimensionFromComplex(*data);
   }
   return std::nullopt;
 }

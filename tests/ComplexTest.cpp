@@ -4,13 +4,87 @@
 
 #include <cmath>
 #include <limits>
+#include <type_traits>
+#include <utility>
 
 #include "hydroid/res/Complex.h"
+#include "hydroid/res/ValueParser.h"
 
 namespace hydroid::res {
 namespace {
 
 constexpr uint32_t kDp = static_cast<uint32_t>(DimUnit::Dp);
+
+// ---- Value factories -----------------------------------------------------------------------
+// Detection traits: whether V::f(Arg) compiles. V stays a template parameter so a missing or
+// deleted function is a substitution failure, not a hard error.
+
+template <typename V, typename Arg, typename = void>
+struct AcceptsDimensionFromComplex : std::false_type {};
+template <typename V, typename Arg>
+struct AcceptsDimensionFromComplex<
+    V, Arg, std::void_t<decltype(V::dimensionFromComplex(std::declval<Arg>()))>>
+    : std::true_type {};
+
+template <typename V, typename Arg, typename = void>
+struct AcceptsFractionFromComplex : std::false_type {};
+template <typename V, typename Arg>
+struct AcceptsFractionFromComplex<
+    V, Arg, std::void_t<decltype(V::fractionFromComplex(std::declval<Arg>()))>>
+    : std::true_type {};
+
+template <typename V, typename = void>
+struct HasOldDimension : std::false_type {};
+template <typename V>
+struct HasOldDimension<V, std::void_t<decltype(V::dimension(std::declval<int>()))>>
+    : std::true_type {};
+
+template <typename V, typename = void>
+struct HasOldFractionValue : std::false_type {};
+template <typename V>
+struct HasOldFractionValue<V, std::void_t<decltype(V::fractionValue(std::declval<int>()))>>
+    : std::true_type {};
+
+// Value::dimension(16) used to compile and store data 0x10, which is 0px, not 16px.
+static_assert(!HasOldDimension<Value>::value);
+static_assert(!HasOldFractionValue<Value>::value);
+
+// Complex data is an integer; a float there is a number mistaken for data.
+static_assert(AcceptsDimensionFromComplex<Value, uint32_t>::value);
+static_assert(AcceptsDimensionFromComplex<Value, int>::value);  // hex literals: 0x1001
+static_assert(!AcceptsDimensionFromComplex<Value, float>::value);
+static_assert(!AcceptsDimensionFromComplex<Value, double>::value);
+static_assert(AcceptsFractionFromComplex<Value, uint32_t>::value);
+static_assert(!AcceptsFractionFromComplex<Value, float>::value);
+static_assert(!AcceptsFractionFromComplex<Value, double>::value);
+
+TEST(ValueFromComplex, KeepsDataAndKind) {
+  const Value dim = Value::dimensionFromComplex(0x1001);
+  EXPECT_EQ(dim.kind, ValueKind::Dimension);
+  EXPECT_EQ(dim.complex, 0x1001u);
+  const Value frac = Value::fractionFromComplex(0x40000031);
+  EXPECT_EQ(frac.kind, ValueKind::Fraction);
+  EXPECT_EQ(frac.complex, 0x40000031u);
+  // Same data, different kind.
+  EXPECT_NE(Value::dimensionFromComplex(0x100), Value::fractionFromComplex(0x100));
+}
+
+TEST(ValueFromComplex, NumberGoesThroughFloatToComplex) {
+  // How to build 16dp from a number: encode first, as the parser does.
+  EXPECT_EQ(Value::dimensionFromComplex(*floatToComplex(16, kDp)), parseFloatValue("16dp"));
+  EXPECT_EQ(Value::fractionFromComplex(*floatToComplex(0.5f, kComplexUnitFractionParent)),
+            parseFloatValue("50%p"));
+  // The raw number is not the value: data 16 is 0px.
+  EXPECT_EQ(complexToDimension(Value::dimensionFromComplex(16).complex,
+                               DisplayMetrics::forDensity(160)),
+            0.0f);
+}
+
+TEST(ValueFromComplex, KeepsUnknownUnitsLikeAndroid) {
+  // Units are not validated: Android keeps them too, and complexToDimension gives 0.
+  EXPECT_EQ(Value::dimensionFromComplex(0x100f).complex, 0x100fu);
+  EXPECT_EQ(complexToDimension(0x100f, DisplayMetrics::forDensity(160)), 0.0f);
+}
 
 // ---- floatToComplex ------------------------------------------------------------------------
 
