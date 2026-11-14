@@ -24,7 +24,11 @@ TEST(SdkBaseline, GoldenDumpRanOnEmulatedLevel) {
   int conditions = 0;
   forEachGoldenCondition([&](const std::string& condition, const nlohmann::json& golden) {
     ++conditions;
-    EXPECT_EQ(golden.at("condition").at("sdkInt").get<int>(), kEmulatedSdkVersion) << condition;
+    const nlohmann::json& c = golden.at("condition");
+    EXPECT_EQ(c.at("sdkInt").get<int>(), kEmulatedSdkVersion) << condition;
+    // Build.VERSION.SDK_INT_FULL is major * 100000 + minor: 37.0, not 37.1 or 37.2.
+    ASSERT_TRUE(c.contains("sdkIntFull")) << condition;
+    EXPECT_EQ(c.at("sdkIntFull").get<int>(), kEmulatedSdkVersion * 100000) << condition;
   });
   EXPECT_GT(conditions, 0) << "no golden JSON in " << HYDROID_GOLDEN_DIR;
 }
@@ -43,19 +47,20 @@ TEST(SdkBaseline, GoldenAppBuildsForEmulatedLevel) {
   }
 }
 
-// The first line of each file names them: "... with build-tools 37.0.0 and android-37.0. ...".
+// The first line of each file names them: "... with build-tools 37.0.0 and android-37.0 on
+// Windows. ...". The platform must be <level>.0, not a minor release; any build-tools <level>.x
+// will do.
 TEST(SdkBaseline, Aapt2GoldenUsesEmulatedLevel) {
+  const std::regex tools(R"(build-tools (\d+)\.\S+ and (android-\d+(\.\d+)?))");
   for (const char* path : {HYDROID_AAPT2_VALUES, HYDROID_AAPT2_CONFIGS}) {
     std::ifstream in(path);
     ASSERT_TRUE(in) << "cannot open " << path;
     std::string header;
     std::getline(in, header);
     std::smatch m;
-    ASSERT_TRUE(
-        std::regex_search(header, m, std::regex(R"(build-tools (\d+)\.\S+ and android-(\d+)\.)")))
-        << path << ": " << header;
+    ASSERT_TRUE(std::regex_search(header, m, tools)) << path << ": " << header;
     EXPECT_EQ(m[1].str(), kLevel) << path << ": build-tools";
-    EXPECT_EQ(m[2].str(), kLevel) << path << ": platform";
+    EXPECT_EQ(m[2].str(), "android-" + kLevel + ".0") << path << ": platform";
   }
 }
 

@@ -7,7 +7,8 @@
     "smallestWidthDp": 720,
     "screenWidthDp": 720,
     "screenHeightDp": 1280,
-    "sdkInt": 37
+    "sdkInt": 37,
+    "sdkIntFull": 3700000
   },
   "metrics": {
     "density": 3,

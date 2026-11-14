@@ -107,6 +107,10 @@ class GoldenDumpTest {
                 put("screenWidthDp", config.screenWidthDp)
                 put("screenHeightDp", config.screenHeightDp)
                 put("sdkInt", android.os.Build.VERSION.SDK_INT)
+                // major * 100000 + minor, so 37.0 and 37.1 differ; only there from API 36.
+                if (android.os.Build.VERSION.SDK_INT >= 36) {
+                    put("sdkIntFull", android.os.Build.VERSION.SDK_INT_FULL)
+                }
             })
             // What getDimension multiplied by. xdpi comes from the physical display, not densityDpi.
             put("metrics", JSONObject().apply {
