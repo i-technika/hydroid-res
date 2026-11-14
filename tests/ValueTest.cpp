@@ -31,12 +31,13 @@ float floatFromBits(uint32_t bits) {
   return f;
 }
 
-// A Value of `kind` whose Res_value data is `data` (0 or 1), or nullopt past the last kind. No
-// default, so a new ValueKind doesn't build (-Wswitch, C4062) until it is added here, and then
-// everyKind() has it.
+// A Value of `kind` built from `data` (1 or 2, since a reference to 0 is @null), or nullopt past
+// the last kind. No default, so a new ValueKind doesn't build (-Wswitch, C4062) until it is added
+// here, and then everyKind() has it.
 std::optional<Value> sample(ValueKind kind, uint32_t data) {
   switch (kind) {
-    case ValueKind::Null: return Value();
+    case ValueKind::Null: return Value::null();
+    case ValueKind::Empty: return Value::empty();
     case ValueKind::Reference: return Value::reference(data);
     case ValueKind::AttrRef: return Value::attrRef(data);
     case ValueKind::Color: return Value::color(data, ColorFormat::Argb8);
@@ -44,7 +45,7 @@ std::optional<Value> sample(ValueKind kind, uint32_t data) {
     case ValueKind::Fraction: return Value::fractionFromComplex(data);
     case ValueKind::Float: return Value::floating(floatFromBits(data));
     case ValueKind::Int: return Value::integer(static_cast<int32_t>(data));
-    case ValueKind::Bool: return Value::boolean(data != 0);
+    case ValueKind::Bool: return Value::boolean(data == 1);  // true holds 1, false 0
     case ValueKind::String: return Value::string(data);
     case ValueKind::StyledString: return Value::styledString(data);
     case ValueKind::File: return Value::file(data);
@@ -59,7 +60,7 @@ std::optional<Value> sample(ValueKind kind, uint32_t data) {
 
 std::vector<ValueKind> everyKind() {
   std::vector<ValueKind> kinds;
-  for (int k = 0; sample(static_cast<ValueKind>(k), 0); ++k) {
+  for (int k = 0; sample(static_cast<ValueKind>(k), 1); ++k) {
     kinds.push_back(static_cast<ValueKind>(k));
   }
   return kinds;
@@ -169,6 +170,13 @@ TEST(ValueAccessorDeathTest, WrongKindStopsADebugBuild) {
   EXPECT_DEATH(Value::string(0).ref(), "not a reference");
   EXPECT_DEATH(Value::reference(0x7f010001).index(), "not a pooled kind");
   EXPECT_DEATH(Value().index(), "not a pooled kind");
+  EXPECT_DEATH(Value::empty().ref(), "not a reference");
+}
+
+// A reference to 0 is how @null is written, so it would read back as Null, not as itself.
+TEST(ValueFactoryDeathTest, ReferenceToZeroStopsADebugBuild) {
+  EXPECT_DEATH(Value::reference(0), "reference to 0");
+  EXPECT_DEATH(Value::attrRef(0), "reference to 0");
 }
 #endif
 
@@ -190,13 +198,14 @@ TEST(ValueEquality, EveryKindComparesItsData) {
   for (ValueKind kind : everyKind()) {
     SCOPED_TRACE(testing::PrintToString(*sample(kind, 1)));
     EXPECT_EQ(sample(kind, 1), sample(kind, 1));
-    if (kind != ValueKind::Null) {
-      EXPECT_NE(sample(kind, 1), sample(kind, 0));
+    if (kind != ValueKind::Null && kind != ValueKind::Empty) {
+      EXPECT_NE(sample(kind, 1), sample(kind, 2));
     }
   }
 }
 
-// Every kind but Null holds data 1 in the same union bits, so only the kind tells them apart.
+// Every kind but Null and Empty holds data 1 in the same union bits, so only the kind tells them
+// apart.
 TEST(ValueEquality, SameDataDifferentKindDiffers) {
   const std::vector<ValueKind> kinds = everyKind();
   for (ValueKind a : kinds) {
@@ -216,6 +225,13 @@ TEST(ValueEquality, ReferenceAndNull) {
   EXPECT_NE(ref, other);
   EXPECT_NE(ref, attr);
   EXPECT_EQ(Value(), Value());
+}
+
+// @null and @empty both hold no data, but mean different things at runtime (#18).
+TEST(ValueEquality, NullIsNotEmpty) {
+  EXPECT_EQ(Value(), Value::null());
+  EXPECT_EQ(Value::empty(), Value::empty());
+  EXPECT_NE(Value::null(), Value::empty());
 }
 
 TEST(ValueEquality, FloatComparesBits) {
@@ -263,6 +279,7 @@ TEST(PrintValue, EveryKindShowsItsData) {
   EXPECT_EQ(print(Value::reference(0x7f010001)), "Reference(0x7f010001)");
   EXPECT_EQ(print(Value::attrRef(0x01010000)), "AttrRef(0x01010000)");
   EXPECT_EQ(print(Value()), "Null()");
+  EXPECT_EQ(print(Value::empty()), "Empty()");
   EXPECT_EQ(print(Value::string(3)), "String(index 3)");
   EXPECT_EQ(print(Value::styleableDecl(7)), "StyleableDecl(index 7)");
 }
