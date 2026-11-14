@@ -10,7 +10,7 @@ add_executable(hydroid-res-tests
   ValueParserTest.cpp
   ValueTest.cpp)
 target_link_libraries(hydroid-res-tests PRIVATE
-  hydroid::res GTest::gtest_main nlohmann_json::nlohmann_json)
+  hydroid::res pugixml::pugixml GTest::gtest_main nlohmann_json::nlohmann_json)
 target_compile_definitions(hydroid-res-tests PRIVATE
   HYDROID_AAPT2_VALUES="${PROJECT_SOURCE_DIR}/golden/aapt2/values.tsv"
   HYDROID_GOLDEN_DIR="${PROJECT_SOURCE_DIR}/golden/data"
@@ -22,3 +22,10 @@ endif()
 hydroid_set_warnings(hydroid-res-tests)
 
 gtest_discover_tests(hydroid-res-tests DISCOVERY_MODE PRE_TEST)
+
+# pugixml is an implementation detail of hydroid::res, so its consumers must not see it (#10).
+add_test(NAME CMake.PugixmlStaysPrivate
+  COMMAND ${CMAKE_COMMAND}
+    "-DCONSUMER_INCLUDES=$<JOIN:$<TARGET_PROPERTY:hydroid-res,INTERFACE_INCLUDE_DIRECTORIES>,|>"
+    "-DPUGIXML_INCLUDES=$<JOIN:$<TARGET_PROPERTY:pugixml::pugixml,INTERFACE_INCLUDE_DIRECTORIES>,|>"
+    -P ${CMAKE_CURRENT_SOURCE_DIR}/CheckPrivateDeps.cmake)
