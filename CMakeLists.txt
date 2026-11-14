@@ -22,6 +22,10 @@ if(PROJECT_IS_TOP_LEVEL AND NOT DEFINED CMAKE_RUNTIME_OUTPUT_DIRECTORY)
   set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/bin)
 endif()
 
+# BUILD_SHARED_LIBS as hydroid-res was asked for it, as a plain variable or a cache entry, so
+# CMake.LibraryTypes catches one that Dependencies.cmake failed to restore.
+set(hydroid_res_shared_requested "${BUILD_SHARED_LIBS}")
+
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 include(CompilerWarnings)
 include(Dependencies)
