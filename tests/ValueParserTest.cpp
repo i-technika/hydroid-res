@@ -43,13 +43,11 @@ TEST(ParseColor, FourFormats) {
   EXPECT_EQ(parseColor("#806200ee"), Value::colorValue(0x806200ee, ColorFormat::Argb8));
 }
 
-TEST(ParseColor, FormatIsTheResValueType) {
-  // Issue #4: the golden app has accent (#6200EE) as type 29 and surface (#FFFFFFFF) as 28.
-  EXPECT_EQ(static_cast<int>(ColorFormat::Argb8), 28);  // TYPE_INT_COLOR_ARGB8
-  EXPECT_EQ(static_cast<int>(ColorFormat::Rgb8), 29);   // TYPE_INT_COLOR_RGB8
-  EXPECT_EQ(static_cast<int>(ColorFormat::Argb4), 30);  // TYPE_INT_COLOR_ARGB4
-  EXPECT_EQ(static_cast<int>(ColorFormat::Rgb4), 31);   // TYPE_INT_COLOR_RGB4
-}
+// Issue #4: the golden app has accent (#6200EE) as type 29 and surface (#FFFFFFFF) as 28.
+static_assert(static_cast<int>(ColorFormat::Argb8) == 28);  // TYPE_INT_COLOR_ARGB8
+static_assert(static_cast<int>(ColorFormat::Rgb8) == 29);   // TYPE_INT_COLOR_RGB8
+static_assert(static_cast<int>(ColorFormat::Argb4) == 30);  // TYPE_INT_COLOR_ARGB4
+static_assert(static_cast<int>(ColorFormat::Rgb4) == 31);   // TYPE_INT_COLOR_RGB4
 
 TEST(ParseColor, SameColorInAnotherFormatIsAnotherValue) {
   // Opaque white four ways: equal argb, but Android keeps four different types.
