@@ -1,0 +1,95 @@
+{
+  "condition": {
+    "densityDpi": 480,
+    "locale": "ja-JP",
+    "night": true,
+    "orientation": "land",
+    "smallestWidthDp": 720,
+    "screenWidthDp": 1280,
+    "screenHeightDp": 720,
+    "sdkInt": 36
+  },
+  "values": {
+    "string\/app_name": {
+      "id": "0x7f050000",
+      "type": 3,
+      "data": 1,
+      "string": "Hydroid Golden"
+    },
+    "string\/density_bucket": {
+      "id": "0x7f050001",
+      "type": 3,
+      "data": 7,
+      "string": "xxhdpi"
+    },
+    "string\/greeting": {
+      "id": "0x7f050002",
+      "type": 3,
+      "data": 0,
+      "string": "Hello"
+    },
+    "string\/qualifier_hint": {
+      "id": "0x7f050003",
+      "type": 3,
+      "data": 2,
+      "string": "default"
+    },
+    "color\/accent": {
+      "id": "0x7f020000",
+      "type": 29,
+      "data": -10354450,
+      "string": "#ff6200ee"
+    },
+    "color\/accent_alias": {
+      "id": "0x7f020001",
+      "type": 29,
+      "data": -10354450,
+      "string": "#ff6200ee"
+    },
+    "color\/on_surface": {
+      "id": "0x7f020002",
+      "type": 28,
+      "data": -1646107,
+      "string": "#ffe6e1e5"
+    },
+    "color\/surface": {
+      "id": "0x7f020003",
+      "type": 28,
+      "data": -14935265,
+      "string": "#ff1c1b1f"
+    },
+    "dimen\/hairline": {
+      "id": "0x7f030000",
+      "type": 5,
+      "data": 256,
+      "string": "1.0px",
+      "px": 1
+    },
+    "dimen\/margin": {
+      "id": "0x7f030001",
+      "type": 5,
+      "data": 8193,
+      "string": "32.0dip",
+      "px": 96
+    },
+    "dimen\/text_body": {
+      "id": "0x7f030002",
+      "type": 5,
+      "data": 3586,
+      "string": "14.0sp",
+      "px": 42
+    },
+    "integer\/columns": {
+      "id": "0x7f040000",
+      "type": 16,
+      "data": 4,
+      "string": "4"
+    },
+    "bool\/is_tablet": {
+      "id": "0x7f010000",
+      "type": 18,
+      "data": -1,
+      "string": "true"
+    }
+  }
+}
