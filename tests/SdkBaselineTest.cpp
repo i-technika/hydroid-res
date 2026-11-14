@@ -43,7 +43,7 @@ TEST(SdkBaseline, GoldenAppBuildsForEmulatedLevel) {
   }
 }
 
-// The first line of each file names them: "... with build-tools 36.1.0 and android-36. ...".
+// The first line of each file names them: "... with build-tools 37.0.0 and android-37.0. ...".
 TEST(SdkBaseline, Aapt2GoldenUsesEmulatedLevel) {
   for (const char* path : {HYDROID_AAPT2_VALUES, HYDROID_AAPT2_CONFIGS}) {
     std::ifstream in(path);

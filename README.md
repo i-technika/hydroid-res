@@ -69,10 +69,10 @@ git ls-files -z -- '*.h' '*.cpp' | xargs -0 clang-format -i
 ## Golden data
 
 All of it comes from one API level, `kEmulatedSdkVersion` in `include/hydroid/res/Version.h`
-(36): the emulator, the golden app's `compileSdk` and `targetSdk`, and the build-tools and
+(37): the emulator, the golden app's `compileSdk` and `targetSdk`, and the build-tools and
 platform the aapt2 scripts pin. `SdkBaseline` tests fail when one of them moves without the rest.
 
-The dump needs an API 36 emulator or device, the Android SDK and JDK 17+ (Android Studio's
+The dump needs an API 37.0 emulator or device, the Android SDK and JDK 17+ (Android Studio's
 bundled JDK works).
 Open `golden/` in Android Studio, or build it with `golden/gradlew`. Then:
 
@@ -83,7 +83,7 @@ python scripts/golden/pull_golden.py
 This runs `GoldenDumpTest` over 252 conditions (7 densities × 3 languages × night × orientation ×
 3 smallest widths) and writes `golden/data/*.json`.
 
-The aapt2 files need only the SDK (build-tools 36.1.0 and platform android-36), no device:
+The aapt2 files need only the SDK (build-tools 37.0.0 and platform android-37.0), no device:
 
 ```sh
 python scripts/golden/gen_aapt2_values.py    # golden/aapt2/values.tsv

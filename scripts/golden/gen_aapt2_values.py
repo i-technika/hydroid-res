@@ -35,8 +35,8 @@ OUT = ROOT / "golden" / "aapt2" / "values.tsv"
 EXE = ".exe" if os.name == "nt" else ""
 # The build-tools and platform the aapt2 golden files come from, at the API level of
 # kEmulatedSdkVersion in include/hydroid/res/Version.h. Raise them together with it.
-BUILD_TOOLS = "36.1.0"
-PLATFORM = "android-36"
+BUILD_TOOLS = "37.0.0"
+PLATFORM = "android-37.0"
 
 UNITS = ["px", "dp", "dip", "sp", "pt", "in", "mm", "%", "%p"]
 

@@ -29,8 +29,9 @@
 // On purpose, these reject some names that aapt2 takes, where aapt2 cuts a part short, wraps a
 // number or packs a locale into bytes that no longer say what was written:
 //   - Numbers past 65535 in sw<N>dp, w<N>dp, h<N>dp, <N>dpi and <W>x<H>, which aapt2 wraps to 16
-//     bits: aapt2 reads sw65536dp as sw0dp, which is no qualifier at all. Versions past 65535
-//     fail in aapt2 too.
+//     bits: aapt2 reads sw65536dp as sw0dp, which is no qualifier at all. A number past 32 bits
+//     it first stops at 0xffffffff, so sw99999999999dp is sw65535dp and 99999999999dpi nodpi
+//     (build-tools 36.1.0 wrapped those too). Versions past 65535 fail in aapt2 too.
 //   - In the b+ form: an empty subtag ("b+", "b+sr+Latn+RS+"), a language that is not 2 or 3
 //     letters ("b+e" comes out "e" and a NUL, "b+english" "eng"), a region of 3 letters (aapt2
 //     packs region letters as 5 bits above '0': "b+en+xyz" comes out "en-r89;"), a region of 1
