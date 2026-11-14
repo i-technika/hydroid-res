@@ -195,6 +195,24 @@ TEST(AospFrameworkRes, EveryFolderParses) {
   EXPECT_EQ(types["drawable"], 28);
 }
 
+// Each folder is a row of configs.tsv that aapt2 took, so ParsesLikeAapt2 has checked it: a list
+// updated without rerunning gen_aapt2_configs.py fails here.
+void expectInAapt2Golden(const std::vector<std::string>& dirs) {
+  std::map<std::string, const Row*> byQualifiers;
+  for (const Row& row : rows()) byQualifiers.emplace(row.qualifiers, &row);
+  for (const std::string& dir : dirs) {
+    const size_t dash = dir.find('-');
+    const auto it = byQualifiers.find(dash == std::string::npos ? "" : dir.substr(dash + 1));
+    if (it == byQualifiers.end()) {
+      ADD_FAILURE() << dir << " is not in configs.tsv";
+    } else {
+      EXPECT_TRUE(it->second->aapt2) << dir << ": aapt2 rejects it";
+    }
+  }
+}
+
+TEST(AospFrameworkRes, EveryFolderIsInAapt2Golden) { expectInAapt2Golden(aospFrameworkDirs()); }
+
 // A few of them as aapt2 writes them; ParsesLikeAapt2 checks all.
 TEST(AospFrameworkRes, Samples) {
   auto canonical = [](const char* dir) {
@@ -224,6 +242,15 @@ TEST(GoldenAppRes, EveryFolderParses) {
     EXPECT_TRUE(parseResDir(entry.path().filename().string())) << entry.path().filename().string();
   }
   EXPECT_GT(count, 10);
+}
+
+TEST(GoldenAppRes, EveryFolderIsInAapt2Golden) {
+  std::vector<std::string> dirs;
+  for (const auto& entry : std::filesystem::directory_iterator(HYDROID_TEST_RES_DIR)) {
+    if (entry.is_directory()) dirs.push_back(entry.path().filename().string());
+  }
+  EXPECT_GT(dirs.size(), 10u);
+  expectInAapt2Golden(dirs);
 }
 
 }  // namespace
