@@ -1,0 +1,21 @@
+# CMake
+/build/
+/out/
+CMakeUserPresets.json
+
+# IDEs
+.vs/
+.vscode/
+.idea/
+*.user
+
+# Android / Gradle (golden app)
+golden/.gradle/
+golden/build/
+golden/app/build/
+golden/local.properties
+golden/.idea/
+*.apk
+
+# Python
+__pycache__/

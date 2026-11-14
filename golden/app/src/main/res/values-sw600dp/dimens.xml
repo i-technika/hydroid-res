@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <dimen name="margin">32dp</dimen>
+    <integer name="columns">3</integer>
+    <bool name="is_tablet">true</bool>
+</resources>
