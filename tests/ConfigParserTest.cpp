@@ -180,6 +180,12 @@ TEST(ParseConfig, ScreenPixels) {
   EXPECT_EQ(canonical("480x640"), "rejected");  // the width is the larger
   EXPECT_EQ(canonical("x480"), "rejected");
   EXPECT_EQ(canonical("640x480x2"), "rejected");
+  EXPECT_EQ(canonical("65535x1"), "65535x1");
+  // aapt2 wraps 65536 to 0, so it takes 65536x0 as the default and 1x65536 as 1x0: hydroid
+  // rejects them (see ConfigParser.h).
+  for (const char* s : {"65536x0", "65536x", "131072x0", "1x65536"}) {
+    EXPECT_EQ(canonical(s), "rejected") << s;
+  }
 }
 
 TEST(ParseConfig, Version) {

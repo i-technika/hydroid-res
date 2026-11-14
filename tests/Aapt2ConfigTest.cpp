@@ -55,7 +55,8 @@ const std::vector<Row>& rows() {
 const std::set<std::string> kDeliberateRejects = {
     // Past 16 bits, which aapt2 wraps: sw65536dp is sw0dp. Past 0x7fffffff it stops there first.
     "sw65536dp", "sw2147483647dp", "sw2147483648dp", "sw4294967296dp", "sw99999999999dp",
-    "w65536dp", "h65536dp", "65536dpi", "99999999999dpi",
+    "w65536dp", "h65536dp", "65536dpi", "99999999999dpi", "65536x0", "65536x", "131072x0",
+    "1x65536",
     // b+ with an empty subtag.
     "b+", "b++en", "b+sr+Latn+RS+", "b+sr+Latn++x", "b+zh+Hant+TW+", "b+zh+Hant++",
     // A language of 1 or of 4 and more letters, or not of letters.
