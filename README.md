@@ -20,7 +20,8 @@ resolves values exactly as Android does, for UIKit, GTK4 and WinUI 3. Design and
 
 ## Build and test
 
-Needs CMake 3.21+ and a C++17 compiler. pugixml and GoogleTest are fetched at configure time.
+Needs CMake 3.21+ and a C++17 compiler. pugixml, plus GoogleTest and nlohmann/json for the
+tests, are fetched at configure time.
 
 ```sh
 cmake --preset debug

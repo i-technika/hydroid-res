@@ -1,5 +1,7 @@
 #include "hydroid/res/ValueParser.h"
 
+#include "hydroid/res/Complex.h"
+
 #include <cmath>
 #include <cstdint>
 #include <locale>
@@ -70,20 +72,23 @@ std::optional<float> toFloat(double d) {
 struct UnitName {
   std::string_view name;
   ValueKind kind;
-  DimUnit unit;
-  bool parent;
+  uint32_t unit;  // COMPLEX_UNIT_*
+  float scale;
 };
 
+constexpr uint32_t dim(DimUnit u) { return static_cast<uint32_t>(u); }
+
+// aapt2's unitNames.
 constexpr UnitName kUnits[] = {
-    {"px", ValueKind::Dimension, DimUnit::Px, false},
-    {"dip", ValueKind::Dimension, DimUnit::Dp, false},
-    {"dp", ValueKind::Dimension, DimUnit::Dp, false},
-    {"sp", ValueKind::Dimension, DimUnit::Sp, false},
-    {"pt", ValueKind::Dimension, DimUnit::Pt, false},
-    {"in", ValueKind::Dimension, DimUnit::In, false},
-    {"mm", ValueKind::Dimension, DimUnit::Mm, false},
-    {"%", ValueKind::Fraction, DimUnit::Px, false},
-    {"%p", ValueKind::Fraction, DimUnit::Px, true},
+    {"px", ValueKind::Dimension, dim(DimUnit::Px), 1.0f},
+    {"dip", ValueKind::Dimension, dim(DimUnit::Dp), 1.0f},
+    {"dp", ValueKind::Dimension, dim(DimUnit::Dp), 1.0f},
+    {"sp", ValueKind::Dimension, dim(DimUnit::Sp), 1.0f},
+    {"pt", ValueKind::Dimension, dim(DimUnit::Pt), 1.0f},
+    {"in", ValueKind::Dimension, dim(DimUnit::In), 1.0f},
+    {"mm", ValueKind::Dimension, dim(DimUnit::Mm), 1.0f},
+    {"%", ValueKind::Fraction, kComplexUnitFraction, 1.0f / 100},
+    {"%p", ValueKind::Fraction, kComplexUnitFractionParent, 1.0f / 100},
 };
 
 uint32_t formatOf(ValueKind kind) {
@@ -175,22 +180,17 @@ std::optional<Value> parseFloatValue(std::string_view s) {
   std::optional<double> d = toDouble(s.substr(0, n));
   if (!d) return std::nullopt;
 
+  std::optional<float> f = toFloat(*d);
+  if (!f) return std::nullopt;
+
   std::string_view rest = s.substr(n);
-  if (rest.empty()) {
-    std::optional<float> f = toFloat(*d);
-    if (!f) return std::nullopt;
-    return Value::floating(*f);
-  }
+  if (rest.empty()) return Value::floating(*f);
   for (const UnitName& u : kUnits) {
     if (rest != u.name) continue;
-    if (u.kind == ValueKind::Fraction) {
-      std::optional<float> f = toFloat(*d / 100.0);
-      if (!f) return std::nullopt;
-      return Value::fractionValue(*f, u.parent);
-    }
-    std::optional<float> f = toFloat(*d);
-    if (!f) return std::nullopt;
-    return Value::dimension(*f, u.unit);
+    // aapt2 scales in float (f *= 1.0f/100), then packs into the complex format.
+    std::optional<uint32_t> data = floatToComplex(*f * u.scale, u.unit);
+    if (!data) return std::nullopt;
+    return u.kind == ValueKind::Fraction ? Value::fractionValue(*data) : Value::dimension(*data);
   }
   return std::nullopt;
 }

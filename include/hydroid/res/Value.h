@@ -14,12 +14,11 @@ enum class ValueKind : uint8_t {
   Style, Array, Plurals, AttrDecl, StyleableDecl
 };
 
-enum class DimUnit : uint8_t { Px, Dp, Sp, Pt, In, Mm };
+// Same values as Android's TypedValue.COMPLEX_UNIT_PX ... COMPLEX_UNIT_MM.
+enum class DimUnit : uint8_t { Px = 0, Dp = 1, Sp = 2, Pt = 3, In = 4, Mm = 5 };
 
-// Named so they can sit in Value's anonymous union (unnamed structs there are an extension).
+// Named so it can sit in Value's anonymous union (unnamed structs there are an extension).
 struct IntData { int32_t v; bool hex; };         // hex = written as 0x.. (TYPE_INT_HEX)
-struct DimData { float v; DimUnit unit; };
-struct FractionData { float v; bool parent; };  // "50%" → 0.5, "%p" sets parent
 
 struct Value {
   ValueKind kind = ValueKind::Null;
@@ -28,8 +27,7 @@ struct Value {
     uint32_t     argb;                          // Color
     IntData      integer;                       // Int
     bool         b;                             // Bool
-    DimData      dim;                           // Dimension
-    FractionData fraction;                      // Fraction
+    uint32_t     complex;                       // Dimension, Fraction: Res_value data, see Complex.h
     float        f;                             // Float
     uint32_t index;                             // 문자열 풀 또는 복합값 풀 위치
   };
@@ -54,16 +52,17 @@ struct Value {
     v.b = value;
     return v;
   }
-  static Value dimension(float value, DimUnit u) {
+  // `data` is the complex value with its unit bits, as aapt2 writes it (16dp → 0x1001).
+  static Value dimension(uint32_t data) {
     Value v;
     v.kind = ValueKind::Dimension;
-    v.dim = {value, u};
+    v.complex = data;
     return v;
   }
-  static Value fractionValue(float value, bool ofParent) {
+  static Value fractionValue(uint32_t data) {
     Value v;
     v.kind = ValueKind::Fraction;
-    v.fraction = {value, ofParent};
+    v.complex = data;
     return v;
   }
   static Value floating(float value) {

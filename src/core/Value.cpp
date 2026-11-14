@@ -17,9 +17,8 @@ bool operator==(const Value& a, const Value& b) {
     case ValueKind::Bool:
       return a.b == b.b;
     case ValueKind::Dimension:
-      return a.dim.v == b.dim.v && a.dim.unit == b.dim.unit;
     case ValueKind::Fraction:
-      return a.fraction.v == b.fraction.v && a.fraction.parent == b.fraction.parent;
+      return a.complex == b.complex;
     case ValueKind::Float:
       return a.f == b.f;
     default:
