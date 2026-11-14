@@ -170,24 +170,21 @@ std::pair<uint64_t, int> floatParts(typename FloatTraits<F>::Bits bits) {
   return {m | (uint64_t{1} << T::kMantissaBits), e - 1 + T::kMinExponent};
 }
 
-// Sign of |d| − (midpoint of the floats with bits n and n + 1).
+// Sign of |d| − (midpoint of the floats with bits n and n + 1), where `scaled` is d's digits
+// times 10^exponent if the exponent is not negative, made once for every midpoint.
 template <typename F>
-int compareWithMidpoint(const Decimal& d, typename FloatTraits<F>::Bits n) {
+int compareWithMidpoint(const BigUint& scaled, int exponent, typename FloatTraits<F>::Bits n) {
   const auto [s0, e0] = floatParts<F>(n);
   const auto [s1, e1] = floatParts<F>(n + 1);
-  BigUint lhs(d.digits);
   BigUint rhs(s0 + (s1 << (e1 - e0)));  // the midpoint is rhs × 2^(e0 - 1)
   const int e2 = e0 - 1;
-  if (d.exponent >= 0) {
-    lhs.mulPow10(d.exponent);
-  } else {
-    rhs.mulPow10(-d.exponent);
-  }
+  if (exponent < 0) rhs.mulPow10(-exponent);
   if (e2 >= 0) {
     rhs.mulPow2(e2);
-  } else {
-    lhs.mulPow2(-e2);
+    return compare(scaled, rhs);
   }
+  BigUint lhs = scaled;
+  lhs.mulPow2(-e2);
   return compare(lhs, rhs);
 }
 
@@ -228,13 +225,15 @@ std::optional<F> roundDecimal(const Decimal& d) {
   Bits n;
   const F start = static_cast<F>(std::min(estimate, double{std::numeric_limits<F>::max()}));
   std::memcpy(&n, &start, sizeof n);
+  BigUint scaled(d.digits);
+  if (d.exponent >= 0) scaled.mulPow10(d.exponent);
   for (;;) {
-    int c = n < inf ? compareWithMidpoint<F>(d, n) : -1;
+    int c = n < inf ? compareWithMidpoint<F>(scaled, d.exponent, n) : -1;
     if (c > 0 || (c == 0 && (n & 1))) {
       n++;
       continue;
     }
-    c = n > 0 ? compareWithMidpoint<F>(d, n - 1) : 1;
+    c = n > 0 ? compareWithMidpoint<F>(scaled, d.exponent, n - 1) : 1;
     if (c < 0 || (c == 0 && (n & 1))) {
       n--;
       continue;
@@ -283,6 +282,8 @@ constexpr uint32_t kFloatFormats = kFormatFloat | kFormatDimension | kFormatFrac
 // Whether the float `f` that `number` parsed to is within 1 of the same text read as a double,
 // which aapt2 asks of a plain float when the formats also allow something else.
 bool closeToDouble(std::string_view number, float f) {
+  // Below 2^24 a float is within half of 1 of the decimal, so only large floats are read again.
+  if (std::fabs(f) < 16777216.0f) return true;
   std::optional<double> d = roundDecimal<double>(toDecimal(trim(number)));
   return d && std::fabs(static_cast<double>(f) - *d) < 1;
 }
@@ -395,7 +396,8 @@ std::optional<Value> parseLiteral(std::string_view s, uint32_t formats) {
     auto v = parseFloatValue(s);
     if (!v || !(formats & formatOf(v->kind))) return std::nullopt;
     // aapt2 keeps the text as a string instead if the float is 1 or more off: 9638178525 under
-    // kFormatAny, whose nearest float is 9638178816.
+    // kFormatAny, whose nearest float is 9638178816. Any format past float/dimension/fraction
+    // asks for the check, even one that cannot hold the string, such as float|reference.
     if (v->kind == ValueKind::Float && (formats & ~kFloatFormats) && !closeToDouble(s, v->f)) {
       return std::nullopt;
     }

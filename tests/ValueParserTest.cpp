@@ -250,8 +250,22 @@ TEST(ParseLiteral, FloatThatMissesTheDoubleByOneIsAStringWhenOtherFormatsAreAllo
   // A float holds 2^31 exactly, and 0.1 is off by far less than 1.
   EXPECT_EQ(parseLiteral("2147483648", kFormatAny), Value::floating(2147483648.0f));
   EXPECT_EQ(parseLiteral("0.1", kFormatAny), Value::floating(0.1f));
-  // Floats only: no check, as for <dimen>.
+  // Any other format asks for the check, even one with no string to fall back to: aapt2 36.1.0
+  // fails a style item of a float|reference, float|integer, float|color, float|boolean, or
+  // float enum/flags attr with this text, and keeps it as a string for float|string.
+  for (uint32_t other : {kFormatReference, kFormatString, kFormatInteger, kFormatBoolean,
+                         kFormatColor, kFormatEnum, kFormatFlags}) {
+    EXPECT_FALSE(parseLiteral("9638178525", kFormatFloat | other)) << other;
+    EXPECT_FALSE(parseLiteral("-2147483649", kFormatFloat | other)) << other;
+  }
+  // Floats only: no check, as for <dimen> or a float attr.
+  EXPECT_EQ(parseLiteral("9638178525", kFormatFloat), Value::floating(9638178816.0f));
   EXPECT_EQ(parseLiteral("9638178525", kDimenTag), Value::floating(9638178816.0f));
+  // Off by exactly 1 fails; less than 1 passes, however large the float.
+  EXPECT_FALSE(parseLiteral("16777217.0", kFormatAny));
+  EXPECT_EQ(parseLiteral("16777216.5", kFormatAny), Value::floating(16777216.0f));
+  EXPECT_EQ(parseLiteral("16777218.0", kFormatAny), Value::floating(16777218.0f));
+  EXPECT_EQ(parseLiteral("1e10", kFormatAny), Value::floating(1e10f));
   // Dimensions are never checked.
   EXPECT_EQ(parseLiteral("9638178525px", kFormatAny), parseFloatValue("9638178525px"));
 }

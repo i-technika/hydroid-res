@@ -205,14 +205,29 @@ def bool_inputs() -> list:
     return texts + ["", "yes", "no", "1", "0", " true ", "truee", "tru", "on", "off", "null"]
 
 
+def hex_float(text: str) -> bool:
+    """Whether strtof may read text as a hex float that hydroid rejects on purpose.
+
+    Under "any", hex past an integer (0X10, -0x10, 0x100000000) falls through to strtof. Only
+    what hydroid's integer parser takes, 0x and at most 32 bits, is kept.
+    """
+    m = re.fullmatch(r"\s*0x([0-9a-fA-F]+)\s*", text)
+    if m:
+        return int(m[1], 16) > 0xFFFFFFFF
+    return re.match(r"\s*[+-]?0[xX]", text) is not None
+
+
 def any_inputs(rng: random.Random, *corpora) -> list:
     # Every format at once: aapt2 tries color, bool, integer, float, then keeps a string.
     texts = ["hello", "5", "-5", "#fff", "true", "1.5", "16dp", "50%", "50%p", "0x10",
              "2147483648", "-2147483649", "0xffffffff", "1e3", "TRUE", "tRUE",
              "#ggg", "", "1.0000000596046447753906251",
+             # A float 1 or more off the double is kept as a string: the edge of that check.
+             "16777216.5", "16777217.0", "16777218.0", "33554433.5", "1e10",
              # Floats under <dimen> but strings here: aapt2 keeps no float inf or NaN for "any".
              "-inf", "+nan", "1e39"]
     for corpus in corpora:
+        corpus = [t for t in corpus if not hex_float(t)]
         texts += rng.sample(corpus, min(len(corpus), 60))
     return texts
 
