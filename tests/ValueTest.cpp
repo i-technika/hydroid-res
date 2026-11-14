@@ -31,12 +31,12 @@ float floatFromBits(uint32_t bits) {
   return f;
 }
 
-// A Value of `kind` whose Res_value data is `data` (0 or 1), or nullopt past the last kind. No
-// default, so a new ValueKind doesn't build (-Wswitch, C4062) until it is added here, and then
-// everyKind() has it.
+// A Value of `kind` built from `data` (1 or 2, since a reference to 0 is @null), or nullopt past
+// the last kind. No default, so a new ValueKind doesn't build (-Wswitch, C4062) until it is added
+// here, and then everyKind() has it.
 std::optional<Value> sample(ValueKind kind, uint32_t data) {
   switch (kind) {
-    case ValueKind::Null: return Value();
+    case ValueKind::Null: return Value::null();
     case ValueKind::Empty: return Value::empty();
     case ValueKind::Reference: return Value::reference(data);
     case ValueKind::AttrRef: return Value::attrRef(data);
@@ -45,7 +45,7 @@ std::optional<Value> sample(ValueKind kind, uint32_t data) {
     case ValueKind::Fraction: return Value::fractionFromComplex(data);
     case ValueKind::Float: return Value::floating(floatFromBits(data));
     case ValueKind::Int: return Value::integer(static_cast<int32_t>(data));
-    case ValueKind::Bool: return Value::boolean(data != 0);
+    case ValueKind::Bool: return Value::boolean(data == 1);  // true holds 1, false 0
     case ValueKind::String: return Value::string(data);
     case ValueKind::StyledString: return Value::styledString(data);
     case ValueKind::File: return Value::file(data);
@@ -60,7 +60,7 @@ std::optional<Value> sample(ValueKind kind, uint32_t data) {
 
 std::vector<ValueKind> everyKind() {
   std::vector<ValueKind> kinds;
-  for (int k = 0; sample(static_cast<ValueKind>(k), 0); ++k) {
+  for (int k = 0; sample(static_cast<ValueKind>(k), 1); ++k) {
     kinds.push_back(static_cast<ValueKind>(k));
   }
   return kinds;
@@ -172,6 +172,12 @@ TEST(ValueAccessorDeathTest, WrongKindStopsADebugBuild) {
   EXPECT_DEATH(Value().index(), "not a pooled kind");
   EXPECT_DEATH(Value::empty().ref(), "not a reference");
 }
+
+// A reference to 0 is how @null is written, so it would read back as Null, not as itself.
+TEST(ValueFactoryDeathTest, ReferenceToZeroStopsADebugBuild) {
+  EXPECT_DEATH(Value::reference(0), "reference to 0");
+  EXPECT_DEATH(Value::attrRef(0), "reference to 0");
+}
 #endif
 
 // Value is trivially copyable, so bytes can hold a kind no factory makes.
@@ -193,7 +199,7 @@ TEST(ValueEquality, EveryKindComparesItsData) {
     SCOPED_TRACE(testing::PrintToString(*sample(kind, 1)));
     EXPECT_EQ(sample(kind, 1), sample(kind, 1));
     if (kind != ValueKind::Null && kind != ValueKind::Empty) {
-      EXPECT_NE(sample(kind, 1), sample(kind, 0));
+      EXPECT_NE(sample(kind, 1), sample(kind, 2));
     }
   }
 }
@@ -223,8 +229,9 @@ TEST(ValueEquality, ReferenceAndNull) {
 
 // @null and @empty both hold no data, but mean different things at runtime (#18).
 TEST(ValueEquality, NullIsNotEmpty) {
+  EXPECT_EQ(Value(), Value::null());
   EXPECT_EQ(Value::empty(), Value::empty());
-  EXPECT_NE(Value(), Value::empty());
+  EXPECT_NE(Value::null(), Value::empty());
 }
 
 TEST(ValueEquality, FloatComparesBits) {

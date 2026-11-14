@@ -36,20 +36,24 @@ enum class IntFormat : uint8_t {
 
 // A value of one ValueKind. Only the factories set the kind, so the data always belongs to it.
 //
-// Factories are named for the kind they make: color, integer, boolean, floating (Int, Bool and
-// Float are C++ keywords), reference, string, ... Each takes the value itself, except the
+// Factories are named for the kind they make: null, empty, color, integer, boolean, floating (Int,
+// Bool and Float are C++ keywords), reference, string, ... Each takes the value itself, except the
 // *FromComplex ones, which take Res_value data. Accessors are named for what they return and
 // check the kind: argb() of a Dimension stops a debug build of the library. A release build of
 // the library doesn't check, and reads the union as it is.
 class Value {
  public:
+  // A default Value is @null.
+  Value() : Value(ValueKind::Null) {}
   // @null: no value. aapt2 writes it as a reference to 0 (TYPE_REFERENCE, data 0), which the
   // runtime reads back as undefined (TYPE_NULL, data 0): TypedArray.hasValueOrEmpty is false.
-  Value() : Value(ValueKind::Null) {}
+  static Value null() { return Value(ValueKind::Null); }
   // @empty: a value that is there but empty (TYPE_NULL, data DATA_NULL_EMPTY = 1), so
   // TypedArray.hasValueOrEmpty is true, unlike for @null.
   static Value empty() { return Value(ValueKind::Empty); }
 
+  // `id` is not 0: a reference to 0 is how aapt2 writes @null, so it reads back as null(), and
+  // reference(0) or attrRef(0) would not. They stop a debug build of the library.
   static Value reference(ResId id) { return withRef(ValueKind::Reference, id); }
   static Value attrRef(ResId id) { return withRef(ValueKind::AttrRef, id); }
   // `argb` is 0xAARRGGBB whatever the format: #f80 is color(0xffff8800, ColorFormat::Rgb4).
@@ -199,6 +203,7 @@ class Value {
   explicit Value(ValueKind kind) : kind_(kind), index_(0) {}
 
   static Value withRef(ValueKind kind, ResId id) {
+    if (id == 0) kindMismatch("reference to 0 (@null is Value::null())");
     Value v(kind);
     v.ref_ = id;
     return v;
