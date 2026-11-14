@@ -40,7 +40,9 @@ TEST(ValueEquality, IndexKindsCompareTheirIndex) {
 TEST(ValueEquality, SameIndexDifferentKindDiffers) {
   for (ValueKind a : kIndexKinds) {
     for (ValueKind b : kIndexKinds) {
-      if (a != b) EXPECT_NE(withIndex(a, 3), withIndex(b, 3));
+      if (a != b) {
+        EXPECT_NE(withIndex(a, 3), withIndex(b, 3));
+      }
     }
   }
 }
