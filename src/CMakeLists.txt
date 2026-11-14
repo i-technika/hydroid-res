@@ -1,4 +1,5 @@
 add_library(hydroid-res
+  core/Complex.cpp
   core/Value.cpp
   core/ValueParser.cpp
   core/Version.cpp

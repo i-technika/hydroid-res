@@ -9,27 +9,33 @@
     "screenHeightDp": 1280,
     "sdkInt": 36
   },
+  "metrics": {
+    "density": 1,
+    "scaledDensity": 1,
+    "xdpi": 420,
+    "fontScale": 1
+  },
   "values": {
     "string\/app_name": {
-      "id": "0x7f050000",
+      "id": "0x7f060000",
       "type": 3,
       "data": 1,
       "string": "Hydroid Golden"
     },
     "string\/density_bucket": {
-      "id": "0x7f050001",
+      "id": "0x7f060001",
       "type": 3,
       "data": 3,
       "string": "none"
     },
     "string\/greeting": {
-      "id": "0x7f050002",
+      "id": "0x7f060002",
       "type": 3,
       "data": 10,
       "string": "안녕하세요"
     },
     "string\/qualifier_hint": {
-      "id": "0x7f050003",
+      "id": "0x7f060003",
       "type": 3,
       "data": 11,
       "string": "ko-rKR"
@@ -58,29 +64,135 @@
       "data": -1,
       "string": "#ffffffff"
     },
-    "dimen\/hairline": {
+    "dimen\/complex_fraction_dropped": {
       "id": "0x7f030000",
+      "type": 5,
+      "data": 76800001,
+      "string": "300000.0dip",
+      "px": 300000
+    },
+    "dimen\/complex_in": {
+      "id": "0x7f030001",
+      "type": 5,
+      "data": 644245300,
+      "string": "0.30000007in",
+      "px": 126.00003051757812
+    },
+    "dimen\/complex_mixed": {
+      "id": "0x7f030002",
+      "type": 5,
+      "data": 40454161,
+      "string": "1234.5625dip",
+      "px": 1234.5625
+    },
+    "dimen\/complex_mm": {
+      "id": "0x7f030003",
+      "type": 5,
+      "data": 14260517,
+      "string": "1.6999817mm",
+      "px": 28.109933853149414
+    },
+    "dimen\/complex_negative": {
+      "id": "0x7f030004",
+      "type": 5,
+      "data": -12582879,
+      "string": "-1.5dip",
+      "px": -1.5
+    },
+    "dimen\/complex_pt": {
+      "id": "0x7f030005",
+      "type": 5,
+      "data": 104857635,
+      "string": "12.5pt",
+      "px": 72.91666412353516
+    },
+    "dimen\/complex_px": {
+      "id": "0x7f030006",
+      "type": 5,
+      "data": 1073741872,
+      "string": "0.5px",
+      "px": 0.5
+    },
+    "dimen\/complex_sp": {
+      "id": "0x7f030007",
+      "type": 5,
+      "data": 114923810,
+      "string": "13.699982sp",
+      "px": 13.699981689453125
+    },
+    "dimen\/complex_tenth": {
+      "id": "0x7f030008",
+      "type": 5,
+      "data": 214748465,
+      "string": "0.100000024dip",
+      "px": 0.10000002384185791
+    },
+    "dimen\/complex_wrap": {
+      "id": "0x7f030009",
+      "type": 5,
+      "data": -1990967295,
+      "string": "-7777216.0dip",
+      "px": -7777216
+    },
+    "dimen\/hairline": {
+      "id": "0x7f03000a",
       "type": 5,
       "data": 256,
       "string": "1.0px",
       "px": 1
     },
     "dimen\/margin": {
-      "id": "0x7f030001",
+      "id": "0x7f03000b",
       "type": 5,
       "data": 8193,
       "string": "32.0dip",
       "px": 32
     },
     "dimen\/text_body": {
-      "id": "0x7f030002",
+      "id": "0x7f03000c",
       "type": 5,
       "data": 3586,
       "string": "14.0sp",
       "px": 14
     },
-    "integer\/columns": {
+    "fraction\/complex_percent": {
       "id": "0x7f040000",
+      "type": 6,
+      "data": 644245040,
+      "string": "29.999996%",
+      "base": 360,
+      "parentBase": 1234,
+      "fraction": 107.99998474121094
+    },
+    "fraction\/complex_percent_large": {
+      "id": "0x7f040001",
+      "type": 6,
+      "data": 20971553,
+      "string": "250.0%p",
+      "base": 360,
+      "parentBase": 1234,
+      "fraction": 3085
+    },
+    "fraction\/complex_percent_negative": {
+      "id": "0x7f040002",
+      "type": 6,
+      "data": -268435408,
+      "string": "-12.5%",
+      "base": 360,
+      "parentBase": 1234,
+      "fraction": -45
+    },
+    "fraction\/complex_percent_parent": {
+      "id": "0x7f040003",
+      "type": 6,
+      "data": 386546993,
+      "string": "17.999994%p",
+      "base": 360,
+      "parentBase": 1234,
+      "fraction": 222.11993408203125
+    },
+    "integer\/columns": {
+      "id": "0x7f050000",
       "type": 16,
       "data": 3,
       "string": "3"

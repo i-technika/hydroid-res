@@ -39,7 +39,11 @@ class GoldenDumpTest {
     private val smallestWidths = listOf(320, 600, 720)
 
     // Types the dump covers; later steps add style, array, plurals, layout and drawable.
-    private val types = listOf("string", "color", "dimen", "integer", "bool")
+    private val types = listOf("string", "color", "dimen", "fraction", "integer", "bool")
+
+    // Bases for Resources.getFraction: "%" scales the first, "%p" the second.
+    private val fractionBase = 360
+    private val fractionParentBase = 1234
 
     @Test
     fun dumpAll() {
@@ -85,6 +89,11 @@ class GoldenDumpTest {
                     put("data", tv.data)
                     put("string", tv.coerceToString()?.toString() ?: JSONObject.NULL)
                     if (type == "dimen") put("px", res.getDimension(id).toDouble())
+                    if (type == "fraction") {
+                        put("base", fractionBase)
+                        put("parentBase", fractionParentBase)
+                        put("fraction", res.getFraction(id, fractionBase, fractionParentBase).toDouble())
+                    }
                 })
             }
         }
@@ -98,6 +107,13 @@ class GoldenDumpTest {
                 put("screenWidthDp", config.screenWidthDp)
                 put("screenHeightDp", config.screenHeightDp)
                 put("sdkInt", android.os.Build.VERSION.SDK_INT)
+            })
+            // What getDimension multiplied by. xdpi comes from the physical display, not densityDpi.
+            put("metrics", JSONObject().apply {
+                put("density", res.displayMetrics.density.toDouble())
+                put("scaledDensity", res.displayMetrics.scaledDensity.toDouble())
+                put("xdpi", res.displayMetrics.xdpi.toDouble())
+                put("fontScale", res.configuration.fontScale.toDouble())
             })
             put("values", values)
         }

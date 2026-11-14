@@ -36,7 +36,8 @@ std::optional<Value> parseBool(std::string_view s);
 std::optional<Value> parseInteger(std::string_view s);
 
 // "1.5" → Float, "16dp" → Dimension, "50%" / "50%p" → Fraction. Units are case-sensitive and
-// must follow the number directly ("16 dp" is rejected); "dip" is an alias of "dp".
+// must follow the number directly ("16 dp" is rejected); "dip" is an alias of "dp". Dimensions and
+// fractions keep aapt2's complex encoding (see Complex.h), so "0.1dp" reads back as 0.100000024.
 std::optional<Value> parseFloatValue(std::string_view s);
 
 // Tries the literal parsers allowed by `formats` in aapt2's order: color, bool, integer, then

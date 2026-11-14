@@ -4,6 +4,7 @@
 
 #include <ostream>
 
+#include "hydroid/res/Complex.h"
 #include "hydroid/res/ValueParser.h"
 
 namespace hydroid::res {
@@ -13,9 +14,15 @@ void PrintTo(const Value& v, std::ostream* os) {
     case ValueKind::Color: *os << "Color(0x" << std::hex << v.argb << std::dec << ")"; break;
     case ValueKind::Int: *os << "Int(" << v.integer.v << (v.integer.hex ? ", hex)" : ")"); break;
     case ValueKind::Bool: *os << "Bool(" << v.b << ")"; break;
-    case ValueKind::Dimension: *os << "Dimension(" << v.dim.v << toString(v.dim.unit) << ")"; break;
+    case ValueKind::Dimension:
+      *os << "Dimension(" << complexToFloat(v.complex)
+          << toString(static_cast<DimUnit>(complexUnit(v.complex))) << ", 0x" << std::hex
+          << v.complex << std::dec << ")";
+      break;
     case ValueKind::Fraction:
-      *os << "Fraction(" << v.fraction.v << (v.fraction.parent ? ", parent)" : ")");
+      *os << "Fraction(" << complexToFloat(v.complex)
+          << (complexUnit(v.complex) == kComplexUnitFractionParent ? ", parent" : "") << ", 0x"
+          << std::hex << v.complex << std::dec << ")";
       break;
     case ValueKind::Float: *os << "Float(" << v.f << ")"; break;
     default: *os << "Value(kind " << static_cast<int>(v.kind) << ")"; break;
@@ -52,28 +59,37 @@ TEST(ParseColor, Rejects) {
 }
 
 // ---- dimension -----------------------------------------------------------------------------
+// Expected values are Res_value data as aapt2 writes it: mantissa << 8 | radix << 4 | unit.
 
 TEST(ParseFloatValue, SixUnits) {
-  EXPECT_EQ(parseFloatValue("1px"), Value::dimension(1, DimUnit::Px));
-  EXPECT_EQ(parseFloatValue("16dp"), Value::dimension(16, DimUnit::Dp));
-  EXPECT_EQ(parseFloatValue("14sp"), Value::dimension(14, DimUnit::Sp));
-  EXPECT_EQ(parseFloatValue("12pt"), Value::dimension(12, DimUnit::Pt));
-  EXPECT_EQ(parseFloatValue("2in"), Value::dimension(2, DimUnit::In));
-  EXPECT_EQ(parseFloatValue("25mm"), Value::dimension(25, DimUnit::Mm));
+  EXPECT_EQ(parseFloatValue("1px"), Value::dimensionFromComplex(0x100));
+  EXPECT_EQ(parseFloatValue("16dp"), Value::dimensionFromComplex(0x1001));
+  EXPECT_EQ(parseFloatValue("14sp"), Value::dimensionFromComplex(0xe02));
+  EXPECT_EQ(parseFloatValue("12pt"), Value::dimensionFromComplex(0xc03));
+  EXPECT_EQ(parseFloatValue("2in"), Value::dimensionFromComplex(0x204));
+  EXPECT_EQ(parseFloatValue("25mm"), Value::dimensionFromComplex(0x1905));
 }
 
 TEST(ParseFloatValue, DipIsDp) {
-  EXPECT_EQ(parseFloatValue("8dip"), Value::dimension(8, DimUnit::Dp));
+  EXPECT_EQ(parseFloatValue("8dip"), Value::dimensionFromComplex(0x801));
 }
 
 TEST(ParseFloatValue, NumberForms) {
-  EXPECT_EQ(parseFloatValue("-4dp"), Value::dimension(-4, DimUnit::Dp));
-  EXPECT_EQ(parseFloatValue("+4dp"), Value::dimension(4, DimUnit::Dp));
-  EXPECT_EQ(parseFloatValue("0.5dp"), Value::dimension(0.5f, DimUnit::Dp));
-  EXPECT_EQ(parseFloatValue(".5dp"), Value::dimension(0.5f, DimUnit::Dp));
-  EXPECT_EQ(parseFloatValue("5.dp"), Value::dimension(5, DimUnit::Dp));
-  EXPECT_EQ(parseFloatValue("1.5e2px"), Value::dimension(150, DimUnit::Px));
-  EXPECT_EQ(parseFloatValue("\t16dp \n"), Value::dimension(16, DimUnit::Dp));
+  EXPECT_EQ(parseFloatValue("-4dp"), Value::dimensionFromComplex(0xfffffc01));
+  EXPECT_EQ(parseFloatValue("+4dp"), Value::dimensionFromComplex(0x401));
+  EXPECT_EQ(parseFloatValue("0.5dp"), Value::dimensionFromComplex(0x40000031));
+  EXPECT_EQ(parseFloatValue(".5dp"), Value::dimensionFromComplex(0x40000031));
+  EXPECT_EQ(parseFloatValue("5.dp"), Value::dimensionFromComplex(0x501));
+  EXPECT_EQ(parseFloatValue("1.5e2px"), Value::dimensionFromComplex(0x9600));
+  EXPECT_EQ(parseFloatValue("\t16dp \n"), Value::dimensionFromComplex(0x1001));
+}
+
+TEST(ParseFloatValue, KeepsAaptPrecision) {
+  // Issue #3: Android reads these back as 0.100000024, 1234.5625 and -7777216.
+  // radix 0p23, radix 16p7, mantissa wraps
+  EXPECT_EQ(parseFloatValue("0.1dp"), Value::dimensionFromComplex(0x0ccccd31));
+  EXPECT_EQ(parseFloatValue("1234.5678dp"), Value::dimensionFromComplex(0x02694811));
+  EXPECT_EQ(parseFloatValue("9000000dp"), Value::dimensionFromComplex(0x89544001));
 }
 
 TEST(ParseFloatValue, NoUnitIsFloat) {
@@ -82,14 +98,23 @@ TEST(ParseFloatValue, NoUnitIsFloat) {
 }
 
 TEST(ParseFloatValue, Fractions) {
-  EXPECT_EQ(parseFloatValue("50%"), Value::fractionValue(0.5f, false));
-  EXPECT_EQ(parseFloatValue("50%p"), Value::fractionValue(0.5f, true));
-  EXPECT_EQ(parseFloatValue("-25%"), Value::fractionValue(-0.25f, false));
+  EXPECT_EQ(parseFloatValue("50%"), Value::fractionFromComplex(0x40000030));
+  EXPECT_EQ(parseFloatValue("50%p"), Value::fractionFromComplex(0x40000031));
+  EXPECT_EQ(parseFloatValue("-25%"), Value::fractionFromComplex(0xe0000030));
+  EXPECT_EQ(parseFloatValue("100%"), Value::fractionFromComplex(0x100));
+}
+
+TEST(ParseFloatValue, FractionScalesInFloatLikeAapt) {
+  // aapt2 does f *= 1.0f/100 in float; 30 / 100.0 in double would give 0x26666730.
+  EXPECT_EQ(parseFloatValue("30%"), Value::fractionFromComplex(0x26666630));
+  EXPECT_EQ(parseFloatValue("18%p"), Value::fractionFromComplex(0x170a3d31));
 }
 
 TEST(ParseFloatValue, Rejects) {
+  // 3e12dp and up overflow aapt2's 64-bit intermediate (undefined there).
   for (const char* s : {"", "dp", "16 dp", "16DP", "16Dp", "16dpx", "16em", "16px5", ".dp",
-                        "-dp", "1e", "1e+dp", "16%%", "1,5dp", "1e39dp", "inf", "nan"}) {
+                        "-dp", "1e", "1e+dp", "16%%", "1,5dp", "1e39dp", "1e39%", "3e12dp",
+                        "inf", "nan"}) {
     EXPECT_FALSE(parseFloatValue(s)) << '"' << s << '"';
   }
 }
@@ -140,10 +165,10 @@ TEST(ParseBool, Rejects) {
 constexpr uint32_t kDimenTag = kFormatFloat | kFormatFraction | kFormatDimension;  // <dimen>
 
 TEST(ParseLiteral, DimenTagTakesFloatDimensionAndFraction) {
-  EXPECT_EQ(parseLiteral("16dp", kDimenTag), Value::dimension(16, DimUnit::Dp));
+  EXPECT_EQ(parseLiteral("16dp", kDimenTag), Value::dimensionFromComplex(0x1001));
   EXPECT_EQ(parseLiteral("1.5", kDimenTag), Value::floating(1.5f));
   EXPECT_EQ(parseLiteral("5", kDimenTag), Value::floating(5));
-  EXPECT_EQ(parseLiteral("50%", kDimenTag), Value::fractionValue(0.5f, false));
+  EXPECT_EQ(parseLiteral("50%", kDimenTag), Value::fractionFromComplex(0x40000030));
   EXPECT_FALSE(parseLiteral("#fff", kDimenTag));
 }
 
