@@ -192,7 +192,8 @@ int compareWithMidpoint(const BigUint& scaled, int exponent, typename FloatTrait
 // double for a float would round twice: 1.0000000596046447753906251 is a hair above the midpoint
 // of 1 and the next float, but the nearest double is that midpoint, which then ties down to 1.
 // Never touches the C locale, which a host app may have set to a decimal comma. nullopt if the
-// number rounds to infinity.
+// number rounds to infinity. Not std::from_chars: libc++ has it for floats only since LLVM 20,
+// and the standard libraries disagree on what it leaves for overflow and underflow.
 template <typename F>
 std::optional<F> roundDecimal(const Decimal& d) {
   using T = FloatTraits<F>;

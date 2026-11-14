@@ -145,7 +145,8 @@ TEST(ParseFloatValue, RejectsWhatAaptOnlyTakesThroughStrtof) {
   // aapt2 accepts all of these; see the top of ValueParser.h for why hydroid does not.
   // inf/NaN, hex floats, past FLT_MAX, and dimensions of 2^41 and up (undefined in aapt2).
   for (const char* s : {"-inf", "+nan", "-infinity", "-infdp", "0x10px", "-0x1p4", "0X10",
-                        "1e39", "1e39dp", "1e39%", "3.4028236e38", "3e12dp", "2199023255552dp"}) {
+                        "1e39", "1e39dp", "-1e39dp", "1e39%", "-1e39%", "3.4028236e38", "3e12dp",
+                        "2199023255552dp"}) {
     EXPECT_FALSE(parseFloatValue(s)) << '"' << s << '"';
   }
   // Just under 2^41 is still defined.
@@ -158,6 +159,7 @@ TEST(ParseFloatValue, RoundsToNearestFloatOnce) {
   EXPECT_EQ(parseFloatValue("1.0000000596046447753906251"), Value::floating(1.00000012f));
   EXPECT_EQ(parseFloatValue("1.0000000596046447753906250"), Value::floating(1.0f));  // tie, even
   EXPECT_EQ(parseFloatValue("1.0000000596046447753906249"), Value::floating(1.0f));
+  EXPECT_EQ(parseFloatValue("1.000000059604644775390625001"), Value::floating(1.00000012f));  // #6
   // In 8p15 the extra bit is lost, but the radix is not: 1.0 would be 23p0, 0x100.
   EXPECT_EQ(parseFloatValue("1.0000000596046447753906251px"),
             Value::dimensionFromComplex(0x800020));

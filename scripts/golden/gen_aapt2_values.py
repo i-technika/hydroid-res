@@ -93,7 +93,7 @@ DELIBERATE_REJECTS = {
         "3.4028235677973367e38",
         "3e12dp", "-3e12dp", "2199023255552dp", "1e20px",
     ],
-    "fraction": ["-inf", "0x10%", "1e39%"],
+    "fraction": ["-inf", "0x10%", "1e39%", "-1e39%"],
     # 0x100000000 is past an integer, so aapt2 reads it as a hex float, 2^32.
     "any": ["-0x10", "0X10", "0x100000000", "-1e39dp"],
 }

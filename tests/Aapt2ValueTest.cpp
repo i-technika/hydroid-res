@@ -124,7 +124,7 @@ const std::set<std::pair<std::string, std::string>> kDeliberateRejects = {
     {"dimen", "1e39"}, {"dimen", "-1e39"}, {"dimen", "1e400"}, {"dimen", "3.4028236e38"},
     {"dimen", "3.4028235677973367e38"},
     {"dimen", "1e39dp"}, {"dimen", "-1e39dp"}, {"dimen", "1e39%"}, {"fraction", "1e39%"},
-    {"any", "-1e39dp"},
+    {"fraction", "-1e39%"}, {"any", "-1e39dp"},
     // Dimensions of 2^41 and up, undefined in aapt2.
     {"dimen", "3e12dp"}, {"dimen", "-3e12dp"}, {"dimen", "2199023255552dp"}, {"dimen", "1e20px"},
 };
