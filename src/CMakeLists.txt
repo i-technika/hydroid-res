@@ -7,7 +7,11 @@ add_library(hydroid-res
 add_library(hydroid::res ALIAS hydroid-res)
 
 # The version is project() alone (#13): the headers get it from VersionNumber.h, generated next
-# to them in the build tree, and version() from those headers.
+# to them in the build tree, and version() from those headers. VersionNumber.h and the SOVERSION
+# below need major.minor.patch, each a C integer literal (#44 review).
+if(NOT PROJECT_VERSION MATCHES "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$")
+  message(FATAL_ERROR "project() VERSION must be major.minor.patch, not '${PROJECT_VERSION}'")
+endif()
 set(hydroid_res_generated_include ${PROJECT_BINARY_DIR}/include)
 configure_file(${PROJECT_SOURCE_DIR}/cmake/VersionNumber.h.in
   ${hydroid_res_generated_include}/hydroid/res/VersionNumber.h @ONLY)

@@ -22,8 +22,8 @@ TEST(Smoke, VersionMatchesProject) {
             HYDROID_RES_VERSION);
 }
 
-// What a consumer of a shared library would check: the library it runs with, through either
-// API, is the version of the headers it was compiled against.
+// In one build the library, through either API, is the version of its headers. (A consumer of
+// a shared library needs only a compatible one: README.md says when it is.)
 TEST(Smoke, VersionMatchesCApi) {
   EXPECT_STREQ(version(), HYDROID_RES_VERSION);
   EXPECT_STREQ(hydroid_res_version(), HYDROID_RES_VERSION);

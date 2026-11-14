@@ -3,7 +3,8 @@
  *
  * These are the version of the headers being compiled. hydroid_res_version() and
  * hydroid::res::version() return the version of the library that was built, so with a shared
- * library a consumer can compare the two to see that it loaded the one it was built against. */
+ * library a consumer can compare the two to see that it loaded one compatible with these
+ * headers (README.md says when it is). */
 #ifndef HYDROID_RES_VERSION_NUMBER_H
 #define HYDROID_RES_VERSION_NUMBER_H
 
