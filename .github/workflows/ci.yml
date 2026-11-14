@@ -15,15 +15,20 @@ jobs:
         os: [ubuntu-24.04, macos-15, windows-2022]
     steps:
       - uses: actions/checkout@v5
+      - name: Name the dependency cache after the runner image and CMake
+        id: deps
+        shell: bash
+        run: echo "key=deps-${ImageOS:?}-${{ github.job }}-$(cmake --version | awk 'NR == 1 { print $3 }')" >> "$GITHUB_OUTPUT"
       - name: Cache the fetched dependencies
         uses: actions/cache@v6
         with:
           # The sources, and the sub-builds whose stamps tell FetchContent they are already there.
-          # The sub-builds belong to the job's CMake and generator, hence the job in the key.
+          # A sub-build belongs to the generator and CMake that made it, hence the image and CMake in
+          # the key: restored under another generator, it stops the configure.
           path: |
             build/debug/_deps/*-src
             build/debug/_deps/*-subbuild
-          key: deps-${{ runner.os }}-${{ github.job }}-${{ hashFiles('cmake/Dependencies.cmake') }}
+          key: ${{ steps.deps.outputs.key }}-${{ hashFiles('cmake/Dependencies.cmake') }}
       - name: Install a decimal-comma locale
         if: runner.os == 'Linux'
         run: sudo locale-gen de_DE.UTF-8
@@ -43,15 +48,20 @@ jobs:
         os: [ubuntu-24.04, macos-15, windows-2022]
     steps:
       - uses: actions/checkout@v5
+      - name: Name the dependency cache after the runner image and CMake
+        id: deps
+        shell: bash
+        run: echo "key=deps-${ImageOS:?}-${{ github.job }}-$(cmake --version | awk 'NR == 1 { print $3 }')" >> "$GITHUB_OUTPUT"
       - name: Cache the fetched dependencies
         uses: actions/cache@v6
         with:
           # The sources, and the sub-builds whose stamps tell FetchContent they are already there.
-          # The sub-builds belong to the job's CMake and generator, hence the job in the key.
+          # A sub-build belongs to the generator and CMake that made it, hence the image and CMake in
+          # the key: restored under another generator, it stops the configure.
           path: |
             build/debug/_deps/*-src
             build/debug/_deps/*-subbuild
-          key: deps-${{ runner.os }}-${{ github.job }}-${{ hashFiles('cmake/Dependencies.cmake') }}
+          key: ${{ steps.deps.outputs.key }}-${{ hashFiles('cmake/Dependencies.cmake') }}
       - name: Install a decimal-comma locale
         if: runner.os == 'Linux'
         run: sudo locale-gen de_DE.UTF-8
@@ -87,21 +97,26 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
-      - name: Cache the fetched dependencies
-        uses: actions/cache@v6
-        with:
-          # The sources, and the sub-builds whose stamps tell FetchContent they are already there.
-          # The sub-builds belong to the job's CMake and generator, hence the job in the key.
-          path: |
-            build/debug/_deps/*-src
-            build/debug/_deps/*-subbuild
-          key: deps-${{ runner.os }}-${{ github.job }}-${{ hashFiles('cmake/Dependencies.cmake') }}
       - name: Install CMake 3.24.0, the oldest README and CMakeLists.txt allow
         run: |
           pipx install cmake==3.24.0
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       - name: Check the CMake version
         run: cmake --version | grep -qx 'cmake version 3.24.0'
+      - name: Name the dependency cache after the runner image and CMake
+        id: deps
+        shell: bash
+        run: echo "key=deps-${ImageOS:?}-${{ github.job }}-$(cmake --version | awk 'NR == 1 { print $3 }')" >> "$GITHUB_OUTPUT"
+      - name: Cache the fetched dependencies
+        uses: actions/cache@v6
+        with:
+          # The sources, and the sub-builds whose stamps tell FetchContent they are already there.
+          # A sub-build belongs to the generator and CMake that made it, hence the image and CMake in
+          # the key: restored under another generator, it stops the configure.
+          path: |
+            build/debug/_deps/*-src
+            build/debug/_deps/*-subbuild
+          key: ${{ steps.deps.outputs.key }}-${{ hashFiles('cmake/Dependencies.cmake') }}
       - name: Install a decimal-comma locale
         run: sudo locale-gen de_DE.UTF-8
       - name: Configure
@@ -116,15 +131,20 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
+      - name: Name the dependency cache after the runner image and CMake
+        id: deps
+        shell: bash
+        run: echo "key=deps-${ImageOS:?}-${{ github.job }}-$(cmake --version | awk 'NR == 1 { print $3 }')" >> "$GITHUB_OUTPUT"
       - name: Cache the fetched dependencies
         uses: actions/cache@v6
         with:
           # The sources, and the sub-builds whose stamps tell FetchContent they are already there.
-          # The sub-builds belong to the job's CMake and generator, hence the job in the key.
+          # A sub-build belongs to the generator and CMake that made it, hence the image and CMake in
+          # the key: restored under another generator, it stops the configure.
           path: |
             build/debug/_deps/*-src
             build/debug/_deps/*-subbuild
-          key: deps-${{ runner.os }}-${{ github.job }}-${{ hashFiles('cmake/Dependencies.cmake') }}
+          key: ${{ steps.deps.outputs.key }}-${{ hashFiles('cmake/Dependencies.cmake') }}
       - name: Install Ubuntu's pugixml, GoogleTest and nlohmann/json, which the default build must ignore
         run: |
           sudo apt-get update
@@ -178,15 +198,20 @@ jobs:
       CXX: clang++
     steps:
       - uses: actions/checkout@v5
+      - name: Name the dependency cache after the runner image and CMake
+        id: deps
+        shell: bash
+        run: echo "key=deps-${ImageOS:?}-${{ github.job }}-$(cmake --version | awk 'NR == 1 { print $3 }')" >> "$GITHUB_OUTPUT"
       - name: Cache the fetched dependencies
         uses: actions/cache@v6
         with:
           # The sources, and the sub-builds whose stamps tell FetchContent they are already there.
-          # The sub-builds belong to the job's CMake and generator, hence the job in the key.
+          # A sub-build belongs to the generator and CMake that made it, hence the image and CMake in
+          # the key: restored under another generator, it stops the configure.
           path: |
             build/sanitize/_deps/*-src
             build/sanitize/_deps/*-subbuild
-          key: deps-${{ runner.os }}-${{ github.job }}-${{ hashFiles('cmake/Dependencies.cmake') }}
+          key: ${{ steps.deps.outputs.key }}-${{ hashFiles('cmake/Dependencies.cmake') }}
       - name: Install a decimal-comma locale
         run: sudo locale-gen de_DE.UTF-8
       - name: Configure

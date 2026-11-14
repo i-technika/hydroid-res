@@ -24,6 +24,7 @@
       "name": "sanitize",
       "inherits": "debug",
       "displayName": "Debug with AddressSanitizer and UndefinedBehaviorSanitizer (GCC or Clang)",
+      "condition": { "type": "notEquals", "lhs": "${hostSystemName}", "rhs": "Windows" },
       "cacheVariables": {
         "CMAKE_C_FLAGS": "-fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer",
         "CMAKE_CXX_FLAGS": "-fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer",
@@ -35,7 +36,12 @@
   "buildPresets": [
     { "name": "debug", "configurePreset": "debug", "configuration": "Debug" },
     { "name": "release", "configurePreset": "release", "configuration": "Release" },
-    { "name": "sanitize", "configurePreset": "sanitize", "configuration": "Debug" }
+    {
+      "name": "sanitize",
+      "configurePreset": "sanitize",
+      "configuration": "Debug",
+      "condition": { "type": "notEquals", "lhs": "${hostSystemName}", "rhs": "Windows" }
+    }
   ],
   "testPresets": [
     {
@@ -55,7 +61,8 @@
       "configurePreset": "sanitize",
       "configuration": "Debug",
       "output": { "outputOnFailure": true },
-      "environment": { "UBSAN_OPTIONS": "print_stacktrace=1" }
+      "environment": { "UBSAN_OPTIONS": "print_stacktrace=1" },
+      "condition": { "type": "notEquals", "lhs": "${hostSystemName}", "rhs": "Windows" }
     }
   ]
 }

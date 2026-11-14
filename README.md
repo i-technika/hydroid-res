@@ -54,9 +54,10 @@ ctest --preset debug
 ```
 
 With GCC or Clang, the `sanitize` preset does the same under AddressSanitizer and
-UndefinedBehaviorSanitizer, and stops at the first error; CI runs it with Clang on Linux.
+UndefinedBehaviorSanitizer, and stops at the first error; CI runs it with Clang on Linux. It is
+not offered on Windows, where MSVC would ignore its flags.
 
-The C++ sources follow `.clang-format`, as clang-format 23.1.5 applies it (`pip install
+The C++ sources follow `.clang-format`, as clang-format 23.1.5 applies it (`pipx install
 clang-format==23.1.5`); CI fails on any other formatting. To reformat:
 
 ```sh
