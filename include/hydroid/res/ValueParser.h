@@ -30,16 +30,16 @@ namespace hydroid::res {
 // Formats an item may take; same bits as Android's ResTable_map and attrs.xml format="".
 enum FormatBits : uint32_t {
   kFormatReference = 1u << 0,
-  kFormatString    = 1u << 1,
-  kFormatInteger   = 1u << 2,
-  kFormatBoolean   = 1u << 3,
-  kFormatColor     = 1u << 4,
-  kFormatFloat     = 1u << 5,
+  kFormatString = 1u << 1,
+  kFormatInteger = 1u << 2,
+  kFormatBoolean = 1u << 3,
+  kFormatColor = 1u << 4,
+  kFormatFloat = 1u << 5,
   kFormatDimension = 1u << 6,
-  kFormatFraction  = 1u << 7,
-  kFormatAny       = 0x0000ffffu,
-  kFormatEnum      = 1u << 16,
-  kFormatFlags     = 1u << 17,
+  kFormatFraction = 1u << 7,
+  kFormatAny = 0x0000ffffu,
+  kFormatEnum = 1u << 16,
+  kFormatFlags = 1u << 17,
 };
 
 // #RGB, #ARGB, #RRGGBB, #AARRGGBB -> Color: 0xAARRGGBB plus which of the four was written

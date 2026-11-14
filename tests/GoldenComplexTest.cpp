@@ -60,13 +60,11 @@ Golden loadGolden() {
       const bool dimen = key.rfind("dimen/", 0) == 0;
       const bool fraction = key.rfind("fraction/", 0) == 0;
       if (!dimen && !fraction) continue;
-      out.values.push_back({condition + " " + key, key,
-                            static_cast<uint32_t>(v.at("data").get<int64_t>()),
-                            v.at("type").get<int>(), v.at("string").get<std::string>(),
-                            floatAt(v, dimen ? "px" : "fraction"),
-                            fraction ? floatAt(v, "base") : 0.0f,
-                            fraction ? floatAt(v, "parentBase") : 0.0f, dpi,
-                            floatAt(m, "fontScale"), metrics});
+      out.values.push_back(
+          {condition + " " + key, key, static_cast<uint32_t>(v.at("data").get<int64_t>()),
+           v.at("type").get<int>(), v.at("string").get<std::string>(),
+           floatAt(v, dimen ? "px" : "fraction"), fraction ? floatAt(v, "base") : 0.0f,
+           fraction ? floatAt(v, "parentBase") : 0.0f, dpi, floatAt(m, "fontScale"), metrics});
     }
   });
   return out;

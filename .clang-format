@@ -2,3 +2,13 @@ BasedOnStyle: Google
 ColumnLimit: 100
 DerivePointerAlignment: false
 PointerAlignment: Left
+AllowShortCaseLabelsOnASingleLine: true
+# The file's own header, then third-party libraries, the standard library and hydroid.
+IncludeBlocks: Regroup
+IncludeCategories:
+  - Regex: '^<.*\.(h|hpp)>$'
+    Priority: 1
+  - Regex: '^<'
+    Priority: 2
+  - Regex: '.*'
+    Priority: 3

@@ -67,23 +67,16 @@ void Value::kindMismatch([[maybe_unused]] const char* what) {
 bool operator==(const Value& a, const Value& b) {
   if (a.kind() != b.kind()) return false;
   switch (Value::payloadOf(a.kind())) {
-    case Value::Payload::None:
-      return true;
-    case Value::Payload::Ref:
-      return a.ref() == b.ref();
-    case Value::Payload::Color:
-      return a.argb() == b.argb() && a.colorFormat() == b.colorFormat();
-    case Value::Payload::Int:
-      return a.intValue() == b.intValue() && a.intFormat() == b.intFormat();
-    case Value::Payload::Bool:
-      return a.boolValue() == b.boolValue();
-    case Value::Payload::Complex:
-      return a.complexData() == b.complexData();
+    case Value::Payload::None: return true;
+    case Value::Payload::Ref: return a.ref() == b.ref();
+    case Value::Payload::Color: return a.argb() == b.argb() && a.colorFormat() == b.colorFormat();
+    case Value::Payload::Int: return a.intValue() == b.intValue() && a.intFormat() == b.intFormat();
+    case Value::Payload::Bool: return a.boolValue() == b.boolValue();
+    case Value::Payload::Complex: return a.complexData() == b.complexData();
     case Value::Payload::Float:
       // By bits, as Res_value data holds it: -0 is not 0 (0x80000000), and a NaN equals itself.
       return bitsOf(a.floatValue()) == bitsOf(b.floatValue());
-    case Value::Payload::Index:
-      return a.index() == b.index();
+    case Value::Payload::Index: return a.index() == b.index();
   }
   return false;  // unreachable: payloadOf returns one of the above
 }
@@ -100,11 +93,8 @@ std::ostream& operator<<(std::ostream& os, const Value& v) {
 
   out << kindName(v.kind()) << '(';
   switch (Value::payloadOf(v.kind())) {
-    case Value::Payload::None:
-      break;
-    case Value::Payload::Ref:
-      hex(v.ref());
-      break;
+    case Value::Payload::None: break;
+    case Value::Payload::Ref: hex(v.ref()); break;
     case Value::Payload::Color:
       hex(v.argb());
       out << ", " << formatName(v.colorFormat());
@@ -112,9 +102,7 @@ std::ostream& operator<<(std::ostream& os, const Value& v) {
     case Value::Payload::Int:
       out << v.intValue() << (v.intFormat() == IntFormat::Hex ? ", hex" : "");
       break;
-    case Value::Payload::Bool:
-      out << (v.boolValue() ? "true" : "false");
-      break;
+    case Value::Payload::Bool: out << (v.boolValue() ? "true" : "false"); break;
     case Value::Payload::Complex: {
       const uint32_t data = v.complexData();
       out << complexToFloat(data);
@@ -127,12 +115,8 @@ std::ostream& operator<<(std::ostream& os, const Value& v) {
       hex(data);
       break;
     }
-    case Value::Payload::Float:
-      out << v.floatValue();
-      break;
-    case Value::Payload::Index:
-      out << "index " << v.index();
-      break;
+    case Value::Payload::Float: out << v.floatValue(); break;
+    case Value::Payload::Index: out << "index " << v.index(); break;
   }
   out << ')';
   return os << out.str();

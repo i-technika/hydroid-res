@@ -93,8 +93,7 @@ struct IntegerTakesValue<V, T, std::void_t<decltype(V::integer(std::declval<T>()
 template <typename V, typename T, typename = void>
 struct BooleanTakes : std::false_type {};
 template <typename V, typename T>
-struct BooleanTakes<V, T, std::void_t<decltype(V::boolean(std::declval<T>()))>>
-    : std::true_type {};
+struct BooleanTakes<V, T, std::void_t<decltype(V::boolean(std::declval<T>()))>> : std::true_type {};
 
 template <typename V, typename Format, typename = void>
 struct IntegerTakes : std::false_type {};

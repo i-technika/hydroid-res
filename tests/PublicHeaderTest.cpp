@@ -33,8 +33,8 @@ TEST(PublicHeaders, AreAscii) {
       std::ifstream in(entry.path(), std::ios::binary);
       std::string line;
       for (int n = 1; std::getline(in, line); ++n) {
-        auto bad = std::find_if(line.begin(), line.end(),
-                                [](unsigned char c) { return c >= 0x80; });
+        auto bad =
+            std::find_if(line.begin(), line.end(), [](unsigned char c) { return c >= 0x80; });
         if (bad != line.end()) {
           ADD_FAILURE() << name << ":" << n << ":" << (bad - line.begin() + 1)
                         << ": non-ASCII byte in a public header";
