@@ -5,6 +5,10 @@
 #include <gtest/gtest.h>
 
 #include <cfloat>
+#include <clocale>
+#include <cstdlib>
+#include <locale>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 
@@ -124,6 +128,69 @@ TEST(ParseFloatValue, Rejects) {
   for (const char* s : {"", "dp", "16 dp", "16DP", "16Dp", "16dpx", "16em", "16px5", ".dp",
                         "-dp", "1e", "1e+dp", "16%%", "1,5dp", "inf", "nan", "1.5f"}) {
     EXPECT_FALSE(parseFloatValue(s)) << '"' << s << '"';
+  }
+}
+
+// Sets a locale whose decimal point is a comma, as a host app may, for both C (strtof, printf)
+// and C++ (default-constructed streams), and puts both back when it goes.
+class DecimalCommaLocale {
+ public:
+  DecimalCommaLocale() {
+    // Spelled as glibc, macOS and the Windows CRT name them.
+    for (const char* name :
+         {"de_DE.UTF-8", "de_DE.utf8", "de_DE", "de-DE", "fr_FR.UTF-8", "fr_FR", "fr-FR"}) {
+      if (!std::setlocale(LC_ALL, name)) continue;
+      try {
+        std::locale::global(std::locale(name));
+      } catch (const std::runtime_error&) {
+        restore();
+        continue;
+      }
+      if (*std::localeconv()->decimal_point == ',' &&
+          std::use_facet<std::numpunct<char>>(std::locale()).decimal_point() == ',') {
+        name_ = name;
+        return;
+      }
+      restore();
+    }
+  }
+  ~DecimalCommaLocale() { restore(); }
+  DecimalCommaLocale(const DecimalCommaLocale&) = delete;
+  DecimalCommaLocale& operator=(const DecimalCommaLocale&) = delete;
+
+  // nullptr if no such locale is installed.
+  const char* name() const { return name_; }
+
+ private:
+  void restore() {
+    std::locale::global(oldCpp_);
+    std::setlocale(LC_ALL, oldC_.c_str());
+  }
+
+  std::locale oldCpp_;  // default-constructed: a copy of the global locale
+  std::string oldC_ = std::setlocale(LC_ALL, nullptr);
+  const char* name_ = nullptr;
+};
+
+TEST(ParseFloatValue, IgnoresDecimalCommaLocale) {
+  // aapt2's decimal point is '.' whatever the locale; "1,5dp" in Rejects fails at the ',' in any
+  // locale, so it does not show this.
+  const DecimalCommaLocale locale;
+  if (!locale.name()) GTEST_SKIP() << "no locale with a decimal comma is installed";
+  // The locale bites: strtof stops at the '.' and reads the ','.
+  ASSERT_EQ(std::strtof("1.5", nullptr), 1.0f) << locale.name();
+  ASSERT_EQ(std::strtof("1,5", nullptr), 1.5f) << locale.name();
+
+  EXPECT_EQ(parseFloatValue("1.5"), Value::floating(1.5f));
+  EXPECT_EQ(parseFloatValue("0.5dp"), Value::dimensionFromComplex(0x40000031));
+  EXPECT_EQ(parseFloatValue("1.5e2px"), Value::dimensionFromComplex(0x9600));
+  // Past the fast path: more than 7 digits.
+  EXPECT_EQ(parseFloatValue("1234.5678dp"), Value::dimensionFromComplex(0x02694811));
+  EXPECT_EQ(parseFloatValue("1.0000000596046447753906251"), Value::floating(1.00000012f));
+  EXPECT_EQ(parseLiteral("1.5", kFormatAny), Value::floating(1.5f));
+  for (const char* s : {"1,5", "1,5dp", "1,5%", "0,5"}) {
+    EXPECT_FALSE(parseFloatValue(s)) << '"' << s << '"';
+    EXPECT_FALSE(parseLiteral(s, kFormatFloat)) << '"' << s << '"';
   }
 }
 
