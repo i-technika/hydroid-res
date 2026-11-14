@@ -55,8 +55,8 @@ TEST(ParseColor, ZeroAlphaIsKept) {
 }
 
 TEST(ParseColor, Rejects) {
-  for (const char* s : {"", "#", "#f", "#ff", "#fffff", "#fffffff", "#fffffffff", "fff",
-                        "ffffff", "#ggg", "# fff", "#ff ff", "0xffffff", "@color/x"}) {
+  for (const char* s : {"", "#", "#f", "#ff", "#fffff", "#fffffff", "#fffffffff", "fff", "ffffff",
+                        "#ggg", "# fff", "#ff ff", "0xffffff", "@color/x"}) {
     EXPECT_FALSE(parseColor(s)) << '"' << s << '"';
   }
 }
@@ -123,8 +123,8 @@ TEST(ParseFloatValue, FractionScalesInFloatLikeAapt) {
 
 TEST(ParseFloatValue, Rejects) {
   // aapt2 rejects these too ("inf" and "nan" fail its first-character check).
-  for (const char* s : {"", "dp", "16 dp", "16DP", "16Dp", "16dpx", "16em", "16px5", ".dp",
-                        "-dp", "1e", "1e+dp", "16%%", "1,5dp", "inf", "nan", "1.5f"}) {
+  for (const char* s : {"", "dp", "16 dp", "16DP", "16Dp", "16dpx", "16em", "16px5", ".dp", "-dp",
+                        "1e", "1e+dp", "16%%", "1,5dp", "inf", "nan", "1.5f"}) {
     EXPECT_FALSE(parseFloatValue(s)) << '"' << s << '"';
   }
 }
@@ -157,9 +157,9 @@ TEST(ParseFloatValue, IgnoresDecimalCommaLocale) {
 TEST(ParseFloatValue, RejectsWhatAaptOnlyTakesThroughStrtof) {
   // aapt2 accepts all of these; see the top of ValueParser.h for why hydroid does not.
   // inf/NaN, hex floats, past FLT_MAX, and dimensions of 2^41 and up (undefined in aapt2).
-  for (const char* s : {"-inf", "+nan", "-infinity", "-infdp", "0x10px", "-0x1p4", "0X10",
-                        "1e39", "1e39dp", "-1e39dp", "1e39%", "-1e39%", "3.4028236e38", "3e12dp",
-                        "2199023255552dp"}) {
+  for (const char* s :
+       {"-inf", "+nan", "-infinity", "-infdp", "0x10px", "-0x1p4", "0X10", "1e39", "1e39dp",
+        "-1e39dp", "1e39%", "-1e39%", "3.4028236e38", "3e12dp", "2199023255552dp"}) {
     EXPECT_FALSE(parseFloatValue(s)) << '"' << s << '"';
   }
   // Just under 2^41 is still defined.
@@ -186,8 +186,8 @@ TEST(ParseFloatValue, RoundsToNearestFloatOnce) {
 TEST(ParseFloatValue, AtMost126Characters) {
   // aapt2 copies at most 126 characters into its strtof buffer.
   const std::string zeros(121, '0');
-  EXPECT_EQ(parseFloatValue("0." + zeros + "1dp").has_value(), true);       // 126
-  EXPECT_EQ(parseFloatValue("0." + zeros + "01dp").has_value(), false);     // 127
+  EXPECT_EQ(parseFloatValue("0." + zeros + "1dp").has_value(), true);      // 126
+  EXPECT_EQ(parseFloatValue("0." + zeros + "01dp").has_value(), false);    // 127
   EXPECT_EQ(parseFloatValue("  0." + zeros + "1dp  ").has_value(), true);  // trimmed first
   // The limit is stringToFloat's: an integer has none, so leading zeros only fail as a float.
   const std::string padded = std::string(130, '0') + "42";
@@ -195,7 +195,7 @@ TEST(ParseFloatValue, AtMost126Characters) {
   EXPECT_EQ(parseLiteral(padded, kFormatAny), Value::integer(42));
   EXPECT_FALSE(parseLiteral(padded, kFormatFloat));
   EXPECT_EQ(parseLiteral("0." + zeros + "001", kFormatAny), Value::floating(0));  // 126
-  EXPECT_FALSE(parseLiteral("0." + zeros + "0001", kFormatAny));                 // 127
+  EXPECT_FALSE(parseLiteral("0." + zeros + "0001", kFormatAny));                  // 127
 }
 
 // ---- integer -------------------------------------------------------------------------------
@@ -226,8 +226,8 @@ TEST(ParseInteger, HexIsTrimmed) {
 }
 
 TEST(ParseInteger, Rejects) {
-  for (const char* s : {"", "-", "+5", "2147483648", "-2147483649", "0x", "0X10", "-0x10",
-                        "00x10", "0x100000000", "0xg", "4 2", "1.0", "1e3", "x10", "true"}) {
+  for (const char* s : {"", "-", "+5", "2147483648", "-2147483649", "0x", "0X10", "-0x10", "00x10",
+                        "0x100000000", "0xg", "4 2", "1.0", "1e3", "x10", "true"}) {
     EXPECT_FALSE(parseInteger(s)) << '"' << s << '"';
   }
 }
@@ -329,10 +329,12 @@ TEST(ParseLiteral, FloatThatMissesTheDoubleByOneIsAStringWhenOtherFormatsAreAllo
 TEST(ParseLiteral, EmbeddedNulIsNotTheEnd) {
   // XML text cannot hold a NUL, but a string_view can; the parsers read all of it rather than
   // stopping at the NUL as a C string would.
+  // clang-format off: "\0" "16dp" stays split, as "\016dp" would be the octal escape \016.
   for (std::string_view s : {"16\0dp"sv, "16dp\0"sv, "\0" "16dp"sv, "5\0"sv, "0x10\0"sv,
                              "#fff\0"sv, "true\0"sv, "1.5\0"sv}) {
     EXPECT_FALSE(parseLiteral(s, kFormatAny)) << testing::PrintToString(std::string(s));
   }
+  // clang-format on
 }
 
 TEST(ParseLiteral, ReadsNoFurtherThanTheView) {

@@ -1,7 +1,5 @@
 #include "hydroid/res/ValueParser.h"
 
-#include "hydroid/res/Complex.h"
-
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
@@ -10,6 +8,8 @@
 #include <string>
 #include <utility>
 #include <vector>
+
+#include "hydroid/res/Complex.h"
 
 namespace hydroid::res {
 namespace {
@@ -290,8 +290,7 @@ uint32_t formatOf(ValueKind kind) {
     case ValueKind::Array:
     case ValueKind::Plurals:
     case ValueKind::AttrDecl:
-    case ValueKind::StyleableDecl:
-      return 0;
+    case ValueKind::StyleableDecl: return 0;
   }
   return 0;
 }

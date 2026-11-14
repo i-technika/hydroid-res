@@ -116,6 +116,7 @@ std::string describe(const std::optional<ResValue>& v) {
 
 // Text aapt2 takes and hydroid rejects on purpose; see the top of ValueParser.h. Every one must
 // still be accepted by aapt2 and rejected by hydroid, so the list cannot go stale.
+// clang-format off
 const std::set<std::pair<std::string, std::string>> kDeliberateRejects = {
     // Infinity and NaN through strtof.
     {"dimen", "-inf"}, {"dimen", "+inf"}, {"dimen", "-nan"}, {"dimen", "+nan"},
@@ -133,6 +134,7 @@ const std::set<std::pair<std::string, std::string>> kDeliberateRejects = {
     // Dimensions of 2^41 and up, undefined in aapt2.
     {"dimen", "3e12dp"}, {"dimen", "-3e12dp"}, {"dimen", "2199023255552dp"}, {"dimen", "1e20px"},
 };
+// clang-format on
 
 TEST(Aapt2Value, ParsesLikeAapt2) {
   ASSERT_GT(rows().size(), 4000u);
@@ -174,8 +176,9 @@ TEST(Aapt2Value, CoversEveryTagAndOutcome) {
       {"integer", {-1, kTypeReference, kTypeIntDec, kTypeIntHex}},
       {"dimen", {-1, kTypeReference, kTypeFloat, kTypeDimension, kTypeFraction}},
       {"fraction", {kTypeFloat, kTypeDimension, kTypeFraction}},
-      {"any", {-1, kTypeFloat, kTypeDimension, kTypeFraction, kTypeIntDec, kTypeIntHex,
-               kTypeIntBoolean, 0x1c, 0x1d, 0x1e, 0x1f}},
+      {"any",
+       {-1, kTypeFloat, kTypeDimension, kTypeFraction, kTypeIntDec, kTypeIntHex, kTypeIntBoolean,
+        0x1c, 0x1d, 0x1e, 0x1f}},
   };
   EXPECT_EQ(seen, expected);
 }

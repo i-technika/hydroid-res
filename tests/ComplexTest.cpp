@@ -23,15 +23,14 @@ template <typename V, typename Arg, typename = void>
 struct AcceptsDimensionFromComplex : std::false_type {};
 template <typename V, typename Arg>
 struct AcceptsDimensionFromComplex<
-    V, Arg, std::void_t<decltype(V::dimensionFromComplex(std::declval<Arg>()))>>
-    : std::true_type {};
+    V, Arg, std::void_t<decltype(V::dimensionFromComplex(std::declval<Arg>()))>> : std::true_type {
+};
 
 template <typename V, typename Arg, typename = void>
 struct AcceptsFractionFromComplex : std::false_type {};
 template <typename V, typename Arg>
 struct AcceptsFractionFromComplex<
-    V, Arg, std::void_t<decltype(V::fractionFromComplex(std::declval<Arg>()))>>
-    : std::true_type {};
+    V, Arg, std::void_t<decltype(V::fractionFromComplex(std::declval<Arg>()))>> : std::true_type {};
 
 template <typename V, typename = void>
 struct HasOldDimension : std::false_type {};
@@ -89,9 +88,9 @@ TEST(ValueFromComplex, KeepsUnknownUnitsLikeAndroid) {
 // ---- floatToComplex ------------------------------------------------------------------------
 
 TEST(FloatToComplex, PicksTheNarrowestRadix) {
-  EXPECT_EQ(floatToComplex(16, kDp), 0x1001u);            // 23p0: no fraction
-  EXPECT_EQ(floatToComplex(0.5f, kDp), 0x40000031u);      // 0p23: |v| < 1
-  EXPECT_EQ(floatToComplex(1.5f, kDp), 0x00c00021u);      // 8p15: |v| < 256
+  EXPECT_EQ(floatToComplex(16, kDp), 0x1001u);              // 23p0: no fraction
+  EXPECT_EQ(floatToComplex(0.5f, kDp), 0x40000031u);        // 0p23: |v| < 1
+  EXPECT_EQ(floatToComplex(1.5f, kDp), 0x00c00021u);        // 8p15: |v| < 256
   EXPECT_EQ(floatToComplex(1234.5678f, kDp), 0x02694811u);  // 16p7: |v| < 65536
   EXPECT_EQ(floatToComplex(300000.5f, kDp), 0x0493e001u);   // 23p0: fraction dropped
 }
@@ -172,17 +171,17 @@ TEST(DisplayMetrics, ZeroFontScaleMeansOne) {
 
 TEST(ComplexToDimension, Units) {
   const DisplayMetrics m = DisplayMetrics::forDensity(320, 1.5f);
-  EXPECT_EQ(complexToDimension(0x100, m), 1.0f);     // 1px
-  EXPECT_EQ(complexToDimension(0x1001, m), 32.0f);   // 16dp × 2
-  EXPECT_EQ(complexToDimension(0xe02, m), 42.0f);    // 14sp × 3
+  EXPECT_EQ(complexToDimension(0x100, m), 1.0f);    // 1px
+  EXPECT_EQ(complexToDimension(0x1001, m), 32.0f);  // 16dp × 2
+  EXPECT_EQ(complexToDimension(0xe02, m), 42.0f);   // 14sp × 3
   // pt and mm in TypedValue.applyDimension's order: value * xdpi * (1.0f/72). For 5pt and 7mm
   // at xdpi 320, value * xdpi / 72 (or / 25.4f) differs in the last bit.
-  EXPECT_EQ(complexToDimension(0x503, m), 5.0f * 320.0f * (1.0f / 72));     // 5pt
+  EXPECT_EQ(complexToDimension(0x503, m), 5.0f * 320.0f * (1.0f / 72));  // 5pt
   EXPECT_NE(complexToDimension(0x503, m), 5.0f * 320.0f / 72);
   EXPECT_EQ(complexToDimension(0x104, m), 320.0f);                          // 1in
   EXPECT_EQ(complexToDimension(0x705, m), 7.0f * 320.0f * (1.0f / 25.4f));  // 7mm
   EXPECT_NE(complexToDimension(0x705, m), 7.0f * 320.0f / 25.4f);
-  EXPECT_EQ(complexToDimension(0x106, m), 0.0f);     // unknown unit
+  EXPECT_EQ(complexToDimension(0x106, m), 0.0f);  // unknown unit
 }
 
 TEST(ComplexToFraction, BaseAndParentBase) {

@@ -9,6 +9,7 @@
 
 namespace hydroid::res {
 
+// clang-format off
 enum class ValueKind : uint8_t {
   Null, Empty,                       // @null, @empty: see Value::null() and Value::empty()
   Reference, AttrRef,                // @type/name, ?attr/name
@@ -17,6 +18,7 @@ enum class ValueKind : uint8_t {
   File,                              // a file such as layout/foo.xml or drawable/bg.png
   Style, Array, Plurals, AttrDecl, StyleableDecl
 };
+// clang-format on
 
 // Same values as Android's TypedValue.COMPLEX_UNIT_PX ... COMPLEX_UNIT_MM.
 enum class DimUnit : uint8_t { Px = 0, Dp = 1, Sp = 2, Pt = 3, In = 4, Mm = 5 };
@@ -91,9 +93,7 @@ class Value {
   static Value dimensionFromComplex(uint32_t data) {
     return withComplex(ValueKind::Dimension, data);
   }
-  static Value fractionFromComplex(uint32_t data) {
-    return withComplex(ValueKind::Fraction, data);
-  }
+  static Value fractionFromComplex(uint32_t data) { return withComplex(ValueKind::Fraction, data); }
   // A float is a number, not complex data: dimensionFromComplex(1.5f) would store 0x1 (0px).
   template <typename F, std::enable_if_t<std::is_floating_point_v<F>, int> = 0>
   static Value dimensionFromComplex(F) = delete;
@@ -200,8 +200,14 @@ class Value {
   static HYDROID_RES_API void kindMismatch(const char* what);
 
   // Named so they can sit in the anonymous union (unnamed structs there are an extension).
-  struct ColorData { uint32_t argb; ColorFormat format; };  // argb is always 0xAARRGGBB
-  struct IntData { int32_t value; IntFormat format; };
+  struct ColorData {
+    uint32_t argb;  // always 0xAARRGGBB
+    ColorFormat format;
+  };
+  struct IntData {
+    int32_t value;
+    IntFormat format;
+  };
 
   explicit Value(ValueKind kind) : kind_(kind), index_(0) {}
 
@@ -224,13 +230,13 @@ class Value {
 
   ValueKind kind_;
   union {
-    ResId     ref_;      // Reference, AttrRef
-    ColorData color_;    // Color
-    IntData   integer_;  // Int
-    bool      bool_;     // Bool
-    uint32_t  complex_;  // Dimension, Fraction
-    float     float_;    // Float
-    uint32_t  index_;    // pooled kinds: position in the string or compound value pool
+    ResId ref_;         // Reference, AttrRef
+    ColorData color_;   // Color
+    IntData integer_;   // Int
+    bool bool_;         // Bool
+    uint32_t complex_;  // Dimension, Fraction
+    float float_;       // Float
+    uint32_t index_;    // pooled kinds: position in the string or compound value pool
   };
 };
 
