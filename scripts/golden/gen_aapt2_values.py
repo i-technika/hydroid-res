@@ -246,6 +246,8 @@ def inputs() -> list:
     pairs += [("fraction" if t.endswith(("%", "%p")) else "dimen", t) for t in complex_texts]
     pairs += [("dimen", t) for t in floats]
     pairs += [("fraction", t) for t in ["16dp", "1.5", "5"]]
+    # Hex with whitespace around it (#23). Not in integer_inputs, which "any" samples from.
+    pairs += [("integer", t) for t in ["0x10 ", " 0x10", " -0 "]]
     pairs += [("any", t) for t in any_inputs(rng, colors, integers, bools, floats)]
     pairs += [(tag, t) for tag, texts in DELIBERATE_REJECTS.items() for t in texts]
     for tag, text in pairs:
