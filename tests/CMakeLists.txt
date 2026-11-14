@@ -1,7 +1,8 @@
 include(GoogleTest)
 
 add_executable(hydroid-res-tests
-  SmokeTest.cpp)
+  SmokeTest.cpp
+  ValueParserTest.cpp)
 target_link_libraries(hydroid-res-tests PRIVATE hydroid::res GTest::gtest_main)
 target_compile_definitions(hydroid-res-tests PRIVATE
   HYDROID_GOLDEN_DIR="${PROJECT_SOURCE_DIR}/golden/data"

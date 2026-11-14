@@ -1,4 +1,6 @@
 add_library(hydroid-res
+  core/Value.cpp
+  core/ValueParser.cpp
   core/Version.cpp
   capi/hydroid_res.cpp)
 add_library(hydroid::res ALIAS hydroid-res)
