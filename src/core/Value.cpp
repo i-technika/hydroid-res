@@ -18,6 +18,7 @@ namespace {
 const char* kindName(ValueKind kind) {
   switch (kind) {
     case ValueKind::Null: return "Null";
+    case ValueKind::Empty: return "Empty";
     case ValueKind::Reference: return "Reference";
     case ValueKind::AttrRef: return "AttrRef";
     case ValueKind::String: return "String";

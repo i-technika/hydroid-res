@@ -37,6 +37,7 @@ float floatFromBits(uint32_t bits) {
 std::optional<Value> sample(ValueKind kind, uint32_t data) {
   switch (kind) {
     case ValueKind::Null: return Value();
+    case ValueKind::Empty: return Value::empty();
     case ValueKind::Reference: return Value::reference(data);
     case ValueKind::AttrRef: return Value::attrRef(data);
     case ValueKind::Color: return Value::color(data, ColorFormat::Argb8);
@@ -169,6 +170,7 @@ TEST(ValueAccessorDeathTest, WrongKindStopsADebugBuild) {
   EXPECT_DEATH(Value::string(0).ref(), "not a reference");
   EXPECT_DEATH(Value::reference(0x7f010001).index(), "not a pooled kind");
   EXPECT_DEATH(Value().index(), "not a pooled kind");
+  EXPECT_DEATH(Value::empty().ref(), "not a reference");
 }
 #endif
 
@@ -190,13 +192,14 @@ TEST(ValueEquality, EveryKindComparesItsData) {
   for (ValueKind kind : everyKind()) {
     SCOPED_TRACE(testing::PrintToString(*sample(kind, 1)));
     EXPECT_EQ(sample(kind, 1), sample(kind, 1));
-    if (kind != ValueKind::Null) {
+    if (kind != ValueKind::Null && kind != ValueKind::Empty) {
       EXPECT_NE(sample(kind, 1), sample(kind, 0));
     }
   }
 }
 
-// Every kind but Null holds data 1 in the same union bits, so only the kind tells them apart.
+// Every kind but Null and Empty holds data 1 in the same union bits, so only the kind tells them
+// apart.
 TEST(ValueEquality, SameDataDifferentKindDiffers) {
   const std::vector<ValueKind> kinds = everyKind();
   for (ValueKind a : kinds) {
@@ -216,6 +219,12 @@ TEST(ValueEquality, ReferenceAndNull) {
   EXPECT_NE(ref, other);
   EXPECT_NE(ref, attr);
   EXPECT_EQ(Value(), Value());
+}
+
+// @null and @empty both hold no data, but mean different things at runtime (#18).
+TEST(ValueEquality, NullIsNotEmpty) {
+  EXPECT_EQ(Value::empty(), Value::empty());
+  EXPECT_NE(Value(), Value::empty());
 }
 
 TEST(ValueEquality, FloatComparesBits) {
@@ -263,6 +272,7 @@ TEST(PrintValue, EveryKindShowsItsData) {
   EXPECT_EQ(print(Value::reference(0x7f010001)), "Reference(0x7f010001)");
   EXPECT_EQ(print(Value::attrRef(0x01010000)), "AttrRef(0x01010000)");
   EXPECT_EQ(print(Value()), "Null()");
+  EXPECT_EQ(print(Value::empty()), "Empty()");
   EXPECT_EQ(print(Value::string(3)), "String(index 3)");
   EXPECT_EQ(print(Value::styleableDecl(7)), "StyleableDecl(index 7)");
 }

@@ -9,7 +9,8 @@
 namespace hydroid::res {
 
 enum class ValueKind : uint8_t {
-  Null, Reference, AttrRef,          // @type/name, ?attr/name
+  Null, Empty,                       // @null, @empty: see Value() and Value::empty()
+  Reference, AttrRef,                // @type/name, ?attr/name
   String, StyledString,              // <b> 등 서식 있는 문자열은 span 목록 포함
   Color, Dimension, Fraction, Float, Int, Bool,
   File,                              // layout/foo.xml, drawable/bg.png 같은 파일
@@ -42,7 +43,12 @@ enum class IntFormat : uint8_t {
 // the library doesn't check, and reads the union as it is.
 class Value {
  public:
+  // @null: no value. aapt2 writes it as a reference to 0 (TYPE_REFERENCE, data 0), which the
+  // runtime reads back as undefined (TYPE_NULL, data 0): TypedArray.hasValueOrEmpty is false.
   Value() : Value(ValueKind::Null) {}
+  // @empty: a value that is there but empty (TYPE_NULL, data DATA_NULL_EMPTY = 1), so
+  // TypedArray.hasValueOrEmpty is true, unlike for @null.
+  static Value empty() { return Value(ValueKind::Empty); }
 
   static Value reference(ResId id) { return withRef(ValueKind::Reference, id); }
   static Value attrRef(ResId id) { return withRef(ValueKind::AttrRef, id); }
@@ -153,7 +159,8 @@ class Value {
   enum class Payload : uint8_t { None, Ref, Color, Int, Bool, Float, Complex, Index };
   static constexpr Payload payloadOf(ValueKind kind) {
     switch (kind) {
-      case ValueKind::Null: return Payload::None;
+      case ValueKind::Null:
+      case ValueKind::Empty: return Payload::None;
       case ValueKind::Reference:
       case ValueKind::AttrRef: return Payload::Ref;
       case ValueKind::Color: return Payload::Color;
