@@ -11,10 +11,13 @@ add_executable(hydroid-res-tests
   ValueTest.cpp)
 target_link_libraries(hydroid-res-tests PRIVATE
   hydroid::res pugixml::pugixml GTest::gtest_main nlohmann_json::nlohmann_json)
+# Every directory a consumer of hydroid::res includes from, for PublicHeaders.AreAscii.
+set(public_include_dirs "$<JOIN:$<TARGET_PROPERTY:hydroid-res,INTERFACE_INCLUDE_DIRECTORIES>,|>")
 target_compile_definitions(hydroid-res-tests PRIVATE
   HYDROID_AAPT2_VALUES="${PROJECT_SOURCE_DIR}/golden/aapt2/values.tsv"
   HYDROID_GOLDEN_DIR="${PROJECT_SOURCE_DIR}/golden/data"
-  HYDROID_INCLUDE_DIR="${PROJECT_SOURCE_DIR}/include"
+  HYDROID_PROJECT_VERSION="${PROJECT_VERSION}"
+  HYDROID_PUBLIC_INCLUDE_DIRS="${public_include_dirs}"
   HYDROID_TEST_RES_DIR="${PROJECT_SOURCE_DIR}/golden/app/src/main/res")
 if(HYDROID_RES_REQUIRE_LOCALE_TESTS)
   target_compile_definitions(hydroid-res-tests PRIVATE HYDROID_REQUIRE_LOCALE_TESTS)
@@ -44,6 +47,14 @@ add_test(NAME CMake.LibraryTypes
     "-DHYDROID_RES_TYPE=$<TARGET_PROPERTY:hydroid-res,TYPE>"
     "-DPUGIXML_LINKS=${pugixml_links}"
     -P ${CMAKE_CURRENT_SOURCE_DIR}/CheckLibraryTypes.cmake)
+
+# The shared library's file and soname versions come from project() too (#13).
+add_test(NAME CMake.LibraryVersion
+  COMMAND ${CMAKE_COMMAND}
+    -DPROJECT_VERSION=${PROJECT_VERSION}
+    "-DVERSION=$<TARGET_PROPERTY:hydroid-res,VERSION>"
+    "-DSOVERSION=$<TARGET_PROPERTY:hydroid-res,SOVERSION>"
+    -P ${CMAKE_CURRENT_SOURCE_DIR}/CheckLibraryVersion.cmake)
 
 # The dependencies come from where HYDROID_RES_USE_SYSTEM_DEPS says, never silently from the
 # system (#11).

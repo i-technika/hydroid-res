@@ -54,6 +54,15 @@ jobs:
           # With nothing exported, the pugixml check below would pass vacuously.
           grep -q hydroid_res_version exports.txt
           if grep -i pugi exports.txt; then exit 1; fi
+      - name: Check that the library names its ABI version
+        if: runner.os != 'Windows'
+        run: |
+          # CMake.LibraryVersion checks the SOVERSION; this checks it reached the file.
+          if [ "$RUNNER_OS" = Linux ]; then
+            objdump -p build/debug/src/libhydroid-res.so | grep -E 'SONAME +libhydroid-res\.so\.[0-9]'
+          else
+            otool -D build/debug/src/libhydroid-res.dylib | grep -E 'libhydroid-res\.[0-9.]+\.dylib$'
+          fi
 
   oldest-cmake:
     name: core (CMake 3.24)

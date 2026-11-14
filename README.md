@@ -34,6 +34,16 @@ project, puts its DLL next to the executables in `build/<preset>/bin` (`bin/<con
 multi-config generator such as Visual Studio). A project that uses the shared library without
 CMake must define `HYDROID_RES_SHARED` when it includes the headers.
 
+The version is `project()` in `CMakeLists.txt` and nowhere else. CMake generates
+`hydroid/res/VersionNumber.h` from it into `build/<preset>/include`, which a project that uses
+the headers without CMake must also put on its include path. Its `HYDROID_RES_VERSION` is the
+version of the headers, and `hydroid_res_version()` that of the library. The shared library's
+ABI version (its soname on Linux) is `major.minor` until 1.0, as a 0.x minor release may break
+the ABI, and the major alone after. A library is compatible with the headers when its ABI
+version is the same and, from 1.0, its minor is no older; the patch may differ either way. On
+Windows the DLL name carries no version, so a consumer of the shared library should check this
+when it starts.
+
 On Windows, Visual Studio 2026 needs a CMake that knows its generator (CMake 4.3 does); with an
 older CMake, configure with `-G Ninja` from a developer prompt.
 
