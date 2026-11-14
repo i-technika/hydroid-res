@@ -1,6 +1,8 @@
 function(hydroid_set_warnings target)
   if(MSVC)
-    target_compile_options(${target} PRIVATE /W4 /permissive- /utf-8)
+    # /w44062: an enum switch without default that misses an enumerator, which -Wall's -Wswitch
+    # catches elsewhere but MSVC leaves off even at /W4.
+    target_compile_options(${target} PRIVATE /W4 /w44062 /permissive- /utf-8)
     if(HYDROID_RES_WARNINGS_AS_ERRORS)
       target_compile_options(${target} PRIVATE /WX)
     endif()

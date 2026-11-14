@@ -1,9 +1,14 @@
-// Value's operator<<, which is also what gtest shows for a Value in failure messages.
+// Value's operator== for the kinds the parser tests don't build, and its operator<<, which is also
+// what gtest shows for a Value in failure messages.
 
 #include <gtest/gtest.h>
 
+#include <cstring>
+#include <limits>
+#include <optional>
 #include <sstream>
 #include <string>
+#include <vector>
 
 #include "hydroid/res/Complex.h"
 #include "hydroid/res/ValueParser.h"
@@ -22,6 +27,95 @@ Value withIndex(ValueKind kind, uint32_t index) {
   v.kind = kind;
   v.index = index;
   return v;
+}
+
+float floatFromBits(uint32_t bits) {
+  float f;
+  std::memcpy(&f, &bits, sizeof f);
+  return f;
+}
+
+// A Value of `kind` whose Res_value data is `data` (0 or 1), or nullopt past the last kind. No
+// default, so a new ValueKind doesn't build (-Wswitch, C4062) until it is added here, and then
+// everyKind() has it.
+std::optional<Value> sample(ValueKind kind, uint32_t data) {
+  switch (kind) {
+    case ValueKind::Null: return Value();
+    case ValueKind::Reference:
+    case ValueKind::AttrRef: {
+      Value v;
+      v.kind = kind;
+      v.ref = data;
+      return v;
+    }
+    case ValueKind::Color: return Value::colorValue(data, ColorFormat::Argb8);
+    case ValueKind::Dimension: return Value::dimensionFromComplex(data);
+    case ValueKind::Fraction: return Value::fractionFromComplex(data);
+    case ValueKind::Float: return Value::floating(floatFromBits(data));
+    case ValueKind::Int: return Value::integerValue(static_cast<int32_t>(data));
+    case ValueKind::Bool: return Value::boolean(data != 0);
+    case ValueKind::String:
+    case ValueKind::StyledString:
+    case ValueKind::File:
+    case ValueKind::Style:
+    case ValueKind::Array:
+    case ValueKind::Plurals:
+    case ValueKind::AttrDecl:
+    case ValueKind::StyleableDecl:
+      return withIndex(kind, data);
+  }
+  return std::nullopt;
+}
+
+std::vector<ValueKind> everyKind() {
+  std::vector<ValueKind> kinds;
+  for (int k = 0; sample(static_cast<ValueKind>(k), 0); ++k) {
+    kinds.push_back(static_cast<ValueKind>(k));
+  }
+  return kinds;
+}
+
+TEST(ValueEquality, EveryKindComparesItsData) {
+  for (ValueKind kind : everyKind()) {
+    SCOPED_TRACE(testing::PrintToString(*sample(kind, 1)));
+    EXPECT_EQ(sample(kind, 1), sample(kind, 1));
+    if (kind != ValueKind::Null) {
+      EXPECT_NE(sample(kind, 1), sample(kind, 0));
+    }
+  }
+}
+
+// Every kind but Null holds data 1 in the same union bits, so only the kind tells them apart.
+TEST(ValueEquality, SameDataDifferentKindDiffers) {
+  const std::vector<ValueKind> kinds = everyKind();
+  for (ValueKind a : kinds) {
+    for (ValueKind b : kinds) {
+      if (a != b) {
+        EXPECT_NE(sample(a, 1), sample(b, 1));
+      }
+    }
+  }
+}
+
+TEST(ValueEquality, ReferenceAndNull) {
+  Value ref;
+  ref.kind = ValueKind::Reference;
+  ref.ref = 0x7f010001;
+  Value attr = ref;
+  attr.kind = ValueKind::AttrRef;
+  Value other = ref;
+  other.ref = 0x7f010002;
+  EXPECT_EQ(ref, ref);
+  EXPECT_NE(ref, other);
+  EXPECT_NE(ref, attr);
+  EXPECT_EQ(Value(), Value());
+}
+
+TEST(ValueEquality, FloatComparesBits) {
+  EXPECT_EQ(Value::floating(1.5f), Value::floating(1.5f));
+  EXPECT_NE(Value::floating(-0.0f), Value::floating(0.0f));
+  const Value nan = Value::floating(std::numeric_limits<float>::quiet_NaN());
+  EXPECT_EQ(nan, nan);
 }
 
 TEST(PrintValue, IsWhatGtestShows) {
