@@ -25,6 +25,36 @@ jobs:
       - name: Test
         run: ctest --preset debug
 
+  shared:
+    name: core (${{ matrix.os }}, shared)
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15, windows-2022]
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install a decimal-comma locale
+        if: runner.os == 'Linux'
+        run: sudo locale-gen de_DE.UTF-8
+      - name: Configure
+        run: cmake --preset debug -DBUILD_SHARED_LIBS=ON -DHYDROID_RES_REQUIRE_LOCALE_TESTS=ON
+      - name: Build
+        run: cmake --build --preset debug --parallel
+      - name: Test
+        run: ctest --preset debug
+      - name: Check that the pugixml inside is not exported
+        if: runner.os != 'Windows'
+        run: |
+          if [ "$RUNNER_OS" = Linux ]; then
+            nm -D --defined-only build/debug/src/libhydroid-res.so > exports.txt
+          else
+            nm -gU build/debug/src/libhydroid-res.dylib > exports.txt
+          fi
+          # With nothing exported, the pugixml check below would pass vacuously.
+          grep -q hydroid_res_version exports.txt
+          if grep -i pugi exports.txt; then exit 1; fi
+
   oldest-cmake:
     name: core (CMake 3.24)
     runs-on: ubuntu-24.04

@@ -30,6 +30,21 @@ add_test(NAME CMake.PugixmlStaysPrivate
     "-DPUGIXML_INCLUDES=$<JOIN:$<TARGET_PROPERTY:pugixml::pugixml,INTERFACE_INCLUDE_DIRECTORIES>,|>"
     -P ${CMAKE_CURRENT_SOURCE_DIR}/CheckPrivateDeps.cmake)
 
+# BUILD_SHARED_LIBS as given on the command line, so one that Dependencies.cmake failed to
+# restore after pugixml shows up here (#12).
+if(HYDROID_RES_USE_SYSTEM_DEPS)
+  set(pugixml_links "")
+else()
+  set(pugixml_links "$<TARGET_PROPERTY:pugixml::pugixml,INTERFACE_LINK_LIBRARIES>")
+endif()
+add_test(NAME CMake.LibraryTypes
+  COMMAND ${CMAKE_COMMAND}
+    "-DSHARED=$CACHE{BUILD_SHARED_LIBS}"
+    -DUSE_SYSTEM_DEPS=${HYDROID_RES_USE_SYSTEM_DEPS}
+    "-DHYDROID_RES_TYPE=$<TARGET_PROPERTY:hydroid-res,TYPE>"
+    "-DPUGIXML_LINKS=${pugixml_links}"
+    -P ${CMAKE_CURRENT_SOURCE_DIR}/CheckLibraryTypes.cmake)
+
 # The dependencies come from where HYDROID_RES_USE_SYSTEM_DEPS says, never silently from the
 # system (#11).
 set(dependency_sources "")

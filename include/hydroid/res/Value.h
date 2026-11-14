@@ -4,6 +4,7 @@
 #include <iosfwd>
 #include <type_traits>
 
+#include "hydroid/res/Export.h"
 #include "hydroid/res/ResId.h"
 
 namespace hydroid::res {
@@ -155,8 +156,9 @@ class Value {
   }
 
  private:
-  friend bool operator==(const Value& a, const Value& b);
-  friend std::ostream& operator<<(std::ostream& os, const Value& v);
+  // MSVC wants the export on the friend declarations too, as they come first.
+  friend HYDROID_RES_API bool operator==(const Value& a, const Value& b);
+  friend HYDROID_RES_API std::ostream& operator<<(std::ostream& os, const Value& v);
 
   // The union member a kind holds. This is the one place that sorts kinds into members; the
   // accessors, operator== and operator<< all go through it.
@@ -194,7 +196,8 @@ class Value {
   void expect(Payload payload, const char* what) const {
     if (payloadOf(kind_) != payload) kindMismatch(what);
   }
-  static void kindMismatch(const char* what);
+  // Exported although private: the inline accessors above call it from the consumer's code.
+  static HYDROID_RES_API void kindMismatch(const char* what);
 
   // Named so they can sit in the anonymous union (unnamed structs there are an extension).
   struct ColorData { uint32_t argb; ColorFormat format; };  // argb is always 0xAARRGGBB
@@ -231,14 +234,14 @@ class Value {
   };
 };
 
-bool operator==(const Value& a, const Value& b);
+HYDROID_RES_API bool operator==(const Value& a, const Value& b);
 inline bool operator!=(const Value& a, const Value& b) { return !(a == b); }
 
 // For logs and test failures: Dimension(16dp, 0x00001001), Color(0xff6200ee, Rgb8). Floats get
 // every digit, so values one ulp apart print differently. Declared here rather than in the tests
 // so that every file that sees Value sees it too, and gtest prints Values the same way in all.
-std::ostream& operator<<(std::ostream& os, const Value& v);
+HYDROID_RES_API std::ostream& operator<<(std::ostream& os, const Value& v);
 
-const char* toString(DimUnit unit);  // "px", "dp", ...
+HYDROID_RES_API const char* toString(DimUnit unit);  // "px", "dp", ...
 
 }  // namespace hydroid::res

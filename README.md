@@ -28,6 +28,11 @@ one, changes its API), and found through their CMake package configs (point
 `CMAKE_PREFIX_PATH` at them if needed). On MSVC they must also be built against the shared CRT,
 in the configuration you build (Debug or Release).
 
+hydroid-res is a static library unless `BUILD_SHARED_LIBS` is on. A shared build exports only the
+public API, links the fetched pugixml statically without exporting it, and puts its DLL next to the
+executables in `build/<preset>/bin`. A project that uses the shared library without CMake must
+define `HYDROID_RES_SHARED` when it includes the headers.
+
 On Windows, Visual Studio 2026 needs a CMake that knows its generator (CMake 4.3 does); with an
 older CMake, configure with `-G Ninja` from a developer prompt.
 

@@ -16,6 +16,12 @@ option(HYDROID_RES_WARNINGS_AS_ERRORS "Treat compiler warnings as errors" OFF)
 option(HYDROID_RES_REQUIRE_LOCALE_TESTS
   "Fail, rather than skip, tests that need a decimal-comma locale where none is installed" OFF)
 
+# A shared build puts DLLs next to the executables that load them, as Windows has no rpath. Set
+# before the dependencies so a shared GoogleTest lands there too.
+if(PROJECT_IS_TOP_LEVEL AND NOT DEFINED CMAKE_RUNTIME_OUTPUT_DIRECTORY)
+  set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/bin)
+endif()
+
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 include(CompilerWarnings)
 include(Dependencies)

@@ -26,7 +26,18 @@ else()
     GIT_REPOSITORY https://github.com/zeux/pugixml.git
     GIT_TAG        v1.14
     GIT_SHALLOW    TRUE)
+  # Static whatever BUILD_SHARED_LIBS says, so a shared hydroid-res holds it and needs no
+  # pugixml DLL next to it (#12). pugixml's option(BUILD_SHARED_LIBS) takes this plain variable
+  # under CMP0077. Restoring with an unquoted value unsets it again if it was never set; if it
+  # was only a cache entry, the plain variable left behind has the same value.
+  set(hydroid_build_shared_libs ${BUILD_SHARED_LIBS})
+  set(BUILD_SHARED_LIBS OFF)
   FetchContent_MakeAvailable(pugixml)
+  set(BUILD_SHARED_LIBS ${hydroid_build_shared_libs})
+  # Nor does a shared hydroid-res export the pugixml it holds, on Linux and macOS.
+  set_target_properties(pugixml-static PROPERTIES
+    CXX_VISIBILITY_PRESET hidden
+    VISIBILITY_INLINES_HIDDEN ON)
 endif()
 
 if(HYDROID_RES_BUILD_TESTS)
