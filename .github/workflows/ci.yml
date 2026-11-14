@@ -15,8 +15,11 @@ jobs:
         os: [ubuntu-24.04, macos-15, windows-2022]
     steps:
       - uses: actions/checkout@v5
+      - name: Install a decimal-comma locale
+        if: runner.os == 'Linux'
+        run: sudo locale-gen de_DE.UTF-8
       - name: Configure
-        run: cmake --preset debug
+        run: cmake --preset debug -DHYDROID_RES_REQUIRE_LOCALE_TESTS=ON
       - name: Build
         run: cmake --build --preset debug --parallel
       - name: Test
