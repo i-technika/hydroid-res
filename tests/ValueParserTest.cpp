@@ -5,38 +5,17 @@
 #include <gtest/gtest.h>
 
 #include <cfloat>
-#include <ostream>
+#include <cmath>
 #include <string>
+#include <string_view>
 
 #include "hydroid/res/Complex.h"
 #include "hydroid/res/ValueParser.h"
 
 namespace hydroid::res {
-
-void PrintTo(const Value& v, std::ostream* os) {
-  switch (v.kind) {
-    case ValueKind::Color:
-      *os << "Color(0x" << std::hex << v.color.argb << std::dec << ", type "
-          << static_cast<int>(v.color.format) << ")";
-      break;
-    case ValueKind::Int: *os << "Int(" << v.integer.v << (v.integer.hex ? ", hex)" : ")"); break;
-    case ValueKind::Bool: *os << "Bool(" << v.b << ")"; break;
-    case ValueKind::Dimension:
-      *os << "Dimension(" << complexToFloat(v.complex)
-          << toString(static_cast<DimUnit>(complexUnit(v.complex))) << ", 0x" << std::hex
-          << v.complex << std::dec << ")";
-      break;
-    case ValueKind::Fraction:
-      *os << "Fraction(" << complexToFloat(v.complex)
-          << (complexUnit(v.complex) == kComplexUnitFractionParent ? ", parent" : "") << ", 0x"
-          << std::hex << v.complex << std::dec << ")";
-      break;
-    case ValueKind::Float: *os << "Float(" << v.f << ")"; break;
-    default: *os << "Value(kind " << static_cast<int>(v.kind) << ")"; break;
-  }
-}
-
 namespace {
+
+using namespace std::string_view_literals;
 
 // ---- color ---------------------------------------------------------------------------------
 
@@ -120,6 +99,16 @@ TEST(ParseFloatValue, NoUnitIsFloat) {
   EXPECT_EQ(parseFloatValue("-2"), Value::floating(-2));
 }
 
+TEST(ParseFloatValue, NegativeZero) {
+  // aapt2 keeps the sign of a float (0x80000000) but not of a dimension or fraction.
+  const auto f = parseFloatValue("-0");
+  ASSERT_TRUE(f);
+  EXPECT_EQ(f->kind, ValueKind::Float);
+  EXPECT_TRUE(std::signbit(f->f));  // Value's == has -0 equal to 0
+  EXPECT_EQ(parseFloatValue("-0dp"), Value::dimensionFromComplex(0x1));
+  EXPECT_EQ(parseFloatValue("-0%"), Value::fractionFromComplex(0x0));
+}
+
 TEST(ParseFloatValue, Fractions) {
   EXPECT_EQ(parseFloatValue("50%"), Value::fractionFromComplex(0x40000030));
   EXPECT_EQ(parseFloatValue("50%p"), Value::fractionFromComplex(0x40000031));
@@ -176,6 +165,13 @@ TEST(ParseFloatValue, AtMost126Characters) {
   EXPECT_EQ(parseFloatValue("0." + zeros + "1dp").has_value(), true);       // 126
   EXPECT_EQ(parseFloatValue("0." + zeros + "01dp").has_value(), false);     // 127
   EXPECT_EQ(parseFloatValue("  0." + zeros + "1dp  ").has_value(), true);  // trimmed first
+  // The limit is stringToFloat's: an integer has none, so leading zeros only fail as a float.
+  const std::string padded = std::string(130, '0') + "42";
+  EXPECT_EQ(parseLiteral(padded, kFormatInteger), Value::integerValue(42));
+  EXPECT_EQ(parseLiteral(padded, kFormatAny), Value::integerValue(42));
+  EXPECT_FALSE(parseLiteral(padded, kFormatFloat));
+  EXPECT_EQ(parseLiteral("0." + zeros + "001", kFormatAny), Value::floating(0));  // 126
+  EXPECT_FALSE(parseLiteral("0." + zeros + "0001", kFormatAny));                 // 127
 }
 
 // ---- integer -------------------------------------------------------------------------------
@@ -195,9 +191,19 @@ TEST(ParseInteger, Hex) {
   EXPECT_EQ(parseInteger("0xFfFfFfFf"), Value::integerValue(-1, true));
 }
 
+TEST(ParseInteger, NegativeZeroIsZero) {
+  EXPECT_EQ(parseInteger("-0"), Value::integerValue(0));
+  EXPECT_EQ(parseLiteral("-0", kFormatAny), Value::integerValue(0));  // integer before float
+}
+
+TEST(ParseInteger, HexIsTrimmed) {
+  EXPECT_EQ(parseInteger("0x10 "), Value::integerValue(16, true));
+  EXPECT_EQ(parseInteger("\t0x10\n"), Value::integerValue(16, true));
+}
+
 TEST(ParseInteger, Rejects) {
   for (const char* s : {"", "-", "+5", "2147483648", "-2147483649", "0x", "0X10", "-0x10",
-                        "0x100000000", "0xg", "4 2", "1.0", "1e3", "x10", "true"}) {
+                        "00x10", "0x100000000", "0xg", "4 2", "1.0", "1e3", "x10", "true"}) {
     EXPECT_FALSE(parseInteger(s)) << '"' << s << '"';
   }
 }
@@ -237,6 +243,28 @@ TEST(ParseLiteral, MaskFiltersFloatKinds) {
   EXPECT_EQ(parseLiteral("1.5", kFormatFloat), Value::floating(1.5f));
 }
 
+TEST(ParseLiteral, NoFormatsTakesNothing) {
+  for (const char* s : {"#fff", "true", "5", "0x10", "1.5", "16dp", "50%"}) {
+    EXPECT_FALSE(parseLiteral(s, 0)) << '"' << s << '"';
+  }
+}
+
+TEST(ParseLiteral, DimensionAndFractionNeedTheirOwnFormat) {
+  // <fraction> takes 16dp only because it also allows a dimension.
+  EXPECT_FALSE(parseLiteral("50%", kFormatDimension));
+  EXPECT_FALSE(parseLiteral("50%p", kFormatDimension));
+  EXPECT_FALSE(parseLiteral("16dp", kFormatFraction));
+  EXPECT_FALSE(parseLiteral("50%", kFormatFloat));
+  EXPECT_EQ(parseLiteral("50%", kFormatFraction), Value::fractionFromComplex(0x40000030));
+  EXPECT_EQ(parseLiteral("16dp", kFormatDimension), Value::dimensionFromComplex(0x1001));
+}
+
+TEST(ParseLiteral, ZeroBeforeHexIsNothing) {
+  // Not hex, and not a number with a unit either: aapt2 has no literal for it.
+  EXPECT_FALSE(parseLiteral("00x10", kFormatAny));
+  EXPECT_FALSE(parseLiteral("00x10", kDimenTag));
+}
+
 TEST(ParseLiteral, AaptOrder) {
   // Integer is tried before float, color before everything.
   EXPECT_EQ(parseLiteral("5", kFormatInteger | kFormatFloat), Value::integerValue(5));
@@ -270,6 +298,27 @@ TEST(ParseLiteral, FloatThatMissesTheDoubleByOneIsAStringWhenOtherFormatsAreAllo
   EXPECT_EQ(parseLiteral("1e10", kFormatAny), Value::floating(1e10f));
   // Dimensions are never checked.
   EXPECT_EQ(parseLiteral("9638178525px", kFormatAny), parseFloatValue("9638178525px"));
+}
+
+// ---- string_view input ----------------------------------------------------------------------
+
+TEST(ParseLiteral, EmbeddedNulIsNotTheEnd) {
+  // XML text cannot hold a NUL, but a string_view can; the parsers read all of it rather than
+  // stopping at the NUL as a C string would.
+  for (std::string_view s : {"16\0dp"sv, "16dp\0"sv, "\0" "16dp"sv, "5\0"sv, "0x10\0"sv,
+                             "#fff\0"sv, "true\0"sv, "1.5\0"sv}) {
+    EXPECT_FALSE(parseLiteral(s, kFormatAny)) << testing::PrintToString(std::string(s));
+  }
+}
+
+TEST(ParseLiteral, ReadsNoFurtherThanTheView) {
+  EXPECT_EQ(parseLiteral(std::string_view("16dpx", 4), kFormatAny),
+            Value::dimensionFromComplex(0x1001));
+  EXPECT_EQ(parseLiteral(std::string_view("0x10g", 4), kFormatAny), Value::integerValue(16, true));
+  EXPECT_EQ(parseLiteral(std::string_view("#fff0", 4), kFormatAny),
+            Value::colorValue(0xffffffff, ColorFormat::Rgb4));
+  EXPECT_EQ(parseLiteral(std::string_view("truee", 4), kFormatAny), Value::boolean(true));
+  EXPECT_EQ(parseLiteral(std::string_view("1.5e", 3), kFormatAny), Value::floating(1.5f));
 }
 
 }  // namespace

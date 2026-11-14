@@ -6,7 +6,8 @@ add_executable(hydroid-res-tests
   GoldenColorTest.cpp
   GoldenComplexTest.cpp
   SmokeTest.cpp
-  ValueParserTest.cpp)
+  ValueParserTest.cpp
+  ValueTest.cpp)
 target_link_libraries(hydroid-res-tests PRIVATE
   hydroid::res GTest::gtest_main nlohmann_json::nlohmann_json)
 target_compile_definitions(hydroid-res-tests PRIVATE
