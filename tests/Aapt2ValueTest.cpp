@@ -86,16 +86,17 @@ uint32_t formatsOf(const std::string& tag) {
 
 // The Res_value aapt2 would write for `v`.
 ResValue toResValue(const Value& v) {
-  switch (v.kind) {
-    case ValueKind::Color: return {static_cast<int>(v.color.format), v.color.argb};
+  switch (v.kind()) {
+    case ValueKind::Color: return {static_cast<int>(v.colorFormat()), v.argb()};
     case ValueKind::Int:
-      return {v.integer.hex ? kTypeIntHex : kTypeIntDec, static_cast<uint32_t>(v.integer.v)};
-    case ValueKind::Bool: return {kTypeIntBoolean, v.b ? 0xffffffffu : 0u};
-    case ValueKind::Dimension: return {kTypeDimension, v.complex};
-    case ValueKind::Fraction: return {kTypeFraction, v.complex};
+      return {static_cast<int>(v.intFormat()), static_cast<uint32_t>(v.intValue())};
+    case ValueKind::Bool: return {kTypeIntBoolean, v.boolValue() ? 0xffffffffu : 0u};
+    case ValueKind::Dimension: return {kTypeDimension, v.complexData()};
+    case ValueKind::Fraction: return {kTypeFraction, v.complexData()};
     case ValueKind::Float: {
+      const float f = v.floatValue();
       uint32_t bits;
-      std::memcpy(&bits, &v.f, sizeof bits);
+      std::memcpy(&bits, &f, sizeof bits);
       return {kTypeFloat, bits};
     }
     default: return {-1, 0};

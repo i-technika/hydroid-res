@@ -54,26 +54,8 @@ uint32_t bitsOf(float f) {
 
 }  // namespace
 
-bool operator==(const Value& a, const Value& b) {
-  if (a.kind != b.kind) return false;
-  switch (a.kind) {
-    case ValueKind::Null:
-      return true;
-    case ValueKind::Reference:
-    case ValueKind::AttrRef:
-      return a.ref == b.ref;
-    case ValueKind::Color:
-      return a.color.argb == b.color.argb && a.color.format == b.color.format;
-    case ValueKind::Int:
-      return a.integer.v == b.integer.v && a.integer.hex == b.integer.hex;
-    case ValueKind::Bool:
-      return a.b == b.b;
-    case ValueKind::Dimension:
-    case ValueKind::Fraction:
-      return a.complex == b.complex;
-    case ValueKind::Float:
-      // By bits, as Res_value data holds it: -0 is not 0 (0x80000000), and a NaN equals itself.
-      return bitsOf(a.f) == bitsOf(b.f);
+bool Value::holdsIndex(ValueKind kind) {
+  switch (kind) {
     case ValueKind::String:
     case ValueKind::StyledString:
     case ValueKind::File:
@@ -82,9 +64,52 @@ bool operator==(const Value& a, const Value& b) {
     case ValueKind::Plurals:
     case ValueKind::AttrDecl:
     case ValueKind::StyleableDecl:
-      return a.index == b.index;
+      return true;
+    case ValueKind::Null:
+    case ValueKind::Reference:
+    case ValueKind::AttrRef:
+    case ValueKind::Color:
+    case ValueKind::Dimension:
+    case ValueKind::Fraction:
+    case ValueKind::Float:
+    case ValueKind::Int:
+    case ValueKind::Bool:
+      return false;
   }
   return false;
+}
+
+bool operator==(const Value& a, const Value& b) {
+  if (a.kind() != b.kind()) return false;
+  switch (a.kind()) {
+    case ValueKind::Null:
+      return true;
+    case ValueKind::Reference:
+    case ValueKind::AttrRef:
+      return a.ref() == b.ref();
+    case ValueKind::Color:
+      return a.argb() == b.argb() && a.colorFormat() == b.colorFormat();
+    case ValueKind::Int:
+      return a.intValue() == b.intValue() && a.intFormat() == b.intFormat();
+    case ValueKind::Bool:
+      return a.boolValue() == b.boolValue();
+    case ValueKind::Dimension:
+    case ValueKind::Fraction:
+      return a.complexData() == b.complexData();
+    case ValueKind::Float:
+      // By bits, as Res_value data holds it: -0 is not 0 (0x80000000), and a NaN equals itself.
+      return bitsOf(a.floatValue()) == bitsOf(b.floatValue());
+    case ValueKind::String:
+    case ValueKind::StyledString:
+    case ValueKind::File:
+    case ValueKind::Style:
+    case ValueKind::Array:
+    case ValueKind::Plurals:
+    case ValueKind::AttrDecl:
+    case ValueKind::StyleableDecl:
+      return a.index() == b.index();
+  }
+  return false;  // unreachable: only the factories set the kind
 }
 
 std::ostream& operator<<(std::ostream& os, const Value& v) {
@@ -97,36 +122,39 @@ std::ostream& operator<<(std::ostream& os, const Value& v) {
     out << "0x" << std::hex << std::setw(8) << std::setfill('0') << x << std::dec;
   };
 
-  out << kindName(v.kind) << '(';
-  switch (v.kind) {
+  out << kindName(v.kind()) << '(';
+  switch (v.kind()) {
     case ValueKind::Null:
       break;
     case ValueKind::Reference:
     case ValueKind::AttrRef:
-      hex(v.ref);
+      hex(v.ref());
       break;
     case ValueKind::Color:
-      hex(v.color.argb);
-      out << ", " << formatName(v.color.format);
+      hex(v.argb());
+      out << ", " << formatName(v.colorFormat());
       break;
     case ValueKind::Int:
-      out << v.integer.v << (v.integer.hex ? ", hex" : "");
+      out << v.intValue() << (v.intFormat() == IntFormat::Hex ? ", hex" : "");
       break;
     case ValueKind::Bool:
-      out << (v.b ? "true" : "false");
+      out << (v.boolValue() ? "true" : "false");
       break;
-    case ValueKind::Dimension:
-      out << complexToFloat(v.complex) << toString(static_cast<DimUnit>(complexUnit(v.complex)))
-          << ", ";
-      hex(v.complex);
+    case ValueKind::Dimension: {
+      const uint32_t data = v.complexData();
+      out << complexToFloat(data) << toString(static_cast<DimUnit>(complexUnit(data))) << ", ";
+      hex(data);
       break;
-    case ValueKind::Fraction:
-      out << complexToFloat(v.complex)
-          << (complexUnit(v.complex) == kComplexUnitFractionParent ? ", parent" : "") << ", ";
-      hex(v.complex);
+    }
+    case ValueKind::Fraction: {
+      const uint32_t data = v.complexData();
+      out << complexToFloat(data)
+          << (complexUnit(data) == kComplexUnitFractionParent ? ", parent" : "") << ", ";
+      hex(data);
       break;
+    }
     case ValueKind::Float:
-      out << v.f;
+      out << v.floatValue();
       break;
     case ValueKind::String:
     case ValueKind::StyledString:
@@ -136,7 +164,7 @@ std::ostream& operator<<(std::ostream& os, const Value& v) {
     case ValueKind::Plurals:
     case ValueKind::AttrDecl:
     case ValueKind::StyleableDecl:
-      out << "index " << v.index;
+      out << "index " << v.index();
       break;
   }
   out << ')';

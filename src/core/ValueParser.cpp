@@ -327,11 +327,11 @@ std::optional<Value> parseColor(std::string_view s) {
     // #RGB / #ARGB: each digit is doubled, #f80 → #ff8800. Missing alpha is opaque.
     uint32_t argb = hex.size() == 3 ? 0xffu : nibbles[0] * 0x11u;
     for (size_t i = hex.size() - 3; i < hex.size(); i++) argb = (argb << 8) | (nibbles[i] * 0x11u);
-    return Value::colorValue(argb, hex.size() == 3 ? ColorFormat::Rgb4 : ColorFormat::Argb4);
+    return Value::color(argb, hex.size() == 3 ? ColorFormat::Rgb4 : ColorFormat::Argb4);
   }
   uint32_t argb = hex.size() == 6 ? 0xffu : 0u;
   for (size_t i = 0; i < hex.size(); i++) argb = (argb << 4) | nibbles[i];
-  return Value::colorValue(argb, hex.size() == 6 ? ColorFormat::Rgb8 : ColorFormat::Argb8);
+  return Value::color(argb, hex.size() == 6 ? ColorFormat::Rgb8 : ColorFormat::Argb8);
 }
 
 std::optional<Value> parseBool(std::string_view s) {
@@ -374,7 +374,8 @@ std::optional<Value> parseInteger(std::string_view s) {
   }
   if (negative) value = -value;
   // Hex keeps the bit pattern: 0xffffffff is -1.
-  return Value::integerValue(static_cast<int32_t>(static_cast<uint32_t>(value)), hex);
+  return Value::integer(static_cast<int32_t>(static_cast<uint32_t>(value)),
+                        hex ? IntFormat::Hex : IntFormat::Dec);
 }
 
 std::optional<Value> parseFloatValue(std::string_view s) {
@@ -412,11 +413,12 @@ std::optional<Value> parseLiteral(std::string_view s, uint32_t formats) {
   }
   if (formats & kFloatFormats) {
     auto v = parseFloatValue(s);
-    if (!v || !(formats & formatOf(v->kind))) return std::nullopt;
+    if (!v || !(formats & formatOf(v->kind()))) return std::nullopt;
     // aapt2 keeps the text as a string instead if the float is 1 or more off: 9638178525 under
     // kFormatAny, whose nearest float is 9638178816. Any format past float/dimension/fraction
     // asks for the check, even one that cannot hold the string, such as float|reference.
-    if (v->kind == ValueKind::Float && (formats & ~kFloatFormats) && !closeToDouble(s, v->f)) {
+    if (v->kind() == ValueKind::Float && (formats & ~kFloatFormats) &&
+        !closeToDouble(s, v->floatValue())) {
       return std::nullopt;
     }
     return v;

@@ -88,12 +88,12 @@ Sources loadSources() {
     if (tag != "dimen" && tag != "fraction") return;
     const std::string key = tag + "/" + node.attribute("name").value();
     auto v = parseLiteral(node.child_value(), kComplexTag);
-    if (!v || (v->kind != ValueKind::Dimension && v->kind != ValueKind::Fraction)) {
+    if (!v || (v->kind() != ValueKind::Dimension && v->kind() != ValueKind::Fraction)) {
       ADD_FAILURE() << file.string() << ": " << key << " \"" << node.child_value()
                     << "\" does not parse to a dimension or fraction";
       return;
     }
-    out[key].insert(v->complex);
+    out[key].insert(v->complexData());
   });
   return out;
 }
@@ -125,8 +125,8 @@ TEST(GoldenComplex, CoercedStringParsesBackToData) {
     SCOPED_TRACE(g.where + " \"" + g.coerced + "\"");
     auto v = parseFloatValue(g.coerced);
     ASSERT_TRUE(v);
-    EXPECT_EQ(v->kind, g.type == kTypeDimension ? ValueKind::Dimension : ValueKind::Fraction);
-    EXPECT_EQ(v->complex, g.data);
+    EXPECT_EQ(v->kind(), g.type == kTypeDimension ? ValueKind::Dimension : ValueKind::Fraction);
+    EXPECT_EQ(v->complexData(), g.data);
   }
 }
 

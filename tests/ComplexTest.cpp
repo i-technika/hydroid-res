@@ -60,11 +60,11 @@ static_assert(!AcceptsFractionFromComplex<Value, double>::value);
 
 TEST(ValueFromComplex, KeepsDataAndKind) {
   const Value dim = Value::dimensionFromComplex(0x1001);
-  EXPECT_EQ(dim.kind, ValueKind::Dimension);
-  EXPECT_EQ(dim.complex, 0x1001u);
+  EXPECT_EQ(dim.kind(), ValueKind::Dimension);
+  EXPECT_EQ(dim.complexData(), 0x1001u);
   const Value frac = Value::fractionFromComplex(0x40000031);
-  EXPECT_EQ(frac.kind, ValueKind::Fraction);
-  EXPECT_EQ(frac.complex, 0x40000031u);
+  EXPECT_EQ(frac.kind(), ValueKind::Fraction);
+  EXPECT_EQ(frac.complexData(), 0x40000031u);
   // Same data, different kind.
   EXPECT_NE(Value::dimensionFromComplex(0x100), Value::fractionFromComplex(0x100));
 }
@@ -75,14 +75,14 @@ TEST(ValueFromComplex, NumberGoesThroughFloatToComplex) {
   EXPECT_EQ(Value::fractionFromComplex(*floatToComplex(0.5f, kComplexUnitFractionParent)),
             parseFloatValue("50%p"));
   // The raw number is not the value: data 16 is 0px.
-  EXPECT_EQ(complexToDimension(Value::dimensionFromComplex(16).complex,
+  EXPECT_EQ(complexToDimension(Value::dimensionFromComplex(16).complexData(),
                                DisplayMetrics::forDensity(160)),
             0.0f);
 }
 
 TEST(ValueFromComplex, KeepsUnknownUnitsLikeAndroid) {
   // Units are not validated: Android keeps them too, and complexToDimension gives 0.
-  EXPECT_EQ(Value::dimensionFromComplex(0x100f).complex, 0x100fu);
+  EXPECT_EQ(Value::dimensionFromComplex(0x100f).complexData(), 0x100fu);
   EXPECT_EQ(complexToDimension(0x100f, DisplayMetrics::forDensity(160)), 0.0f);
 }
 

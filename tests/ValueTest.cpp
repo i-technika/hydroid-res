@@ -1,5 +1,6 @@
-// Value's operator== for the kinds the parser tests don't build, and its operator<<, which is also
-// what gtest shows for a Value in failure messages.
+// Value's invariant (only factories set the kind, accessors check it), its operator== for the
+// kinds the parser tests don't build, and its operator<<, which is also what gtest shows for a
+// Value in failure messages.
 
 #include <gtest/gtest.h>
 
@@ -8,6 +9,8 @@
 #include <optional>
 #include <sstream>
 #include <string>
+#include <type_traits>
+#include <utility>
 #include <vector>
 
 #include "hydroid/res/Complex.h"
@@ -22,13 +25,6 @@ std::string print(const Value& v) {
   return os.str();
 }
 
-Value withIndex(ValueKind kind, uint32_t index) {
-  Value v;
-  v.kind = kind;
-  v.index = index;
-  return v;
-}
-
 float floatFromBits(uint32_t bits) {
   float f;
   std::memcpy(&f, &bits, sizeof f);
@@ -41,28 +37,22 @@ float floatFromBits(uint32_t bits) {
 std::optional<Value> sample(ValueKind kind, uint32_t data) {
   switch (kind) {
     case ValueKind::Null: return Value();
-    case ValueKind::Reference:
-    case ValueKind::AttrRef: {
-      Value v;
-      v.kind = kind;
-      v.ref = data;
-      return v;
-    }
-    case ValueKind::Color: return Value::colorValue(data, ColorFormat::Argb8);
+    case ValueKind::Reference: return Value::reference(data);
+    case ValueKind::AttrRef: return Value::attrRef(data);
+    case ValueKind::Color: return Value::color(data, ColorFormat::Argb8);
     case ValueKind::Dimension: return Value::dimensionFromComplex(data);
     case ValueKind::Fraction: return Value::fractionFromComplex(data);
     case ValueKind::Float: return Value::floating(floatFromBits(data));
-    case ValueKind::Int: return Value::integerValue(static_cast<int32_t>(data));
+    case ValueKind::Int: return Value::integer(static_cast<int32_t>(data));
     case ValueKind::Bool: return Value::boolean(data != 0);
-    case ValueKind::String:
-    case ValueKind::StyledString:
-    case ValueKind::File:
-    case ValueKind::Style:
-    case ValueKind::Array:
-    case ValueKind::Plurals:
-    case ValueKind::AttrDecl:
-    case ValueKind::StyleableDecl:
-      return withIndex(kind, data);
+    case ValueKind::String: return Value::string(data);
+    case ValueKind::StyledString: return Value::styledString(data);
+    case ValueKind::File: return Value::file(data);
+    case ValueKind::Style: return Value::style(data);
+    case ValueKind::Array: return Value::array(data);
+    case ValueKind::Plurals: return Value::plurals(data);
+    case ValueKind::AttrDecl: return Value::attrDecl(data);
+    case ValueKind::StyleableDecl: return Value::styleableDecl(data);
   }
   return std::nullopt;
 }
@@ -74,6 +64,92 @@ std::vector<ValueKind> everyKind() {
   }
   return kinds;
 }
+
+// ---- Invariant ------------------------------------------------------------------------------
+// Detection traits: whether an expression on V compiles. V stays a template parameter so an
+// ill-formed one is a substitution failure, not a hard error.
+
+template <typename V, typename = void>
+struct KindIsAssignable : std::false_type {};
+template <typename V>
+struct KindIsAssignable<V, std::void_t<decltype(std::declval<V&>().kind = ValueKind::Int)>>
+    : std::true_type {};
+
+template <typename V, typename Format, typename = void>
+struct IntegerTakes : std::false_type {};
+template <typename V, typename Format>
+struct IntegerTakes<V, Format, std::void_t<decltype(V::integer(0, std::declval<Format>()))>>
+    : std::true_type {};
+
+template <typename V, typename = void>
+struct HasOldColorValue : std::false_type {};
+template <typename V>
+struct HasOldColorValue<V, std::void_t<decltype(V::colorValue(0u, ColorFormat::Rgb8))>>
+    : std::true_type {};
+
+template <typename V, typename = void>
+struct HasOldIntegerValue : std::false_type {};
+template <typename V>
+struct HasOldIntegerValue<V, std::void_t<decltype(V::integerValue(0))>> : std::true_type {};
+
+// v.kind = ValueKind::Dimension used to compile and leave the union holding something else.
+static_assert(!KindIsAssignable<Value>::value);
+// integerValue(16, true) did not say what true meant.
+static_assert(IntegerTakes<Value, IntFormat>::value);
+static_assert(!IntegerTakes<Value, bool>::value);
+static_assert(!IntegerTakes<Value, int>::value);
+static_assert(!HasOldColorValue<Value>::value);
+static_assert(!HasOldIntegerValue<Value>::value);
+// Still a 32-bit payload plus tags, cheap to copy.
+static_assert(std::is_trivially_copyable_v<Value>);
+
+TEST(ValueFactory, EveryFactoryMakesItsKind) {
+  EXPECT_EQ(Value().kind(), ValueKind::Null);
+  for (ValueKind kind : everyKind()) {
+    EXPECT_EQ(sample(kind, 1)->kind(), kind) << testing::PrintToString(*sample(kind, 1));
+  }
+}
+
+TEST(ValueFactory, AccessorsReturnWhatTheFactoryTook) {
+  EXPECT_EQ(Value::reference(0x7f010001).ref(), 0x7f010001u);
+  EXPECT_EQ(Value::attrRef(0x01010000).ref(), 0x01010000u);
+  const Value color = Value::color(0x80ff8800, ColorFormat::Argb4);
+  EXPECT_EQ(color.argb(), 0x80ff8800u);
+  EXPECT_EQ(color.colorFormat(), ColorFormat::Argb4);
+  EXPECT_EQ(Value::integer(-42).intValue(), -42);
+  EXPECT_EQ(Value::integer(-42).intFormat(), IntFormat::Dec);
+  EXPECT_EQ(Value::integer(16, IntFormat::Hex).intFormat(), IntFormat::Hex);
+  EXPECT_TRUE(Value::boolean(true).boolValue());
+  EXPECT_FALSE(Value::boolean(false).boolValue());
+  EXPECT_EQ(Value::floating(1.5f).floatValue(), 1.5f);
+  EXPECT_EQ(Value::fractionFromComplex(0x40000031).complexData(), 0x40000031u);
+  EXPECT_EQ(Value::string(3).index(), 3u);
+  EXPECT_EQ(Value::styleableDecl(7).index(), 7u);
+}
+
+TEST(ValueFactory, IntFormatIsTheResValueType) {
+  // TypedValue.TYPE_INT_DEC and TYPE_INT_HEX, as ColorFormat is TYPE_INT_COLOR_*.
+  EXPECT_EQ(static_cast<int>(IntFormat::Dec), 0x10);
+  EXPECT_EQ(static_cast<int>(IntFormat::Hex), 0x11);
+}
+
+// assert() only runs in debug builds; in release the accessors read the union unchecked.
+#ifndef NDEBUG
+TEST(ValueAccessorDeathTest, WrongKindStopsADebugBuild) {
+  EXPECT_DEATH(Value().argb(), "not a Color");
+  EXPECT_DEATH(Value::dimensionFromComplex(0x1001).colorFormat(), "not a Color");
+  EXPECT_DEATH(Value::floating(1).intValue(), "not an Int");
+  EXPECT_DEATH(Value::color(0, ColorFormat::Rgb8).intFormat(), "not an Int");
+  EXPECT_DEATH(Value::integer(1).boolValue(), "not a Bool");
+  EXPECT_DEATH(Value::integer(1).floatValue(), "not a Float");
+  EXPECT_DEATH(Value::floating(16).complexData(), "not a Dimension or Fraction");
+  EXPECT_DEATH(Value::string(0).ref(), "not a reference");
+  EXPECT_DEATH(Value::reference(0x7f010001).index(), "not a pooled kind");
+  EXPECT_DEATH(Value().index(), "not a pooled kind");
+}
+#endif
+
+// ---- operator== -----------------------------------------------------------------------------
 
 TEST(ValueEquality, EveryKindComparesItsData) {
   for (ValueKind kind : everyKind()) {
@@ -98,13 +174,9 @@ TEST(ValueEquality, SameDataDifferentKindDiffers) {
 }
 
 TEST(ValueEquality, ReferenceAndNull) {
-  Value ref;
-  ref.kind = ValueKind::Reference;
-  ref.ref = 0x7f010001;
-  Value attr = ref;
-  attr.kind = ValueKind::AttrRef;
-  Value other = ref;
-  other.ref = 0x7f010002;
+  const Value ref = Value::reference(0x7f010001);
+  const Value attr = Value::attrRef(0x7f010001);
+  const Value other = Value::reference(0x7f010002);
   EXPECT_EQ(ref, ref);
   EXPECT_NE(ref, other);
   EXPECT_NE(ref, attr);
@@ -118,6 +190,8 @@ TEST(ValueEquality, FloatComparesBits) {
   EXPECT_EQ(nan, nan);
 }
 
+// ---- operator<< -----------------------------------------------------------------------------
+
 TEST(PrintValue, IsWhatGtestShows) {
   EXPECT_EQ(testing::PrintToString(Value::boolean(true)), "Bool(true)");
 }
@@ -128,13 +202,13 @@ TEST(PrintValue, Bool) {
 }
 
 TEST(PrintValue, ColorHasAllEightDigitsAndItsFormat) {
-  EXPECT_EQ(print(Value::colorValue(0x00ff0000, ColorFormat::Argb8)), "Color(0x00ff0000, Argb8)");
-  EXPECT_EQ(print(Value::colorValue(0xffff8800, ColorFormat::Rgb4)), "Color(0xffff8800, Rgb4)");
+  EXPECT_EQ(print(Value::color(0x00ff0000, ColorFormat::Argb8)), "Color(0x00ff0000, Argb8)");
+  EXPECT_EQ(print(Value::color(0xffff8800, ColorFormat::Rgb4)), "Color(0xffff8800, Rgb4)");
 }
 
 TEST(PrintValue, Int) {
-  EXPECT_EQ(print(Value::integerValue(-42)), "Int(-42)");
-  EXPECT_EQ(print(Value::integerValue(16, true)), "Int(16, hex)");
+  EXPECT_EQ(print(Value::integer(-42)), "Int(-42)");
+  EXPECT_EQ(print(Value::integer(16, IntFormat::Hex)), "Int(16, hex)");
 }
 
 TEST(PrintValue, FloatsOneUlpApartDiffer) {
@@ -151,20 +225,18 @@ TEST(PrintValue, DimensionAndFraction) {
 }
 
 TEST(PrintValue, EveryKindShowsItsData) {
-  Value ref;
-  ref.kind = ValueKind::Reference;
-  ref.ref = 0x7f010001;
-  EXPECT_EQ(print(ref), "Reference(0x7f010001)");
+  EXPECT_EQ(print(Value::reference(0x7f010001)), "Reference(0x7f010001)");
+  EXPECT_EQ(print(Value::attrRef(0x01010000)), "AttrRef(0x01010000)");
   EXPECT_EQ(print(Value()), "Null()");
-  EXPECT_EQ(print(withIndex(ValueKind::String, 3)), "String(index 3)");
-  EXPECT_EQ(print(withIndex(ValueKind::StyleableDecl, 7)), "StyleableDecl(index 7)");
+  EXPECT_EQ(print(Value::string(3)), "String(index 3)");
+  EXPECT_EQ(print(Value::styleableDecl(7)), "StyleableDecl(index 7)");
 }
 
 TEST(PrintValue, LeavesTheStreamAsItWas) {
   std::ostringstream os;
   os << std::hex << std::showpos;
   const auto flags = os.flags();
-  os << Value::integerValue(16) << ' ' << 16;
+  os << Value::integer(16) << ' ' << 16;
   EXPECT_EQ(os.str(), "Int(16) 10");
   EXPECT_EQ(os.flags(), flags);
 }

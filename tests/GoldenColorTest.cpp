@@ -79,12 +79,12 @@ Sources loadSources() {
       return;
     }
     auto v = parseLiteral(text, kFormatColor);
-    if (!v || v->kind != ValueKind::Color) {
+    if (!v || v->kind() != ValueKind::Color) {
       ADD_FAILURE() << file.string() << ": " << key << " \"" << text
                     << "\" does not parse to a color";
       return;
     }
-    out.values[key].insert({static_cast<int>(v->color.format), v->color.argb});
+    out.values[key].insert({static_cast<int>(v->colorFormat()), v->argb()});
   });
   for (bool changed = true; changed;) {
     changed = false;

@@ -19,10 +19,10 @@ using namespace std::string_view_literals;
 // ---- color ---------------------------------------------------------------------------------
 
 TEST(ParseColor, FourFormats) {
-  EXPECT_EQ(parseColor("#f80"), Value::colorValue(0xffff8800, ColorFormat::Rgb4));
-  EXPECT_EQ(parseColor("#8f80"), Value::colorValue(0x88ff8800, ColorFormat::Argb4));
-  EXPECT_EQ(parseColor("#6200ee"), Value::colorValue(0xff6200ee, ColorFormat::Rgb8));
-  EXPECT_EQ(parseColor("#806200ee"), Value::colorValue(0x806200ee, ColorFormat::Argb8));
+  EXPECT_EQ(parseColor("#f80"), Value::color(0xffff8800, ColorFormat::Rgb4));
+  EXPECT_EQ(parseColor("#8f80"), Value::color(0x88ff8800, ColorFormat::Argb4));
+  EXPECT_EQ(parseColor("#6200ee"), Value::color(0xff6200ee, ColorFormat::Rgb8));
+  EXPECT_EQ(parseColor("#806200ee"), Value::color(0x806200ee, ColorFormat::Argb8));
 }
 
 // Issue #4: the golden app has accent (#6200EE) as type 29 and surface (#FFFFFFFF) as 28.
@@ -33,23 +33,23 @@ static_assert(static_cast<int>(ColorFormat::Rgb4) == 31);   // TYPE_INT_COLOR_RG
 
 TEST(ParseColor, SameColorInAnotherFormatIsAnotherValue) {
   // Opaque white four ways: equal argb, but Android keeps four different types.
-  EXPECT_EQ(parseColor("#fff"), Value::colorValue(0xffffffff, ColorFormat::Rgb4));
-  EXPECT_EQ(parseColor("#ffff"), Value::colorValue(0xffffffff, ColorFormat::Argb4));
-  EXPECT_EQ(parseColor("#ffffff"), Value::colorValue(0xffffffff, ColorFormat::Rgb8));
-  EXPECT_EQ(parseColor("#ffffffff"), Value::colorValue(0xffffffff, ColorFormat::Argb8));
+  EXPECT_EQ(parseColor("#fff"), Value::color(0xffffffff, ColorFormat::Rgb4));
+  EXPECT_EQ(parseColor("#ffff"), Value::color(0xffffffff, ColorFormat::Argb4));
+  EXPECT_EQ(parseColor("#ffffff"), Value::color(0xffffffff, ColorFormat::Rgb8));
+  EXPECT_EQ(parseColor("#ffffffff"), Value::color(0xffffffff, ColorFormat::Argb8));
   EXPECT_NE(parseColor("#fff"), parseColor("#ffffffff"));
   EXPECT_NE(parseColor("#ffffff"), parseColor("#ffffffff"));
 }
 
 TEST(ParseColor, HexIsCaseInsensitiveAndWhitespaceIsTrimmed) {
-  EXPECT_EQ(parseColor("#FF6200EE"), Value::colorValue(0xff6200ee, ColorFormat::Argb8));
-  EXPECT_EQ(parseColor("#aBcDeF"), Value::colorValue(0xffabcdef, ColorFormat::Rgb8));
-  EXPECT_EQ(parseColor("  #fff\n"), Value::colorValue(0xffffffff, ColorFormat::Rgb4));
+  EXPECT_EQ(parseColor("#FF6200EE"), Value::color(0xff6200ee, ColorFormat::Argb8));
+  EXPECT_EQ(parseColor("#aBcDeF"), Value::color(0xffabcdef, ColorFormat::Rgb8));
+  EXPECT_EQ(parseColor("  #fff\n"), Value::color(0xffffffff, ColorFormat::Rgb4));
 }
 
 TEST(ParseColor, ZeroAlphaIsKept) {
-  EXPECT_EQ(parseColor("#0000"), Value::colorValue(0x00000000, ColorFormat::Argb4));
-  EXPECT_EQ(parseColor("#00ffffff"), Value::colorValue(0x00ffffff, ColorFormat::Argb8));
+  EXPECT_EQ(parseColor("#0000"), Value::color(0x00000000, ColorFormat::Argb4));
+  EXPECT_EQ(parseColor("#00ffffff"), Value::color(0x00ffffff, ColorFormat::Argb8));
 }
 
 TEST(ParseColor, Rejects) {
@@ -164,8 +164,8 @@ TEST(ParseFloatValue, AtMost126Characters) {
   EXPECT_EQ(parseFloatValue("  0." + zeros + "1dp  ").has_value(), true);  // trimmed first
   // The limit is stringToFloat's: an integer has none, so leading zeros only fail as a float.
   const std::string padded = std::string(130, '0') + "42";
-  EXPECT_EQ(parseLiteral(padded, kFormatInteger), Value::integerValue(42));
-  EXPECT_EQ(parseLiteral(padded, kFormatAny), Value::integerValue(42));
+  EXPECT_EQ(parseLiteral(padded, kFormatInteger), Value::integer(42));
+  EXPECT_EQ(parseLiteral(padded, kFormatAny), Value::integer(42));
   EXPECT_FALSE(parseLiteral(padded, kFormatFloat));
   EXPECT_EQ(parseLiteral("0." + zeros + "001", kFormatAny), Value::floating(0));  // 126
   EXPECT_FALSE(parseLiteral("0." + zeros + "0001", kFormatAny));                 // 127
@@ -174,28 +174,28 @@ TEST(ParseFloatValue, AtMost126Characters) {
 // ---- integer -------------------------------------------------------------------------------
 
 TEST(ParseInteger, Decimal) {
-  EXPECT_EQ(parseInteger("0"), Value::integerValue(0));
-  EXPECT_EQ(parseInteger("42"), Value::integerValue(42));
-  EXPECT_EQ(parseInteger("-42"), Value::integerValue(-42));
-  EXPECT_EQ(parseInteger(" 7\n"), Value::integerValue(7));
-  EXPECT_EQ(parseInteger("2147483647"), Value::integerValue(INT32_MAX));
-  EXPECT_EQ(parseInteger("-2147483648"), Value::integerValue(INT32_MIN));
+  EXPECT_EQ(parseInteger("0"), Value::integer(0));
+  EXPECT_EQ(parseInteger("42"), Value::integer(42));
+  EXPECT_EQ(parseInteger("-42"), Value::integer(-42));
+  EXPECT_EQ(parseInteger(" 7\n"), Value::integer(7));
+  EXPECT_EQ(parseInteger("2147483647"), Value::integer(INT32_MAX));
+  EXPECT_EQ(parseInteger("-2147483648"), Value::integer(INT32_MIN));
 }
 
 TEST(ParseInteger, Hex) {
-  EXPECT_EQ(parseInteger("0x10"), Value::integerValue(16, true));
-  EXPECT_EQ(parseInteger("0x7f010000"), Value::integerValue(0x7f010000, true));
-  EXPECT_EQ(parseInteger("0xFfFfFfFf"), Value::integerValue(-1, true));
+  EXPECT_EQ(parseInteger("0x10"), Value::integer(16, IntFormat::Hex));
+  EXPECT_EQ(parseInteger("0x7f010000"), Value::integer(0x7f010000, IntFormat::Hex));
+  EXPECT_EQ(parseInteger("0xFfFfFfFf"), Value::integer(-1, IntFormat::Hex));
 }
 
 TEST(ParseInteger, NegativeZeroIsZero) {
-  EXPECT_EQ(parseInteger("-0"), Value::integerValue(0));
-  EXPECT_EQ(parseLiteral("-0", kFormatAny), Value::integerValue(0));  // integer before float
+  EXPECT_EQ(parseInteger("-0"), Value::integer(0));
+  EXPECT_EQ(parseLiteral("-0", kFormatAny), Value::integer(0));  // integer before float
 }
 
 TEST(ParseInteger, HexIsTrimmed) {
-  EXPECT_EQ(parseInteger("0x10 "), Value::integerValue(16, true));
-  EXPECT_EQ(parseInteger("\t0x10\n"), Value::integerValue(16, true));
+  EXPECT_EQ(parseInteger("0x10 "), Value::integer(16, IntFormat::Hex));
+  EXPECT_EQ(parseInteger("\t0x10\n"), Value::integer(16, IntFormat::Hex));
 }
 
 TEST(ParseInteger, Rejects) {
@@ -264,8 +264,8 @@ TEST(ParseLiteral, ZeroBeforeHexIsNothing) {
 
 TEST(ParseLiteral, AaptOrder) {
   // Integer is tried before float, color before everything.
-  EXPECT_EQ(parseLiteral("5", kFormatInteger | kFormatFloat), Value::integerValue(5));
-  EXPECT_EQ(parseLiteral("#fff", kFormatAny), Value::colorValue(0xffffffff, ColorFormat::Rgb4));
+  EXPECT_EQ(parseLiteral("5", kFormatInteger | kFormatFloat), Value::integer(5));
+  EXPECT_EQ(parseLiteral("#fff", kFormatAny), Value::color(0xffffffff, ColorFormat::Rgb4));
   EXPECT_EQ(parseLiteral("true", kFormatAny), Value::boolean(true));
   EXPECT_FALSE(parseLiteral("hello", kFormatAny));
 }
@@ -311,9 +311,10 @@ TEST(ParseLiteral, EmbeddedNulIsNotTheEnd) {
 TEST(ParseLiteral, ReadsNoFurtherThanTheView) {
   EXPECT_EQ(parseLiteral(std::string_view("16dpx", 4), kFormatAny),
             Value::dimensionFromComplex(0x1001));
-  EXPECT_EQ(parseLiteral(std::string_view("0x10g", 4), kFormatAny), Value::integerValue(16, true));
+  EXPECT_EQ(parseLiteral(std::string_view("0x10g", 4), kFormatAny),
+            Value::integer(16, IntFormat::Hex));
   EXPECT_EQ(parseLiteral(std::string_view("#fff0", 4), kFormatAny),
-            Value::colorValue(0xffffffff, ColorFormat::Rgb4));
+            Value::color(0xffffffff, ColorFormat::Rgb4));
   EXPECT_EQ(parseLiteral(std::string_view("truee", 4), kFormatAny), Value::boolean(true));
   EXPECT_EQ(parseLiteral(std::string_view("1.5e", 3), kFormatAny), Value::floating(1.5f));
 }
