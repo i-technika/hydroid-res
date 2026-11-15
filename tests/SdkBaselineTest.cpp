@@ -49,9 +49,9 @@ TEST(SdkBaseline, GoldenAppBuildsForEmulatedLevel) {
 
 // The first line of each file names them: "... with build-tools 37.0.0 and android-37.0 on
 // Windows. ...". The platform must be <level>.0, not a minor release; any build-tools <level>.x
-// will do. The OS is GOLDEN_HOST in gen_aapt2_values.py (#62): aapt2 reads a number past
-// 2147483647 in sw<N>dp, w<N>dp, h<N>dp or <N>dpi through the host's long, so another OS would
-// change rows of configs.tsv without failing Aapt2ConfigTest.
+// will do. The OS is GOLDEN_HOST in gen_aapt2_values.py (#62): on Linux or macOS, aapt2 37.0.0
+// wraps sw2147483648dp to the default Config rather than stop it at sw65535dp, and writes other
+// NaN bits, and the aapt2 tests miss nearly all of it, as they are deliberate rejections.
 TEST(SdkBaseline, Aapt2GoldenUsesEmulatedLevel) {
   const std::regex tools(R"(build-tools (\d+)\.\S+ and (android-\d+(\.\d+)?) on (\w+)\.)");
   for (const char* path : {HYDROID_AAPT2_VALUES, HYDROID_AAPT2_CONFIGS}) {

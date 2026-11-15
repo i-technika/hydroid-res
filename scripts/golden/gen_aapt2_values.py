@@ -42,11 +42,14 @@ EXE = ".exe" if os.name == "nt" else ""
 BUILD_TOOLS = "37.0.0"
 PLATFORM = "android-37.0"
 # The OS the aapt2 golden files come from, which their header records and SdkBaselineTest checks.
-# aapt2 reads the numbers of sw<N>dp, w<N>dp, h<N>dp and <N>dpi with atoi, which goes through the
-# host's long: 37.0.0 on Windows, with a 32-bit long, stops sw2147483648dp at 0x7fffffff, so it is
-# sw65535dp. With the 64-bit long of Linux and macOS, atoi would wrap it to INT_MIN, the default
-# Config (not yet run there). A golden file made on another OS would change those rows without
-# failing a test. Change it together with the header check in SdkBaselineTest.
+# The same build-tools write other rows elsewhere (#62), mostly among the deliberate rejections:
+#   - aapt2 reads the numbers of sw<N>dp, w<N>dp, h<N>dp, <N>dpi and <W>x<H> with atoi. On
+#     Windows it stops sw2147483648dp at 0x7fffffff, sw65535dp; on Linux and macOS it wraps it to
+#     32 bits, the default Config, and sw99999999999dp to sw59391dp.
+#   - strtof sets the quiet bit of "-nan(1)" on Linux and macOS, not on Windows.
+#   - On macOS arm64, a dimension past 2^41 ("1e39dp", "3e12dp") gets other data than on x86.
+# Nearly all of these would pass Aapt2ConfigTest and Aapt2ValueTest: made on Linux, only
+# 2147483648x1, which aapt2 rejects there, fails. Change it together with SdkBaselineTest.
 GOLDEN_HOST = "Windows"
 HOST = platform.system()
 
