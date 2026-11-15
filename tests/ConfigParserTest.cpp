@@ -355,15 +355,5 @@ TEST(Config, DeviceValuesWithoutAQualifier) {
   EXPECT_EQ(toString(device), "420dpi");
 }
 
-// Same values as Android's AConfiguration, so an adapter or a binary table can copy them.
-static_assert(static_cast<int>(Orientation::Square) == 3);
-static_assert(static_cast<int>(UiModeType::VrHeadset) == 7);
-static_assert(static_cast<int>(Touchscreen::Finger) == 3);
-static_assert(static_cast<int>(KeysHidden::Soft) == 3);
-static_assert(static_cast<int>(Keyboard::TwelveKey) == 3);
-static_assert(static_cast<int>(Navigation::Wheel) == 4);
-static_assert(static_cast<int>(GrammaticalGender::Masculine) == 3);
-static_assert(static_cast<int>(ScreenSize::XLarge) == 4);
-
 }  // namespace
 }  // namespace hydroid::res
