@@ -166,7 +166,8 @@ TEST(Aapt2Config, NumbersPast16Bits) {
 // Whether toString writes `c` in a form aapt2 prints but no folder can be named, so that it cannot
 // read back: an mcc below 100 without its leading zeros (mcc001 is mcc1; an mnc may have 1 to 3
 // digits), kMncZero as mnc65535, a 3-digit region in the legacy form (b+es+419 is es-r419), and
-// the language "any" with no mnc before it, where it reads back as the mnc's wildcard.
+// the language "any" with no mnc before it, where it reads back as the wildcard of the mcc, or of
+// the mnc after an mcc.
 bool writtenAsNoFolderIs(const Config& c) {
   const bool threeDigitRegion = c.region[2] >= '0' && c.region[2] <= '9';
   return (c.mcc != 0 && c.mcc < 100) || c.mnc == kMncZero ||
