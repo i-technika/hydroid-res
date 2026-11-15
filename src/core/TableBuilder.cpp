@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "core/ValuesParser.h"
+#include "core/Whitespace.h"
 #include "hydroid/res/ValueParser.h"
 
 namespace hydroid::res::detail {
@@ -248,13 +249,7 @@ class Linker {
     if (text.empty()) return flags;
     for (;;) {
       const size_t bar = text.find('|');
-      std::string_view part = text.substr(0, bar);
-      while (!part.empty() && std::string_view(" \t\n\v\f\r").find(part.front()) != part.npos) {
-        part.remove_prefix(1);
-      }
-      while (!part.empty() && std::string_view(" \t\n\v\f\r").find(part.back()) != part.npos) {
-        part.remove_suffix(1);
-      }
+      const std::string_view part = trim(text.substr(0, bar));
       const auto symbol = std::find_if(attr.symbols.begin(), attr.symbols.end(),
                                        [&](const AttrInfo::Symbol& s) { return s.name == part; });
       if (symbol == attr.symbols.end()) return std::nullopt;
