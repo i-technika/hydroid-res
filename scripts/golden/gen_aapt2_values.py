@@ -38,7 +38,8 @@ ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / "golden" / "aapt2" / "values.tsv"
 EXE = ".exe" if os.name == "nt" else ""
 # The build-tools and platform the aapt2 golden files come from, at the API level of
-# kEmulatedSdkVersion in include/hydroid/res/Version.h. Raise them together with it.
+# kEmulatedSdkVersion in include/hydroid/res/Version.h. Raise them together with it, and make both
+# files again: SdkBaselineTest wants their header to name these two and GOLDEN_HOST.
 BUILD_TOOLS = "37.0.0"
 PLATFORM = "android-37.0"
 # The OS the aapt2 golden files come from, which their header records and SdkBaselineTest checks.
@@ -49,7 +50,7 @@ PLATFORM = "android-37.0"
 #   - strtof sets the quiet bit of "-nan(1)" on Linux and macOS, not on Windows.
 #   - On macOS arm64, a dimension past 2^41 ("1e39dp", "3e12dp") gets other data than on x86.
 # Nearly all of these would pass Aapt2ConfigTest and Aapt2ValueTest: made on Linux, only
-# 2147483648x1, which aapt2 rejects there, fails. Change it together with SdkBaselineTest.
+# 2147483648x1, which aapt2 rejects there, fails. Changing it means making both files on that OS.
 GOLDEN_HOST = "Windows"
 HOST = platform.system()
 # The header records the CPU too, which only the OS does not tell: on macOS, aapt2 runs as arm64

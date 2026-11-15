@@ -18,6 +18,7 @@ target_link_libraries(hydroid-res-tests PRIVATE
 set(public_include_dirs "$<JOIN:$<TARGET_PROPERTY:hydroid-res,INTERFACE_INCLUDE_DIRECTORIES>,|>")
 target_compile_definitions(hydroid-res-tests PRIVATE
   HYDROID_AAPT2_CONFIGS="${PROJECT_SOURCE_DIR}/golden/aapt2/configs.tsv"
+  HYDROID_AAPT2_SCRIPT="${PROJECT_SOURCE_DIR}/scripts/golden/gen_aapt2_values.py"
   HYDROID_AAPT2_VALUES="${PROJECT_SOURCE_DIR}/golden/aapt2/values.tsv"
   HYDROID_AOSP_RES_DIRS="${PROJECT_SOURCE_DIR}/golden/aosp/framework_res_dirs.txt"
   HYDROID_GOLDEN_APP_GRADLE="${PROJECT_SOURCE_DIR}/golden/app/build.gradle.kts"
