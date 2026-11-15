@@ -119,9 +119,10 @@ TEST(ParseConfig, ScreenDp) {
   EXPECT_EQ(canonical("sw65535dp"), "sw65535dp-v13");
   // aapt2 wraps 65536 to 0 and 65537 to 1, so it takes sw65537dp as sw1dp. Past 0x7fffffff it
   // stops there first: w99999999999dp is w65535dp. hydroid rejects them (see ConfigParser.h).
-  for (const char* s : {"sw65536dp", "sw65537dp", "sw2147483648dp", "sw99999999999dp",
-                        "w65536dp", "w65537dp", "w2147483648dp", "w99999999999dp", "h65536dp",
-                        "h65537dp", "h2147483648dp", "h99999999999dp"}) {
+  for (const char* s :
+       {"sw65536dp", "sw65537dp", "sw2147483647dp", "sw2147483648dp", "sw4294967296dp",
+        "sw99999999999dp", "w65536dp", "w65537dp", "w2147483648dp", "w99999999999dp", "h65536dp",
+        "h65537dp", "h2147483648dp", "h99999999999dp"}) {
     EXPECT_EQ(canonical(s), "rejected") << s;
   }
   for (const char* s : {"sw600", "sw600px", "sw-600dp", "SW600DPX", "swdp"}) {
