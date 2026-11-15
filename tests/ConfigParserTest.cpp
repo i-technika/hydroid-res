@@ -117,8 +117,13 @@ TEST(ParseConfig, ScreenDp) {
   EXPECT_EQ(c.sdkVersion, 13);
   EXPECT_EQ(canonical("sw0dp"), "");  // 0 is any
   EXPECT_EQ(canonical("sw65535dp"), "sw65535dp-v13");
-  // aapt2 wraps 65536 to 0: hydroid rejects it (see ConfigParser.h).
-  EXPECT_EQ(canonical("sw65536dp"), "rejected");
+  // aapt2 wraps 65536 to 0 and 65537 to 1, so it takes sw65537dp as sw1dp. Past 0x7fffffff it
+  // stops there first: w99999999999dp is w65535dp. hydroid rejects them (see ConfigParser.h).
+  for (const char* s : {"sw65536dp", "sw65537dp", "sw2147483648dp", "sw99999999999dp",
+                        "w65536dp", "w65537dp", "w2147483648dp", "w99999999999dp", "h65536dp",
+                        "h65537dp", "h2147483648dp", "h99999999999dp"}) {
+    EXPECT_EQ(canonical(s), "rejected") << s;
+  }
   for (const char* s : {"sw600", "sw600px", "sw-600dp", "SW600DPX", "swdp"}) {
     EXPECT_EQ(canonical(s), "rejected") << s;
   }
@@ -166,7 +171,12 @@ TEST(ParseConfig, Density) {
   EXPECT_EQ(canonical("480dpi"), "xxhdpi-v4");
   EXPECT_EQ(canonical("65534dpi"), "anydpi-v21");
   EXPECT_EQ(canonical("65535dpi"), "nodpi-v4");
-  for (const char* s : {"0dpi", "-1dpi", "65536dpi", "xxxxhdpi", "400dp"}) {
+  for (const char* s : {"0dpi", "-1dpi", "xxxxhdpi", "400dp"}) {
+    EXPECT_EQ(canonical(s), "rejected") << s;
+  }
+  // aapt2 wraps 65536 to 0 and 65537 to 1dpi. Past 0x7fffffff it stops there first:
+  // 2147483648dpi is 65535dpi, nodpi. hydroid rejects them (see ConfigParser.h).
+  for (const char* s : {"65536dpi", "65537dpi", "2147483648dpi", "99999999999dpi"}) {
     EXPECT_EQ(canonical(s), "rejected") << s;
   }
 }

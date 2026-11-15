@@ -54,9 +54,11 @@ const std::vector<Row>& rows() {
 // clang-format off
 const std::set<std::string> kDeliberateRejects = {
     // Past 16 bits, which aapt2 wraps: sw65536dp is sw0dp. Past 0x7fffffff it stops there first.
-    "sw65536dp", "sw2147483647dp", "sw2147483648dp", "sw4294967296dp", "sw99999999999dp",
-    "w65536dp", "h65536dp", "65536dpi", "99999999999dpi", "65536x0", "65536x", "131072x0",
-    "1x65536", "65537x1", "2147483648x1", "99999999999x1",
+    "sw65536dp", "sw65537dp", "sw2147483647dp", "sw2147483648dp", "sw4294967296dp",
+    "sw99999999999dp", "w65536dp", "w65537dp", "w2147483648dp", "w99999999999dp", "h65536dp",
+    "h65537dp", "h2147483648dp", "h99999999999dp", "65536dpi", "65537dpi", "2147483648dpi",
+    "99999999999dpi", "65536x0", "65536x", "131072x0", "1x65536", "65537x1", "2147483648x1",
+    "99999999999x1",
     // b+ with an empty subtag.
     "b+", "b++en", "b+sr+Latn+RS+", "b+sr+Latn++x", "b+zh+Hant+TW+", "b+zh+Hant++",
     // A language of 1 or of 4 and more letters, or not of letters.
