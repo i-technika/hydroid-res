@@ -8,11 +8,13 @@
 #include <iterator>
 #include <map>
 #include <optional>
+#include <set>
 #include <sstream>
 #include <string>
 #include <utility>
 
 #include "core/FieldCount.h"
+#include "core/QualifierNames.h"
 #include "hydroid/res/ConfigParser.h"
 
 namespace hydroid::res {
@@ -166,6 +168,73 @@ TEST(ParseConfig, NamedQualifiers) {
   EXPECT_EQ(canonical("normal-car"), "normal-car-v8");
   for (const char* s : {"land-normal", "port-normal", "car-normal", "night-normal"}) {
     EXPECT_EQ(canonical(s), "rejected") << s;
+  }
+}
+
+// Each name the qualifier tables hold, with the value it must give its field, written here apart
+// from QualifierNames.h (#54): parseConfig and toString read the same table, so a name in the
+// wrong place there would read back and print as aapt2 does, with the wrong value in the field.
+// The values themselves are the NDK's (Config.cpp). A name added to the tables belongs here too.
+TEST(ParseConfig, EveryNameGivesItsValue) {
+  // clang-format off
+  const std::pair<const char*, bool (*)(const Config&)> kNames[] = {
+      {"neuter", [](const Config& c) { return c.grammaticalGender == GrammaticalGender::Neuter; }},
+      {"feminine",
+       [](const Config& c) { return c.grammaticalGender == GrammaticalGender::Feminine; }},
+      {"masculine",
+       [](const Config& c) { return c.grammaticalGender == GrammaticalGender::Masculine; }},
+      {"ldltr", [](const Config& c) { return c.layoutDir == LayoutDir::Ltr; }},
+      {"ldrtl", [](const Config& c) { return c.layoutDir == LayoutDir::Rtl; }},
+      {"small", [](const Config& c) { return c.screenSize == ScreenSize::Small; }},
+      {"normal", [](const Config& c) { return c.screenSize == ScreenSize::Normal; }},
+      {"large", [](const Config& c) { return c.screenSize == ScreenSize::Large; }},
+      {"xlarge", [](const Config& c) { return c.screenSize == ScreenSize::XLarge; }},
+      {"notlong", [](const Config& c) { return c.screenLong == ScreenLong::No; }},
+      {"long", [](const Config& c) { return c.screenLong == ScreenLong::Yes; }},
+      {"notround", [](const Config& c) { return c.screenRound == ScreenRound::No; }},
+      {"round", [](const Config& c) { return c.screenRound == ScreenRound::Yes; }},
+      {"nowidecg", [](const Config& c) { return c.wideColorGamut == WideColorGamut::No; }},
+      {"widecg", [](const Config& c) { return c.wideColorGamut == WideColorGamut::Yes; }},
+      {"lowdr", [](const Config& c) { return c.hdr == Hdr::No; }},
+      {"highdr", [](const Config& c) { return c.hdr == Hdr::Yes; }},
+      {"port", [](const Config& c) { return c.orientation == Orientation::Port; }},
+      {"land", [](const Config& c) { return c.orientation == Orientation::Land; }},
+      {"square", [](const Config& c) { return c.orientation == Orientation::Square; }},
+      {"desk", [](const Config& c) { return c.uiModeType == UiModeType::Desk; }},
+      {"car", [](const Config& c) { return c.uiModeType == UiModeType::Car; }},
+      {"television", [](const Config& c) { return c.uiModeType == UiModeType::Television; }},
+      {"appliance", [](const Config& c) { return c.uiModeType == UiModeType::Appliance; }},
+      {"watch", [](const Config& c) { return c.uiModeType == UiModeType::Watch; }},
+      {"vrheadset", [](const Config& c) { return c.uiModeType == UiModeType::VrHeadset; }},
+      {"notnight", [](const Config& c) { return c.uiModeNight == UiModeNight::No; }},
+      {"night", [](const Config& c) { return c.uiModeNight == UiModeNight::Yes; }},
+      {"notouch", [](const Config& c) { return c.touchscreen == Touchscreen::NoTouch; }},
+      {"stylus", [](const Config& c) { return c.touchscreen == Touchscreen::Stylus; }},
+      {"finger", [](const Config& c) { return c.touchscreen == Touchscreen::Finger; }},
+      {"keysexposed", [](const Config& c) { return c.keysHidden == KeysHidden::No; }},
+      {"keyshidden", [](const Config& c) { return c.keysHidden == KeysHidden::Yes; }},
+      {"keyssoft", [](const Config& c) { return c.keysHidden == KeysHidden::Soft; }},
+      {"nokeys", [](const Config& c) { return c.keyboard == Keyboard::NoKeys; }},
+      {"qwerty", [](const Config& c) { return c.keyboard == Keyboard::Qwerty; }},
+      {"12key", [](const Config& c) { return c.keyboard == Keyboard::TwelveKey; }},
+      {"navexposed", [](const Config& c) { return c.navHidden == NavHidden::No; }},
+      {"navhidden", [](const Config& c) { return c.navHidden == NavHidden::Yes; }},
+      {"nonav", [](const Config& c) { return c.navigation == Navigation::NoNav; }},
+      {"dpad", [](const Config& c) { return c.navigation == Navigation::Dpad; }},
+      {"trackball", [](const Config& c) { return c.navigation == Navigation::Trackball; }},
+      {"wheel", [](const Config& c) { return c.navigation == Navigation::Wheel; }},
+  };
+  // clang-format on
+  static_assert(std::size(kNames) == names::countNamed(), "a qualifier name is missing here");
+  // As many as the tables hold, and none twice, so each of theirs is here once.
+  std::set<std::string> listed;
+  for (const auto& entry : kNames) {
+    EXPECT_TRUE(listed.insert(entry.first).second) << entry.first << " is listed twice";
+  }
+  for (const auto& [name, gives] : kNames) {
+    const std::optional<Config> c = parseConfig(name);
+    ASSERT_TRUE(c) << name;
+    EXPECT_TRUE(gives(*c)) << name << " gives " << *c;
   }
 }
 

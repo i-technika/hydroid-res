@@ -163,6 +163,46 @@ TEST(Aapt2Config, NumbersPast16Bits) {
   }
 }
 
+// Whether toString writes `c` in a form aapt2 prints but no folder can be named, so that it cannot
+// read back: an mcc below 100 without its leading zeros (mcc001 is mcc1; an mnc may have 1 to 3
+// digits), kMncZero as mnc65535, a 3-digit region in the legacy form (b+es+419 is es-r419), and
+// the language "any" with no mnc before it, where it reads back as the wildcard of the mcc, or of
+// the mnc after an mcc.
+bool writtenAsNoFolderIs(const Config& c) {
+  const bool threeDigitRegion = c.region[2] >= '0' && c.region[2] <= '9';
+  return (c.mcc != 0 && c.mcc < 100) || c.mnc == kMncZero ||
+         (threeDigitRegion && c.script[0] == '\0' && c.variant[0] == '\0') ||
+         (c.mnc == 0 && c.lang[0] == 'a' && c.lang[1] == 'n' && c.lang[2] == 'y');
+}
+
+// Every name hydroid takes reads back as the same Config from what toString makes of it, field by
+// field (#54): ParsesLikeAapt2 compares strings only, and toString would hide a field it does not
+// write. toString of that is the same string again. Configs that writtenAsNoFolderIs are left
+// out; any other that does not read back fails.
+TEST(Aapt2Config, ReadsBackFromToString) {
+  int roundTrips = 0;
+  int leftOut = 0;
+  for (const Row& row : rows()) {
+    const std::optional<Config> c = parseConfig(row.qualifiers);
+    if (!c) continue;
+    if (writtenAsNoFolderIs(*c)) {
+      ++leftOut;
+      continue;
+    }
+    const std::string where = '"' + row.qualifiers + '"';
+    const std::string written = toString(*c);
+    const std::optional<Config> back = parseConfig(written);
+    if (!back) {
+      ADD_FAILURE() << where << " is written \"" << written << "\", which does not read back";
+      continue;
+    }
+    ++roundTrips;
+    EXPECT_EQ(*back, *c) << where << " is written \"" << written << '"';
+    EXPECT_EQ(toString(*back), written) << where;
+  }
+  EXPECT_GT(roundTrips, 4800) << "left out " << leftOut;
+}
+
 // The golden file reaches every qualifier, and both outcomes.
 TEST(Aapt2Config, CoversEveryQualifier) {
   std::map<std::string, int> seen;

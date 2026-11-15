@@ -50,4 +50,22 @@ static_assert(endsAt(kKeyboard, Keyboard::TwelveKey));
 static_assert(endsAt(kNavHidden, NavHidden::Yes));
 static_assert(endsAt(kNavigation, Navigation::Wheel));
 
+// How many names the tables hold, for ParseConfig.EveryNameGivesItsValue, which lists each with
+// the value it must give apart from these tables (#54). A table added above goes here too, and in
+// an endsAt assert.
+template <size_t N>
+constexpr size_t named(const std::string_view (&names)[N]) {
+  size_t n = 0;
+  for (std::string_view name : names) {
+    if (!name.empty()) n++;
+  }
+  return n;
+}
+constexpr size_t countNamed() {
+  return named(kGrammaticalGender) + named(kLayoutDir) + named(kScreenSize) + named(kScreenLong) +
+         named(kScreenRound) + named(kWideColorGamut) + named(kHdr) + named(kOrientation) +
+         named(kUiModeType) + named(kUiModeNight) + named(kTouchscreen) + named(kKeysHidden) +
+         named(kKeyboard) + named(kNavHidden) + named(kNavigation);
+}
+
 }  // namespace hydroid::res::names
