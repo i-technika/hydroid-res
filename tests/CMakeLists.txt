@@ -12,6 +12,7 @@ add_executable(hydroid-res-tests
   ResourceTableTest.cpp
   SdkBaselineTest.cpp
   SmokeTest.cpp
+  Utf8Test.cpp
   ValueParserTest.cpp
   ValueTest.cpp)
 # src/ for the internal headers some tests use, as core/FieldCount.h.

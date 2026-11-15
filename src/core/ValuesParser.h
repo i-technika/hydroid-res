@@ -31,7 +31,7 @@ std::optional<ParsedReference> parseReference(std::string_view text);
 
 // The text of a string as aapt2's StringBuilder makes it of `raw`, with no tags: whitespace runs
 // collapse to one space outside "quotes", which are dropped, and \-escapes are read. nullopt with
-// `error` for an unescaped apostrophe or a bad \u.
+// `error` for an unescaped apostrophe, a bad \u or text that is not UTF-8.
 std::optional<std::string> buildString(std::string_view raw, std::string* error);
 
 }  // namespace hydroid::res::detail
