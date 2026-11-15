@@ -15,6 +15,8 @@ option(HYDROID_RES_BUILD_TOOLS "Build the hydroid-rc resource compiler" ${PROJEC
 option(HYDROID_RES_WARNINGS_AS_ERRORS "Treat compiler warnings as errors" OFF)
 option(HYDROID_RES_REQUIRE_LOCALE_TESTS
   "Fail, rather than skip, tests that need a decimal-comma locale where none is installed" OFF)
+option(HYDROID_RES_REQUIRE_NDK_TESTS
+  "Fail, rather than leave out AConfiguration.MatchesNdk, where no NDK or Python is found" OFF)
 
 # A shared build puts DLLs next to the executables that load them, as Windows has no rpath. Set
 # before the dependencies so a shared GoogleTest lands there too.

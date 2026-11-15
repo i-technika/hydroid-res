@@ -16,7 +16,9 @@ resolves values exactly as Android does, for UIKit, GTK4 and WinUI 3. Design and
 | `tests/` | GoogleTest unit and golden tests |
 | `golden/` | Android test app + instrumentation test that dumps Android's answers |
 | `golden/data/` | The dumped golden JSON the C++ tests compare against |
-| `scripts/golden/` | Runs the dump on a device and pulls the JSON |
+| `golden/aapt2/` | What the SDK's aapt2 makes of literal values and resource folder names |
+| `golden/aosp/` | The folder names of AOSP's framework `res/`, which must all parse |
+| `scripts/golden/` | Runs the dump on a device and pulls the JSON; runs aapt2 for `golden/aapt2/` |
 
 ## Build and test
 
@@ -57,6 +59,12 @@ With GCC or Clang, the `sanitize` preset does the same under AddressSanitizer an
 UndefinedBehaviorSanitizer, and stops at the first error; CI runs it with Clang on Linux. It is
 not offered on Windows, where MSVC would ignore its flags.
 
+With an Android NDK and Python at hand, `ctest` also runs `AConfiguration.MatchesNdk`, which
+checks the values of `Config.h` against the NDK's `android/configuration.h`. It finds the NDK in
+`HYDROID_RES_ANDROID_NDK`, `ANDROID_NDK_HOME`, `ANDROID_NDK_ROOT` or the SDK's `ndk/`, and
+configure says which it took; without one, the test is left out, or configure fails with
+`-DHYDROID_RES_REQUIRE_NDK_TESTS=ON`, as in CI.
+
 The C++ sources follow `.clang-format`, as clang-format 23.1.5 applies it (`pipx install
 clang-format==23.1.5`); CI fails on any other formatting. To reformat:
 
@@ -66,7 +74,14 @@ git ls-files -z -- '*.h' '*.cpp' | xargs -0 clang-format -i
 
 ## Golden data
 
-Needs an emulator or device, the Android SDK and JDK 17+ (Android Studio's bundled JDK works).
+All of it comes from one API level, `kEmulatedSdkVersion` in `include/hydroid/res/Version.h`
+(37): the emulator, the golden app's `compileSdk` and `targetSdk`, and the build-tools and
+platform the aapt2 scripts pin. `SdkBaseline` tests fail when one of them moves without the rest,
+or when the aapt2 files were not made with the build-tools, platform and OS (`GOLDEN_HOST`,
+Windows) that `scripts/golden/gen_aapt2_values.py` pins, or when this README names others.
+
+The dump needs an API 37.0 emulator or device, the Android SDK and JDK 17+ (Android Studio's
+bundled JDK works).
 Open `golden/` in Android Studio, or build it with `golden/gradlew`. Then:
 
 ```sh
@@ -75,3 +90,14 @@ python scripts/golden/pull_golden.py
 
 This runs `GoldenDumpTest` over 252 conditions (7 densities × 3 languages × night × orientation ×
 3 smallest widths) and writes `golden/data/*.json`.
+
+The aapt2 files need only the SDK (build-tools 37.0.0 and platform android-37.0), no device, but
+they must be made on Windows: aapt2 writes some rows otherwise on Linux and macOS (#62).
+
+```sh
+python scripts/golden/gen_aapt2_values.py    # golden/aapt2/values.tsv
+python scripts/golden/gen_aapt2_configs.py   # golden/aapt2/configs.tsv
+```
+
+On another OS the scripts stop. With `--any-host` they run anyway and write
+`build/aapt2-<os>-<cpu>/` instead of `golden/aapt2/`, to compare with the golden files.

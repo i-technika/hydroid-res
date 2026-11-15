@@ -15,11 +15,15 @@ and the file records the Res_value type and data aapt2 wrote, or "-" when it fou
 against this file, so CI needs no Android SDK. Inputs are deterministic: hand-picked edge cases
 plus seeded random values.
 
-Usage: python scripts/golden/gen_aapt2_values.py
-Needs an Android SDK with build-tools (aapt2, aapt) and a platform (android.jar).
+Usage: python scripts/golden/gen_aapt2_values.py [--any-host]
+Needs an Android SDK with build-tools BUILD_TOOLS (aapt2, aapt) and platform PLATFORM, on
+GOLDEN_HOST. With --any-host it runs on any OS and writes build/aapt2-<os>-<cpu>/values.tsv
+instead, to compare with the golden file.
 """
 
+import argparse
 import os
+import platform
 import random
 import re
 import struct
@@ -33,6 +37,26 @@ from xml.sax.saxutils import escape
 ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / "golden" / "aapt2" / "values.tsv"
 EXE = ".exe" if os.name == "nt" else ""
+# The build-tools and platform the aapt2 golden files come from, at the API level of
+# kEmulatedSdkVersion in include/hydroid/res/Version.h. Raise them together with it, and make both
+# files again: SdkBaselineTest wants their header to name these two and GOLDEN_HOST.
+BUILD_TOOLS = "37.0.0"
+PLATFORM = "android-37.0"
+# The OS the aapt2 golden files come from, which their header records and SdkBaselineTest checks.
+# The same build-tools write other rows elsewhere (#62), mostly among the deliberate rejections:
+#   - aapt2 reads the numbers of sw<N>dp, w<N>dp, h<N>dp, <N>dpi and <W>x<H> with atoi. On
+#     Windows it stops sw2147483648dp at 0x7fffffff, sw65535dp; on Linux and macOS it wraps it to
+#     32 bits, the default Config, and sw99999999999dp to sw59391dp.
+#   - strtof sets the quiet bit of "-nan(1)" on Linux and macOS, not on Windows.
+#   - On macOS arm64, a dimension past 2^41 ("1e39dp", "3e12dp") gets other data than on x86.
+# Aapt2ConfigTest and Aapt2ValueTest pin what aapt2 makes of each deliberate rejection (#61), so
+# files made on another OS fail them. Changing it means making both files on that OS, and those
+# tests' lists again.
+GOLDEN_HOST = "Windows"
+HOST = platform.system()
+# The header records the CPU too, which only the OS does not tell: on macOS, aapt2 runs as arm64
+# or x86-64, and the two write other dimensions past 2^41.
+MACHINE = platform.machine()
 
 UNITS = ["px", "dp", "dip", "sp", "pt", "in", "mm", "%", "%p"]
 
@@ -258,6 +282,21 @@ def inputs() -> list:
     return list(dict.fromkeys(pairs))
 
 
+def out_path(golden: Path) -> Path:
+    """golden on GOLDEN_HOST. With --any-host, build/aapt2-<os>-<cpu>/ instead, on any OS."""
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--any-host", action="store_true",
+                        help=f"run on an OS other than {GOLDEN_HOST}, writing to build/ "
+                             "rather than golden/")
+    other = ROOT / "build" / f"aapt2-{HOST}-{MACHINE}".lower() / golden.name
+    if parser.parse_args().any_host:
+        return other
+    if HOST != GOLDEN_HOST:
+        sys.exit(f"the aapt2 golden files come from {GOLDEN_HOST}, not {HOST}: pass --any-host "
+                 f"to write {other.relative_to(ROOT).as_posix()} instead")
+    return golden
+
+
 def find_sdk() -> Path:
     sdks = [os.environ.get(env) for env in ("ANDROID_HOME", "ANDROID_SDK_ROOT")]
     # Android Studio's default SDK locations on Windows, macOS and Linux.
@@ -270,13 +309,16 @@ def find_sdk() -> Path:
     sys.exit("Android SDK not found: set ANDROID_HOME")
 
 
-def newest(paths) -> Path:
-    def key(p):
-        return [int(n) if n.isdigit() else -1 for n in re.split(r"[.-]", p.name.split("-")[-1])]
-    paths = sorted(paths, key=key)
-    if not paths:
-        sys.exit("no build-tools with aapt2 and aapt, or no platform with android.jar")
-    return paths[-1]
+def sdk_tools(*exes):
+    """build-tools/BUILD_TOOLS, which must hold exes, and platforms/PLATFORM/android.jar."""
+    sdk = find_sdk()
+    tools = sdk / "build-tools" / BUILD_TOOLS
+    jar = sdk / "platforms" / PLATFORM / "android.jar"
+    missing = [p for p in [tools / f"{exe}{EXE}" for exe in exes] + [jar] if not p.exists()]
+    if missing:
+        sys.exit(f"missing {', '.join(map(str, missing))}: install build-tools {BUILD_TOOLS} "
+                 f"and {PLATFORM}")
+    return tools, jar
 
 
 def write_values(res: Path, pairs, keep) -> None:
@@ -310,10 +352,8 @@ def compile_errors(aapt2: Path, tmp: Path, pairs, keep) -> set:
 
 
 def main() -> None:
-    sdk = find_sdk()
-    tools = newest(p for p in (sdk / "build-tools").iterdir()
-                   if (p / f"aapt2{EXE}").exists() and (p / f"aapt{EXE}").exists())
-    platform = newest(p for p in (sdk / "platforms").iterdir() if (p / "android.jar").exists())
+    out_file = out_path(OUT)
+    tools, jar = sdk_tools("aapt2", "aapt")
     aapt2 = tools / f"aapt2{EXE}"
     pairs = inputs()
 
@@ -326,7 +366,7 @@ def main() -> None:
         (tmp / "AndroidManifest.xml").write_text(
             '<manifest xmlns:android="http://schemas.android.com/apk/res/android" '
             'package="com.probe"/>\n')
-        subprocess.run([str(aapt2), "link", "-I", str(platform / "android.jar"),
+        subprocess.run([str(aapt2), "link", "-I", str(jar),
                         "--manifest", str(tmp / "AndroidManifest.xml"),
                         "-o", str(tmp / "out.apk"), str(tmp / "compiled.zip")], check=True)
         dump = subprocess.run([str(tools / f"aapt{EXE}"), "dump", "--values", "resources",
@@ -339,10 +379,10 @@ def main() -> None:
     if set(written) != keep:
         sys.exit(f"aapt dump listed {len(written)} of {len(keep)} values")
 
-    OUT.parent.mkdir(parents=True, exist_ok=True)
-    with open(OUT, "w", encoding="utf-8", newline="\n") as out:
+    out_file.parent.mkdir(parents=True, exist_ok=True)
+    with open(out_file, "w", encoding="utf-8", newline="\n") as out:
         out.write(f"# Generated by scripts/golden/gen_aapt2_values.py with build-tools "
-                  f"{tools.name}. Do not edit by hand.\n")
+                  f"{BUILD_TOOLS} and {PLATFORM} on {HOST} ({MACHINE}). Do not edit by hand.\n")
         out.write("# tag\ttext\ttype\tdata (Res_value as aapt2 writes it; - for no literal)\n")
         for i, (tag, text) in enumerate(pairs):
             t, d = written.get(i, (None, None))
@@ -351,7 +391,7 @@ def main() -> None:
             else:
                 out.write(f"{tag}\t{text}\t0x{t:02x}\t0x{d}\n")
     print(f"wrote {len(pairs)} values ({len(pairs) - len(keep)} rejected) to "
-          f"{OUT.relative_to(ROOT)}")
+          f"{out_file.relative_to(ROOT)}")
 
 
 if __name__ == "__main__":

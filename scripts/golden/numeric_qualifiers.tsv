@@ -1,0 +1,6 @@
+# Every qualifier that takes a number, and the numbers around 16 and 32 bits (#61). {} is where
+# the number goes. gen_aapt2_configs.py puts each template with each value in
+# golden/aapt2/configs.tsv, and Aapt2Config.NumbersPast16Bits wants every one of them there, and
+# hydroid to reject each past 65535. Add a template or a value here, then make configs.tsv again.
+templates	sw{}dp	w{}dp	h{}dp	{}dpi	{}x1	1x{}	v{}
+values	65535	65536	65537	2147483647	2147483648	4294967296	99999999999
