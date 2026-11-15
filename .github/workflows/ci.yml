@@ -158,15 +158,15 @@ jobs:
         run: cmake --build --preset debug --parallel
       - name: Test
         run: ctest --preset debug
-      - name: Refuse Ubuntu's GoogleTest, which is not the pinned version
+      - name: Refuse Ubuntu's expat, which is not the pinned version
         run: |
           if cmake --preset debug -B build/mismatch -DHYDROID_RES_USE_SYSTEM_DEPS=ON > mismatch.log 2>&1; then
             cat mismatch.log; exit 1
           fi
           cat mismatch.log
           # CMake wraps the message, so its two halves are on separate lines.
-          grep -q 'package "GTest" that exactly' mismatch.log
-          grep -q 'matches requested version "1.15.2"' mismatch.log
+          grep -q 'package "expat" that exactly' mismatch.log
+          grep -q 'matches requested version "2.7.1"' mismatch.log
       - name: Install the pinned versions from the fetched sources
         run: |
           deps=build/debug/_deps
@@ -178,6 +178,16 @@ jobs:
             cmake --build build/pinned/$dep --parallel
             cmake --install build/pinned/$dep
           done
+      - name: Refuse Ubuntu's GoogleTest, which is not the pinned version
+        run: |
+          # The pinned expat alone, as Ubuntu's would be refused before GoogleTest is looked for.
+          expat_dir=$(dirname "$(ls "$HOME"/pinned/lib*/cmake/expat-*/expat-config.cmake)")
+          if cmake --preset debug -B build/mismatch-gtest -DHYDROID_RES_USE_SYSTEM_DEPS=ON -Dexpat_DIR="$expat_dir" > mismatch.log 2>&1; then
+            cat mismatch.log; exit 1
+          fi
+          cat mismatch.log
+          grep -q 'package "GTest" that exactly' mismatch.log
+          grep -q 'matches requested version "1.15.2"' mismatch.log
       - name: Configure with HYDROID_RES_USE_SYSTEM_DEPS=ON
         run: >
           cmake --preset debug -B build/installed -DHYDROID_RES_USE_SYSTEM_DEPS=ON

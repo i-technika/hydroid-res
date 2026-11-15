@@ -74,6 +74,8 @@ else()
   else()
     set(hydroid_res_fetched_expat ON)
     FetchContent_MakeAvailable(expat)
+    # Which a shared hydroid-res needs to link it in, and expat, unlike pugixml, does not set.
+    set_target_properties(expat PROPERTIES POSITION_INDEPENDENT_CODE ON)
   endif()
 endif()
 

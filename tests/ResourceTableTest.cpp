@@ -342,7 +342,9 @@ TEST(ResourceTable, ErrorsSayWhere) {
   EXPECT_EQ(out.str(), "plain");
 }
 
-// What is not well-formed XML fails with expat's message and line, as in aapt2 (#78).
+// What is not well-formed XML fails with expat's message and the line expat stops at (#78).
+// aapt2 gives the same message, but without "xml parser error: " for an XML file, and line 0 for
+// a values file, as XmlPullParser keeps no line for the error.
 TEST(ResourceTable, XmlErrorsAreExpats) {
   TempDir dir;
   ResourceTable table;
