@@ -49,19 +49,22 @@ TEST(SdkBaseline, GoldenAppBuildsForEmulatedLevel) {
 }
 
 // The value gen_aapt2_values.py gives `name`, which it must set once, on a line of its own:
-// `NAME = "..."`. Python keeps the last of two, so a second, even below the first, fails too. Read
-// a line at a time, as std::regex::multiline is not in every standard library.
+// `NAME = "..."`. Python keeps the last of two, so any other line that starts with the name and
+// then =, :, +=, a comma or the like fails too, even below the first. One inside a block, or with
+// the name second in `A, NAME = ...`, is not seen. Read a line at a time, as
+// std::regex::multiline is not in every standard library.
 void readAapt2ScriptPin(const std::string& name, std::string* value) {
   std::ifstream in(HYDROID_AAPT2_SCRIPT);
   ASSERT_TRUE(in) << "cannot open " << HYDROID_AAPT2_SCRIPT;
-  const std::regex assigns(name + R"(\s*=[^=].*)");
+  const std::regex assigns(name + R"(\s*[^\w\s.].*)");
   const std::regex pin(name + R"re(\s*=\s*"([^"]*)"\s*)re");
   int assignments = 0;
   for (std::string line; std::getline(in, line);) {
     if (!std::regex_match(line, assigns)) continue;
     ++assignments;
     std::smatch m;
-    ASSERT_TRUE(std::regex_match(line, m, pin)) << name << " is not a string: " << line;
+    ASSERT_TRUE(std::regex_match(line, m, pin))
+        << name << " must be set as " << name << " = \"...\" alone on its line, not: " << line;
     *value = m[1].str();
   }
   ASSERT_NE(assignments, 0) << name << " not found in " << HYDROID_AAPT2_SCRIPT;
