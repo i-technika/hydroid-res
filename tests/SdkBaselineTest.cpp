@@ -48,27 +48,37 @@ TEST(SdkBaseline, GoldenAppBuildsForEmulatedLevel) {
   }
 }
 
-// The value of `NAME = "..."` in gen_aapt2_values.py, or "" if no line sets it. Read a line at a
-// time, as std::regex::multiline is not in every standard library.
-std::string aapt2ScriptPin(const std::string& name) {
+// The value gen_aapt2_values.py gives `name`, which it must set once, on a line of its own:
+// `NAME = "..."`. Python keeps the last of two, so a second, even below the first, fails too. Read
+// a line at a time, as std::regex::multiline is not in every standard library.
+void readAapt2ScriptPin(const std::string& name, std::string* value) {
   std::ifstream in(HYDROID_AAPT2_SCRIPT);
+  ASSERT_TRUE(in) << "cannot open " << HYDROID_AAPT2_SCRIPT;
+  const std::regex assigns(name + R"(\s*=[^=].*)");
   const std::regex pin(name + R"re(\s*=\s*"([^"]*)"\s*)re");
+  int assignments = 0;
   for (std::string line; std::getline(in, line);) {
+    if (!std::regex_match(line, assigns)) continue;
+    ++assignments;
     std::smatch m;
-    if (std::regex_match(line, m, pin)) return m[1].str();
+    ASSERT_TRUE(std::regex_match(line, m, pin)) << name << " is not a string: " << line;
+    *value = m[1].str();
   }
-  return "";
+  ASSERT_NE(assignments, 0) << name << " not found in " << HYDROID_AAPT2_SCRIPT;
+  ASSERT_EQ(assignments, 1) << name << " is set " << assignments << " times in "
+                            << HYDROID_AAPT2_SCRIPT;
 }
 
 // gen_aapt2_values.py pins the build-tools, platform and OS of the aapt2 golden files (#64). The
 // platform must be <level>.0, not a minor release; any build-tools <level>.x will do.
 TEST(SdkBaseline, Aapt2ScriptPinsEmulatedLevel) {
-  ASSERT_TRUE(std::ifstream(HYDROID_AAPT2_SCRIPT)) << "cannot open " << HYDROID_AAPT2_SCRIPT;
-  const std::string buildTools = aapt2ScriptPin("BUILD_TOOLS");
-  ASSERT_FALSE(buildTools.empty()) << "BUILD_TOOLS not found in " << HYDROID_AAPT2_SCRIPT;
+  std::string buildTools;
+  std::string platform;
+  ASSERT_NO_FATAL_FAILURE(readAapt2ScriptPin("BUILD_TOOLS", &buildTools));
+  ASSERT_NO_FATAL_FAILURE(readAapt2ScriptPin("PLATFORM", &platform));
   EXPECT_TRUE(buildTools.rfind(kLevel + ".", 0) == 0)
       << "BUILD_TOOLS " << buildTools << " is not of level " << kLevel;
-  EXPECT_EQ(aapt2ScriptPin("PLATFORM"), "android-" + kLevel + ".0") << "PLATFORM";
+  EXPECT_EQ(platform, "android-" + kLevel + ".0") << "PLATFORM";
 }
 
 // The first line of each file names what made it: "... with build-tools 37.0.0 and android-37.0
@@ -78,11 +88,9 @@ TEST(SdkBaseline, Aapt2ScriptPinsEmulatedLevel) {
 // other NaN bits, and the aapt2 tests miss nearly all of it, as they are deliberate rejections.
 // The CPU in parentheses is only recorded.
 TEST(SdkBaseline, Aapt2GoldenComesFromScriptPins) {
-  ASSERT_TRUE(std::ifstream(HYDROID_AAPT2_SCRIPT)) << "cannot open " << HYDROID_AAPT2_SCRIPT;
   std::map<std::string, std::string> pins;
   for (const char* name : {"BUILD_TOOLS", "PLATFORM", "GOLDEN_HOST"}) {
-    pins[name] = aapt2ScriptPin(name);
-    ASSERT_FALSE(pins[name].empty()) << name << " not found in " << HYDROID_AAPT2_SCRIPT;
+    ASSERT_NO_FATAL_FAILURE(readAapt2ScriptPin(name, &pins[name]));
   }
   const std::regex made(R"(build-tools (\S+) and (\S+) on (\w+) \(\w+\)\.)");
   for (const char* path : {HYDROID_AAPT2_VALUES, HYDROID_AAPT2_CONFIGS}) {
