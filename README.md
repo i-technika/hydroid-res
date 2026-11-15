@@ -70,7 +70,8 @@ git ls-files -z -- '*.h' '*.cpp' | xargs -0 clang-format -i
 
 All of it comes from one API level, `kEmulatedSdkVersion` in `include/hydroid/res/Version.h`
 (37): the emulator, the golden app's `compileSdk` and `targetSdk`, and the build-tools and
-platform the aapt2 scripts pin. `SdkBaseline` tests fail when one of them moves without the rest.
+platform the aapt2 scripts pin. `SdkBaseline` tests fail when one of them moves without the rest,
+or when the aapt2 files come from another OS than Windows.
 
 The dump needs an API 37.0 emulator or device, the Android SDK and JDK 17+ (Android Studio's
 bundled JDK works).
@@ -83,9 +84,13 @@ python scripts/golden/pull_golden.py
 This runs `GoldenDumpTest` over 252 conditions (7 densities × 3 languages × night × orientation ×
 3 smallest widths) and writes `golden/data/*.json`.
 
-The aapt2 files need only the SDK (build-tools 37.0.0 and platform android-37.0), no device:
+The aapt2 files need only the SDK (build-tools 37.0.0 and platform android-37.0), no device, but
+they must be made on Windows: aapt2 writes some rows otherwise on Linux and macOS (#62).
 
 ```sh
 python scripts/golden/gen_aapt2_values.py    # golden/aapt2/values.tsv
 python scripts/golden/gen_aapt2_configs.py   # golden/aapt2/configs.tsv
 ```
+
+On another OS the scripts stop. With `--any-host` they run anyway and write
+`build/aapt2-<os>-<cpu>/` instead of `golden/aapt2/`, to compare with the golden files.

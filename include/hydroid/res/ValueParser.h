@@ -23,8 +23,10 @@
 //     integer, since that parser runs first.
 //   - Numbers past FLT_MAX: "1e39" (aapt2 writes inf).
 //   - Dimensions and fractions of magnitude 2^41 or more, "3e12dp": aapt2's 64-bit conversion is
-//     undefined there. Its x86 builds write 0 with the unit; its arm64 build for macOS writes
-//     0xffffff01 for "1e39dp" and "3e12dp", and 0x00000101 for "-1e39dp" and "-infdp".
+//     undefined there. Its x86 builds write 0 with the unit. Its arm64 build for macOS keeps the
+//     unit but writes the mantissa 0xffffff for a positive one ("1e39dp", "3e12dp" and
+//     "2199023255552dp" are 0xffffff01, "1e39%" and "1e20px" 0xffffff00) and 0x000001 for a
+//     negative dimension ("-1e39dp", "-3e12dp" and "-infdp" are 0x00000101).
 // None of these is a value a resource means to hold, and a resource compiler is better off
 // reporting them than storing inf or a platform-dependent dimension.
 
