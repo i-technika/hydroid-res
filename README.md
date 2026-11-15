@@ -10,13 +10,14 @@ resolves values exactly as Android does, for UIKit, GTK4 and WinUI 3. Design and
 | --- | --- |
 | `include/hydroid/res/` | Public C++ headers |
 | `include/hydroid_res.h` | Stable C API, used by the Swift adapter |
-| `src/core/` | Shared core: parser, ResourceTable, Config matching, Theme/Style |
+| `src/core/` | Shared core: parsers, ResourceTable, Config matching, Theme/Style |
 | `src/capi/` | C API implementation |
-| `tools/hydroid-rc/` | `res/` → `.hrt` binary table compiler |
+| `tools/hydroid-rc/` | `res/` → `.hrt` binary table compiler; for now `hydroid-rc dump <res>` |
 | `tests/` | GoogleTest unit and golden tests |
 | `golden/` | Android test app + instrumentation test that dumps Android's answers |
 | `golden/data/` | The dumped golden JSON the C++ tests compare against |
-| `golden/aapt2/` | What the SDK's aapt2 makes of literal values and resource folder names |
+| `golden/table/res/` | A `res/` folder with every kind of value and file, for the table tests |
+| `golden/aapt2/` | What the SDK's aapt2 makes of literal values, resource folder names, strings and whole `res/` folders |
 | `golden/aosp/` | The folder names of AOSP's framework `res/`, which must all parse |
 | `scripts/golden/` | Runs the dump on a device and pulls the JSON; runs aapt2 for `golden/aapt2/` |
 
@@ -97,7 +98,15 @@ they must be made on Windows: aapt2 writes some rows otherwise on Linux and macO
 ```sh
 python scripts/golden/gen_aapt2_values.py    # golden/aapt2/values.tsv
 python scripts/golden/gen_aapt2_configs.py   # golden/aapt2/configs.tsv
+python scripts/golden/gen_aapt2_strings.py   # golden/aapt2/strings.json
+python scripts/golden/gen_aapt2_table.py     # golden/aapt2/table.txt, app_table.txt, table_cases.json
 ```
+
+The table files are what `aapt2 dump resources` prints of `golden/table/res`, of the golden app's
+`res/` and of some 190 small folders, linked with `--no-auto-version`, `--no-version-vectors`,
+`--no-version-transitions`, `--no-resource-removal` and `--no-resource-deduping`, which keep
+aapt2 from adding or dropping values the folder does not say. `hydroid-rc dump <res> [<package>]`
+prints a folder the same way, from hydroid's `ResourceTable`, to compare by hand.
 
 On another OS the scripts stop. With `--any-host` they run anyway and write
 `build/aapt2-<os>-<cpu>/` instead of `golden/aapt2/`, to compare with the golden files.

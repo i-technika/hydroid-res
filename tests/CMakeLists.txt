@@ -2,12 +2,14 @@ include(GoogleTest)
 
 add_executable(hydroid-res-tests
   Aapt2ConfigTest.cpp
+  Aapt2TableTest.cpp
   Aapt2ValueTest.cpp
   ComplexTest.cpp
   ConfigParserTest.cpp
   GoldenColorTest.cpp
   GoldenComplexTest.cpp
   PublicHeaderTest.cpp
+  ResourceTableTest.cpp
   SdkBaselineTest.cpp
   SmokeTest.cpp
   ValueParserTest.cpp
@@ -19,8 +21,12 @@ target_link_libraries(hydroid-res-tests PRIVATE
 # Every directory a consumer of hydroid::res includes from, for PublicHeaders.AreAscii.
 set(public_include_dirs "$<JOIN:$<TARGET_PROPERTY:hydroid-res,INTERFACE_INCLUDE_DIRECTORIES>,|>")
 target_compile_definitions(hydroid-res-tests PRIVATE
+  HYDROID_AAPT2_APP_TABLE="${PROJECT_SOURCE_DIR}/golden/aapt2/app_table.txt"
   HYDROID_AAPT2_CONFIGS="${PROJECT_SOURCE_DIR}/golden/aapt2/configs.tsv"
   HYDROID_AAPT2_SCRIPT="${PROJECT_SOURCE_DIR}/scripts/golden/gen_aapt2_values.py"
+  HYDROID_AAPT2_STRINGS="${PROJECT_SOURCE_DIR}/golden/aapt2/strings.json"
+  HYDROID_AAPT2_TABLE="${PROJECT_SOURCE_DIR}/golden/aapt2/table.txt"
+  HYDROID_AAPT2_TABLE_CASES="${PROJECT_SOURCE_DIR}/golden/aapt2/table_cases.json"
   HYDROID_AAPT2_VALUES="${PROJECT_SOURCE_DIR}/golden/aapt2/values.tsv"
   HYDROID_AOSP_RES_DIRS="${PROJECT_SOURCE_DIR}/golden/aosp/framework_res_dirs.txt"
   HYDROID_GOLDEN_APP_GRADLE="${PROJECT_SOURCE_DIR}/golden/app/build.gradle.kts"
@@ -29,6 +35,7 @@ target_compile_definitions(hydroid-res-tests PRIVATE
   HYDROID_PROJECT_VERSION="${PROJECT_VERSION}"
   HYDROID_PUBLIC_INCLUDE_DIRS="${public_include_dirs}"
   HYDROID_README="${PROJECT_SOURCE_DIR}/README.md"
+  HYDROID_TABLE_RES_DIR="${PROJECT_SOURCE_DIR}/golden/table/res"
   HYDROID_TEST_RES_DIR="${PROJECT_SOURCE_DIR}/golden/app/src/main/res"
   HYDROID_VERSION_HEADER="${PROJECT_SOURCE_DIR}/include/hydroid/res/Version.h")
 if(HYDROID_RES_REQUIRE_LOCALE_TESTS)

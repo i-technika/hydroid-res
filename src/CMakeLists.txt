@@ -2,9 +2,15 @@ add_library(hydroid-res
   core/Complex.cpp
   core/Config.cpp
   core/ConfigParser.cpp
+  core/ResScanner.cpp
+  core/ResourceTable.cpp
+  core/TableBuilder.cpp
+  core/TableDump.cpp
   core/Value.cpp
   core/ValueParser.cpp
+  core/ValuesParser.cpp
   core/Version.cpp
+  core/Xml.cpp
   capi/hydroid_res.cpp)
 add_library(hydroid::res ALIAS hydroid-res)
 
