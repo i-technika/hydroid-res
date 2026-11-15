@@ -95,7 +95,9 @@ TEST(ConfigOrder, IsATotalOrder) {
       EXPECT_EQ(ab, -compareConfigs(b, a)) << a << " " << b;
       EXPECT_EQ(ab == 0, a == b) << a << " " << b;
       for (const Config& x : configs) {
-        if (ab < 0 && compareConfigs(b, x) < 0) EXPECT_LT(compareConfigs(a, x), 0);
+        if (ab < 0 && compareConfigs(b, x) < 0) {
+          EXPECT_LT(compareConfigs(a, x), 0);
+        }
       }
     }
   }
