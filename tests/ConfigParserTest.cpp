@@ -5,6 +5,7 @@
 #include <gtest/gtest.h>
 
 #include <iterator>
+#include <map>
 #include <optional>
 #include <sstream>
 #include <string>
@@ -358,6 +359,32 @@ TEST(Config, DeviceValuesWithoutAQualifier) {
   EXPECT_EQ(toString(device), "420dpi");
 }
 
+std::string printed(const Config& c) {
+  std::ostringstream os;
+  os << c;
+  return os.str();
+}
+
+// operator<< writes what toString leaves out, so a test failure shows what differs (#50).
+TEST(Config, PrintsWhatNoFolderNames) {
+  EXPECT_EQ(printed(Config{}), "Config()");
+  EXPECT_EQ(printed(*parseConfig("en-rUS-land-v13")), "Config(en-rUS-land-v13)");
+  Config device;
+  device.uiModeType = UiModeType::Normal;
+  device.density = 420;
+  EXPECT_EQ(printed(device), "Config(uiModeType=1-420dpi)");
+  Config outOfRange;
+  outOfRange.orientation = static_cast<Orientation>(9);
+  EXPECT_EQ(toString(outOfRange), "");
+  EXPECT_EQ(printed(outOfRange), "Config(orientation=9)");
+  Config noLanguage;
+  noLanguage.region = {'K', 'R'};
+  noLanguage.script = {'L', 'a', 't', 'n'};
+  noLanguage.variant = {'p', 'o', 's', 'i', 'x'};
+  EXPECT_EQ(toString(noLanguage), "");
+  EXPECT_EQ(printed(noLanguage), "Config(region=KR-script=Latn-variant=posix)");
+}
+
 // Each field alone makes a Config other than the default, so operator== compares each (#52). A
 // field missing from Config.cpp's fields() fails its build; this catches one listed twice there
 // in place of another, and a field added to Config fails this file's build until it is here.
@@ -394,11 +421,15 @@ TEST(Config, EveryFieldCountsForEquality) {
       {"minorVersion", [](Config& c) { c.minorVersion = 1; }},
   };
   static_assert(std::size(kFields) == detail::fieldCount<Config>(), "a Config field is missing");
+  // Each prints otherwise too, from the default and from each other (#50).
+  std::map<std::string, const char*> prints = {{printed(Config{}), "the default"}};
   for (const auto& [name, set] : kFields) {
     Config c;
     set(c);
     EXPECT_FALSE(c == Config{}) << name;
     EXPECT_TRUE(c == c) << name;
+    const auto [it, added] = prints.emplace(printed(c), name);
+    EXPECT_TRUE(added) << name << " prints " << it->first << " as " << it->second << " does";
   }
 }
 

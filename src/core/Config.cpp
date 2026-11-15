@@ -165,45 +165,57 @@ std::string_view nameOf(E value, const std::string_view (&names)[N]) {
   return i < N ? names[i] : std::string_view();
 }
 
-}  // namespace
-
-bool operator==(const Config& a, const Config& b) { return fields(a) == fields(b); }
-
-// ResTable_config::toString.
-std::string toString(const Config& c) {
+// ResTable_config::toString, which writes only what has a folder name. With `all`, also what has
+// none, as <field>=<value>: an enum value without a name (UiModeType::Normal, or one out of
+// range) and a region, script or variant without a language. Two Configs that differ then never
+// come out the same (#50).
+std::string write(const Config& c, bool all) {
   std::string out;
   auto part = [&out](std::string_view s) {
     if (s.empty()) return;
     if (!out.empty()) out += '-';
     out += s;
   };
+  auto named = [&](std::string_view field, auto value, const auto& names) {
+    const std::string_view name = nameOf(value, names);
+    if (!name.empty() || !all || value == decltype(value){}) {
+      part(name);
+    } else {
+      part(std::string(field) + "=" + std::to_string(static_cast<int>(value)));
+    }
+  };
   if (c.mcc != 0) part("mcc" + std::to_string(c.mcc));
   if (c.mnc != 0) part("mnc" + std::to_string(c.mnc));
   std::string locale;
   appendLocale(locale, c);
   part(locale);
-  part(nameOf(c.grammaticalGender, names::kGrammaticalGender));
-  part(nameOf(c.layoutDir, names::kLayoutDir));
+  if (all && c.lang[0] == '\0') {
+    if (c.region[0] != '\0') part("region=" + chars(c.region));
+    if (c.script[0] != '\0') part("script=" + chars(c.script));
+    if (c.variant[0] != '\0') part("variant=" + chars(c.variant));
+  }
+  named("grammaticalGender", c.grammaticalGender, names::kGrammaticalGender);
+  named("layoutDir", c.layoutDir, names::kLayoutDir);
   if (c.smallestWidthDp != 0) part("sw" + std::to_string(c.smallestWidthDp) + "dp");
   if (c.widthDp != 0) part("w" + std::to_string(c.widthDp) + "dp");
   if (c.heightDp != 0) part("h" + std::to_string(c.heightDp) + "dp");
-  part(nameOf(c.screenSize, names::kScreenSize));
-  part(nameOf(c.screenLong, names::kScreenLong));
-  part(nameOf(c.screenRound, names::kScreenRound));
-  part(nameOf(c.wideColorGamut, names::kWideColorGamut));
-  part(nameOf(c.hdr, names::kHdr));
-  part(nameOf(c.orientation, names::kOrientation));
-  part(nameOf(c.uiModeType, names::kUiModeType));
-  part(nameOf(c.uiModeNight, names::kUiModeNight));
+  named("screenSize", c.screenSize, names::kScreenSize);
+  named("screenLong", c.screenLong, names::kScreenLong);
+  named("screenRound", c.screenRound, names::kScreenRound);
+  named("wideColorGamut", c.wideColorGamut, names::kWideColorGamut);
+  named("hdr", c.hdr, names::kHdr);
+  named("orientation", c.orientation, names::kOrientation);
+  named("uiModeType", c.uiModeType, names::kUiModeType);
+  named("uiModeNight", c.uiModeNight, names::kUiModeNight);
   if (c.density != 0) {
     const char* name = densityName(c.density);
     part(name ? name : std::to_string(c.density) + "dpi");
   }
-  part(nameOf(c.touchscreen, names::kTouchscreen));
-  part(nameOf(c.keysHidden, names::kKeysHidden));
-  part(nameOf(c.keyboard, names::kKeyboard));
-  part(nameOf(c.navHidden, names::kNavHidden));
-  part(nameOf(c.navigation, names::kNavigation));
+  named("touchscreen", c.touchscreen, names::kTouchscreen);
+  named("keysHidden", c.keysHidden, names::kKeysHidden);
+  named("keyboard", c.keyboard, names::kKeyboard);
+  named("navHidden", c.navHidden, names::kNavHidden);
+  named("navigation", c.navigation, names::kNavigation);
   if (c.screenWidth != 0 || c.screenHeight != 0) {
     part(std::to_string(c.screenWidth) + "x" + std::to_string(c.screenHeight));
   }
@@ -215,8 +227,14 @@ std::string toString(const Config& c) {
   return out;
 }
 
+}  // namespace
+
+bool operator==(const Config& a, const Config& b) { return fields(a) == fields(b); }
+
+std::string toString(const Config& c) { return write(c, /*all=*/false); }
+
 std::ostream& operator<<(std::ostream& os, const Config& config) {
-  return os << "Config(" << toString(config) << ')';
+  return os << "Config(" << write(config, /*all=*/true) << ')';
 }
 
 }  // namespace hydroid::res
