@@ -4,11 +4,13 @@
 
 #include <gtest/gtest.h>
 
+#include <iterator>
 #include <optional>
 #include <sstream>
 #include <string>
 #include <utility>
 
+#include "core/FieldCount.h"
 #include "hydroid/res/ConfigParser.h"
 
 namespace hydroid::res {
@@ -358,7 +360,7 @@ TEST(Config, DeviceValuesWithoutAQualifier) {
 
 // Each field alone makes a Config other than the default, so operator== compares each (#52). A
 // field missing from Config.cpp's fields() fails its build; this catches one listed twice there
-// in place of another. A field added to Config belongs here too.
+// in place of another, and a field added to Config fails this file's build until it is here.
 TEST(Config, EveryFieldCountsForEquality) {
   const std::pair<const char*, void (*)(Config&)> kFields[] = {
       {"mcc", [](Config& c) { c.mcc = 310; }},
@@ -391,6 +393,7 @@ TEST(Config, EveryFieldCountsForEquality) {
       {"sdkVersion", [](Config& c) { c.sdkVersion = 21; }},
       {"minorVersion", [](Config& c) { c.minorVersion = 1; }},
   };
+  static_assert(std::size(kFields) == detail::fieldCount<Config>(), "a Config field is missing");
   for (const auto& [name, set] : kFields) {
     Config c;
     set(c);

@@ -1,11 +1,11 @@
 #include "hydroid/res/Config.h"
 
-#include <cstddef>
 #include <ostream>
 #include <string>
 #include <string_view>
 #include <tuple>
 
+#include "core/FieldCount.h"
 #include "core/QualifierNames.h"
 
 namespace hydroid::res {
@@ -116,31 +116,9 @@ auto fields(const Config& c) {
                   c.navigation, c.screenWidth, c.screenHeight, c.sdkVersion, c.minorVersion);
 }
 
-// Converts to the type of any field, so that T{AnyField{}, ...} takes as many of them as the
-// aggregate T has fields. Only ever named in decltype.
-struct AnyField {
-  template <typename T>
-  operator T() const;
-};
-template <typename T, typename... F>
-constexpr auto takes(int) -> decltype(T{F{}...}, true) {
-  return true;
-}
-template <typename T, typename... F>
-constexpr bool takes(...) {
-  return false;
-}
-template <typename T, typename... F>
-constexpr size_t fieldCount() {
-  if constexpr (takes<T, F..., AnyField>(0)) {
-    return fieldCount<T, F..., AnyField>();
-  } else {
-    return sizeof...(F);
-  }
-}
 // A field added to Config and not to fields() would be one operator== does not see (#52). toString
 // writes each field by hand too, and nothing checks that.
-static_assert(std::tuple_size_v<decltype(fields(Config{}))> == fieldCount<Config>(),
+static_assert(std::tuple_size_v<decltype(fields(Config{}))> == detail::fieldCount<Config>(),
               "every field of Config must be in fields()");
 
 // The characters of a NUL-padded field.

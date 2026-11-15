@@ -52,6 +52,8 @@ inline constexpr uint16_t kDensityNone = 0xffff;  // nodpi
 inline constexpr uint16_t kMncZero = 0xffff;
 
 // The fields are in the order of the qualifiers in a folder name, which is also their precedence.
+// A field added here goes in fields() and toString() in Config.cpp too, and in the test
+// Config.EveryFieldCountsForEquality; the build fails without the first and the last.
 struct Config {
   uint16_t mcc = 0;  // mcc310: 310
   uint16_t mnc = 0;  // mnc260: 260
