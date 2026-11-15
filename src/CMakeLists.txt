@@ -27,7 +27,7 @@ configure_file(${PROJECT_SOURCE_DIR}/cmake/VersionNumber.h.in
 target_include_directories(hydroid-res
   PUBLIC  ${PROJECT_SOURCE_DIR}/include ${hydroid_res_generated_include}
   PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(hydroid-res PRIVATE pugixml::pugixml)
+target_link_libraries(hydroid-res PRIVATE pugixml::pugixml expat::expat)
 target_compile_features(hydroid-res PUBLIC cxx_std_17)
 
 # Static or shared as BUILD_SHARED_LIBS says (#12). Only what include/ marks HYDROID_RES_API is

@@ -45,11 +45,13 @@ hydroid_set_warnings(hydroid-res-tests)
 
 gtest_discover_tests(hydroid-res-tests DISCOVERY_MODE PRE_TEST)
 
-# pugixml is an implementation detail of hydroid::res, so its consumers must not see it (#10).
-add_test(NAME CMake.PugixmlStaysPrivate
+# pugixml and expat are implementation details of hydroid::res, so its consumers must not see
+# them (#10).
+add_test(NAME CMake.DependenciesStayPrivate
   COMMAND ${CMAKE_COMMAND}
     "-DCONSUMER_INCLUDES=$<JOIN:$<TARGET_PROPERTY:hydroid-res,INTERFACE_INCLUDE_DIRECTORIES>,|>"
     "-DPUGIXML_INCLUDES=$<JOIN:$<TARGET_PROPERTY:pugixml::pugixml,INTERFACE_INCLUDE_DIRECTORIES>,|>"
+    "-DEXPAT_INCLUDES=$<JOIN:$<TARGET_PROPERTY:expat::expat,INTERFACE_INCLUDE_DIRECTORIES>,|>"
     -P ${CMAKE_CURRENT_SOURCE_DIR}/CheckPrivateDeps.cmake)
 
 # BUILD_SHARED_LIBS as hydroid-res was asked for it before the dependencies, so one that
@@ -59,12 +61,19 @@ if(hydroid_res_fetched_pugixml)
 else()
   set(pugixml_links "")
 endif()
+if(hydroid_res_fetched_expat)
+  set(expat_type "$<TARGET_PROPERTY:expat::expat,TYPE>")
+else()
+  set(expat_type "")
+endif()
 add_test(NAME CMake.LibraryTypes
   COMMAND ${CMAKE_COMMAND}
     "-DSHARED=${hydroid_res_shared_requested}"
     "-DFETCHED_PUGIXML=${hydroid_res_fetched_pugixml}"
     "-DHYDROID_RES_TYPE=$<TARGET_PROPERTY:hydroid-res,TYPE>"
     "-DPUGIXML_LINKS=${pugixml_links}"
+    "-DFETCHED_EXPAT=${hydroid_res_fetched_expat}"
+    "-DEXPAT_TYPE=${expat_type}"
     -P ${CMAKE_CURRENT_SOURCE_DIR}/CheckLibraryTypes.cmake)
 
 # The shared library's file and soname versions come from project() too (#13).
@@ -78,7 +87,7 @@ add_test(NAME CMake.LibraryVersion
 # The dependencies come from where HYDROID_RES_USE_SYSTEM_DEPS says, never silently from the
 # system (#11).
 set(dependency_sources "")
-foreach(dep IN ITEMS pugixml::pugixml GTest::gtest_main nlohmann_json::nlohmann_json)
+foreach(dep IN ITEMS pugixml::pugixml expat::expat GTest::gtest_main nlohmann_json::nlohmann_json)
   get_target_property(imported ${dep} IMPORTED)
   list(APPEND dependency_sources "${dep}=${imported}")
 endforeach()
