@@ -48,10 +48,13 @@ TEST(SdkBaseline, GoldenAppBuildsForEmulatedLevel) {
 }
 
 // The first line of each file names them: "... with build-tools 37.0.0 and android-37.0 on
-// Windows. ...". The platform must be <level>.0, not a minor release; any build-tools <level>.x
-// will do.
+// Windows (AMD64). ...". The platform must be <level>.0, not a minor release; any build-tools
+// <level>.x will do. The OS is GOLDEN_HOST in gen_aapt2_values.py (#62): on Linux or macOS, aapt2
+// 37.0.0 wraps sw2147483648dp to the default Config rather than stop it at sw65535dp, and writes
+// other NaN bits, and the aapt2 tests miss nearly all of it, as they are deliberate rejections.
+// The CPU in parentheses is only recorded.
 TEST(SdkBaseline, Aapt2GoldenUsesEmulatedLevel) {
-  const std::regex tools(R"(build-tools (\d+)\.\S+ and (android-\d+(\.\d+)?))");
+  const std::regex tools(R"(build-tools (\d+)\.\S+ and (android-\d+(\.\d+)?) on (\w+) \(\w+\)\.)");
   for (const char* path : {HYDROID_AAPT2_VALUES, HYDROID_AAPT2_CONFIGS}) {
     std::ifstream in(path);
     ASSERT_TRUE(in) << "cannot open " << path;
@@ -61,6 +64,7 @@ TEST(SdkBaseline, Aapt2GoldenUsesEmulatedLevel) {
     ASSERT_TRUE(std::regex_search(header, m, tools)) << path << ": " << header;
     EXPECT_EQ(m[1].str(), kLevel) << path << ": build-tools";
     EXPECT_EQ(m[2].str(), "android-" + kLevel + ".0") << path << ": platform";
+    EXPECT_EQ(m[4].str(), "Windows") << path << ": OS";
   }
 }
 

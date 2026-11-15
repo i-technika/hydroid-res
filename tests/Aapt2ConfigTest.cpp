@@ -50,11 +50,13 @@ const std::vector<Row>& rows() {
 }
 
 // Names aapt2 takes and hydroid rejects on purpose; see the top of ConfigParser.h. Every one must
-// still be accepted by aapt2 and rejected by hydroid, so the list cannot go stale.
+// still be accepted by aapt2 and rejected by hydroid, so the list cannot go stale. Which names
+// aapt2 takes is as on the host of the golden file, Windows: on Linux, it rejects 2147483648x1.
 // clang-format off
 const std::set<std::string> kDeliberateRejects = {
     // Past 16 bits, which aapt2 wraps: sw65536dp is sw0dp, and sw65537dp sw1dp, a real one other
-    // than what was written. Past 0x7fffffff it stops there first (see ConfigParser.h).
+    // than what was written. Past 0x7fffffff, 37.0.0 on Windows stops there first (see
+    // ConfigParser.h).
     "sw65536dp", "sw65537dp", "sw2147483647dp", "sw2147483648dp", "sw4294967296dp",
     "sw99999999999dp", "w65536dp", "w65537dp", "w2147483648dp", "w99999999999dp", "h65536dp",
     "h65537dp", "h2147483648dp", "h99999999999dp", "65536dpi", "65537dpi", "2147483648dpi",

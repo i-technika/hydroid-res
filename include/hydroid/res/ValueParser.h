@@ -17,11 +17,16 @@
 // starts with a digit, '.', '-' or '+':
 //   - Infinity and NaN: "-inf", "+nan", "-infinity" (aapt2 writes a float inf or NaN, or for
 //     "-infdp" an undefined dimension). Unsigned "inf" and "nan" fail aapt2's first check too.
+//     The bits of a NaN come from the host's strtof: "-nan(1)" is 0xff800001 on Windows and
+//     0xffc00001 on Linux and macOS.
 //   - Hex floats: "0x10px" (16px), "-0x1p4", "0X10". "0x10" under kFormatInteger is still an
 //     integer, since that parser runs first.
 //   - Numbers past FLT_MAX: "1e39" (aapt2 writes inf).
 //   - Dimensions and fractions of magnitude 2^41 or more, "3e12dp": aapt2's 64-bit conversion is
-//     undefined there (its x86 build writes 0 with the unit).
+//     undefined there. Its x86 builds write 0 with the unit. Its arm64 build for macOS keeps the
+//     unit but writes the mantissa 0xffffff for a positive one ("1e39dp", "3e12dp" and
+//     "2199023255552dp" are 0xffffff01, "1e39%" and "1e20px" 0xffffff00) and 0x000001 for a
+//     negative dimension ("-1e39dp", "-3e12dp" and "-infdp" are 0x00000101).
 // None of these is a value a resource means to hold, and a resource compiler is better off
 // reporting them than storing inf or a platform-dependent dimension.
 
