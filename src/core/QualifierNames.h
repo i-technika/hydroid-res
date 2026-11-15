@@ -19,8 +19,8 @@ inline constexpr std::string_view kScreenRound[] = {"", "notround", "round"};
 inline constexpr std::string_view kWideColorGamut[] = {"", "nowidecg", "widecg"};
 inline constexpr std::string_view kHdr[] = {"", "lowdr", "highdr"};
 inline constexpr std::string_view kOrientation[] = {"", "port", "land", "square"};
-inline constexpr std::string_view kUiModeType[] = {
-    "", "", "desk", "car", "television", "appliance", "watch", "vrheadset"};
+inline constexpr std::string_view kUiModeType[] = {"",           "",          "desk",  "car",
+                                                   "television", "appliance", "watch", "vrheadset"};
 inline constexpr std::string_view kUiModeNight[] = {"", "notnight", "night"};
 inline constexpr std::string_view kTouchscreen[] = {"", "notouch", "stylus", "finger"};
 inline constexpr std::string_view kKeysHidden[] = {"", "keysexposed", "keyshidden", "keyssoft"};

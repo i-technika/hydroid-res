@@ -220,9 +220,7 @@ bool parseScreenRound(std::string_view part, Config& c) {
 bool parseWideColorGamut(std::string_view part, Config& c) {
   return parseName(part, c.wideColorGamut, names::kWideColorGamut);
 }
-bool parseHdr(std::string_view part, Config& c) {
-  return parseName(part, c.hdr, names::kHdr);
-}
+bool parseHdr(std::string_view part, Config& c) { return parseName(part, c.hdr, names::kHdr); }
 bool parseOrientation(std::string_view part, Config& c) {
   return parseName(part, c.orientation, names::kOrientation);
 }
