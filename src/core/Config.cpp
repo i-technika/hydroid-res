@@ -2,7 +2,10 @@
 
 #include <ostream>
 #include <string>
+#include <string_view>
 #include <tuple>
+
+#include "core/QualifierNames.h"
 
 namespace hydroid::res {
 namespace {
@@ -52,11 +55,11 @@ const char* densityName(uint16_t density) {
   }
 }
 
-// The folder name of each enumerator, by its value; "" for Any and for values without one.
+// The folder name of `value` in `names` (QualifierNames.h); "" for values without one.
 template <typename E, size_t N>
-const char* nameOf(E value, const char* const (&names)[N]) {
+std::string_view nameOf(E value, const std::string_view (&names)[N]) {
   const auto i = static_cast<size_t>(value);
-  return i < N ? names[i] : "";
+  return i < N ? names[i] : std::string_view();
 }
 
 }  // namespace
@@ -66,7 +69,7 @@ bool operator==(const Config& a, const Config& b) { return fields(a) == fields(b
 // ResTable_config::toString.
 std::string toString(const Config& c) {
   std::string out;
-  auto part = [&out](const std::string& s) {
+  auto part = [&out](std::string_view s) {
     if (s.empty()) return;
     if (!out.empty()) out += '-';
     out += s;
@@ -76,29 +79,28 @@ std::string toString(const Config& c) {
   std::string locale;
   appendLocale(locale, c);
   part(locale);
-  part(nameOf(c.grammaticalGender, {"", "neuter", "feminine", "masculine"}));
-  part(nameOf(c.layoutDir, {"", "ldltr", "ldrtl"}));
+  part(nameOf(c.grammaticalGender, names::kGrammaticalGender));
+  part(nameOf(c.layoutDir, names::kLayoutDir));
   if (c.smallestWidthDp != 0) part("sw" + std::to_string(c.smallestWidthDp) + "dp");
   if (c.widthDp != 0) part("w" + std::to_string(c.widthDp) + "dp");
   if (c.heightDp != 0) part("h" + std::to_string(c.heightDp) + "dp");
-  part(nameOf(c.screenSize, {"", "small", "normal", "large", "xlarge"}));
-  part(nameOf(c.screenLong, {"", "notlong", "long"}));
-  part(nameOf(c.screenRound, {"", "notround", "round"}));
-  part(nameOf(c.wideColorGamut, {"", "nowidecg", "widecg"}));
-  part(nameOf(c.hdr, {"", "lowdr", "highdr"}));
-  part(nameOf(c.orientation, {"", "port", "land", "square"}));
-  part(nameOf(c.uiModeType,
-              {"", "", "desk", "car", "television", "appliance", "watch", "vrheadset"}));
-  part(nameOf(c.uiModeNight, {"", "notnight", "night"}));
+  part(nameOf(c.screenSize, names::kScreenSize));
+  part(nameOf(c.screenLong, names::kScreenLong));
+  part(nameOf(c.screenRound, names::kScreenRound));
+  part(nameOf(c.wideColorGamut, names::kWideColorGamut));
+  part(nameOf(c.hdr, names::kHdr));
+  part(nameOf(c.orientation, names::kOrientation));
+  part(nameOf(c.uiModeType, names::kUiModeType));
+  part(nameOf(c.uiModeNight, names::kUiModeNight));
   if (c.density != 0) {
     const char* name = densityName(c.density);
     part(name ? name : std::to_string(c.density) + "dpi");
   }
-  part(nameOf(c.touchscreen, {"", "notouch", "stylus", "finger"}));
-  part(nameOf(c.keysHidden, {"", "keysexposed", "keyshidden", "keyssoft"}));
-  part(nameOf(c.keyboard, {"", "nokeys", "qwerty", "12key"}));
-  part(nameOf(c.navHidden, {"", "navexposed", "navhidden"}));
-  part(nameOf(c.navigation, {"", "nonav", "dpad", "trackball", "wheel"}));
+  part(nameOf(c.touchscreen, names::kTouchscreen));
+  part(nameOf(c.keysHidden, names::kKeysHidden));
+  part(nameOf(c.keyboard, names::kKeyboard));
+  part(nameOf(c.navHidden, names::kNavHidden));
+  part(nameOf(c.navigation, names::kNavigation));
   if (c.screenWidth != 0 || c.screenHeight != 0) {
     part(std::to_string(c.screenWidth) + "x" + std::to_string(c.screenHeight));
   }

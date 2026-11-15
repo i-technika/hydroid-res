@@ -155,9 +155,13 @@ TEST(ParseConfig, NamedQualifiers) {
   EXPECT_EQ(canonical("xlarge-appliance-wheel"), "xlarge-appliance-wheel-v8");
   EXPECT_EQ(canonical("vrheadset"), "vrheadset-v26");
   EXPECT_EQ(canonical("watch-keyshidden"), "watch-keyshidden-v8");
-  // "normal" is a screen size, not the normal UI mode.
+  // "normal" is a screen size, not the normal UI mode, which has no qualifier: past the screen
+  // size, only the UI mode could take it, and it does not (#55).
   EXPECT_EQ(canonical("normal"), "normal-v4");
-  EXPECT_EQ(canonical("night-normal"), "rejected");
+  EXPECT_EQ(canonical("normal-car"), "normal-car-v8");
+  for (const char* s : {"land-normal", "port-normal", "car-normal", "night-normal"}) {
+    EXPECT_EQ(canonical(s), "rejected") << s;
+  }
 }
 
 TEST(ParseConfig, Density) {

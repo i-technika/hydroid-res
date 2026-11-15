@@ -5,6 +5,8 @@
 #include <string_view>
 #include <vector>
 
+#include "core/QualifierNames.h"
+
 // A port of aapt2's ConfigDescription::Parse and LocaleValue::InitFromParts (frameworks/base
 // libs/androidfw, android17-release), with the deliberate rejects ConfigParser.h lists. Each
 // qualifier has a parser that takes one part or none, and they run in folder order.
@@ -60,7 +62,8 @@ bool parseUint16(std::string_view s, uint16_t& out) {
   return true;
 }
 
-// A part that is one of `names`, the values 1, 2, ... of E, or "any" when `wildcard`.
+// A part that is the name of a value of E in `names` (QualifierNames.h), or "any" when
+// `wildcard`. A value whose name is "" has no qualifier.
 template <typename E, size_t N>
 bool parseName(std::string_view part, E& out, const std::string_view (&names)[N],
                bool wildcard = true) {
@@ -68,9 +71,9 @@ bool parseName(std::string_view part, E& out, const std::string_view (&names)[N]
     out = E{};
     return true;
   }
-  for (size_t i = 0; i < N; i++) {
-    if (part == names[i]) {
-      out = static_cast<E>(i + 1);
+  for (size_t i = 1; i < N; i++) {
+    if (!names[i].empty() && part == names[i]) {
+      out = static_cast<E>(i);
       return true;
     }
   }
@@ -195,11 +198,10 @@ int parseLocale(const std::vector<std::string>& parts, size_t i, Config& c) {
 }
 
 bool parseGrammaticalGender(std::string_view part, Config& c) {
-  return parseName(part, c.grammaticalGender, {"neuter"sv, "feminine"sv, "masculine"sv},
-                   /*wildcard=*/false);
+  return parseName(part, c.grammaticalGender, names::kGrammaticalGender, /*wildcard=*/false);
 }
 bool parseLayoutDir(std::string_view part, Config& c) {
-  return parseName(part, c.layoutDir, {"ldltr"sv, "ldrtl"sv});
+  return parseName(part, c.layoutDir, names::kLayoutDir);
 }
 bool parseSmallestWidth(std::string_view part, Config& c) {
   return parseDp(part, "sw", c.smallestWidthDp);
@@ -207,32 +209,26 @@ bool parseSmallestWidth(std::string_view part, Config& c) {
 bool parseWidth(std::string_view part, Config& c) { return parseDp(part, "w", c.widthDp); }
 bool parseHeight(std::string_view part, Config& c) { return parseDp(part, "h", c.heightDp); }
 bool parseScreenSize(std::string_view part, Config& c) {
-  return parseName(part, c.screenSize, {"small"sv, "normal"sv, "large"sv, "xlarge"sv});
+  return parseName(part, c.screenSize, names::kScreenSize);
 }
 bool parseScreenLong(std::string_view part, Config& c) {
-  return parseName(part, c.screenLong, {"notlong"sv, "long"sv});
+  return parseName(part, c.screenLong, names::kScreenLong);
 }
 bool parseScreenRound(std::string_view part, Config& c) {
-  return parseName(part, c.screenRound, {"notround"sv, "round"sv});
+  return parseName(part, c.screenRound, names::kScreenRound);
 }
 bool parseWideColorGamut(std::string_view part, Config& c) {
-  return parseName(part, c.wideColorGamut, {"nowidecg"sv, "widecg"sv});
+  return parseName(part, c.wideColorGamut, names::kWideColorGamut);
 }
-bool parseHdr(std::string_view part, Config& c) {
-  return parseName(part, c.hdr, {"lowdr"sv, "highdr"sv});
-}
+bool parseHdr(std::string_view part, Config& c) { return parseName(part, c.hdr, names::kHdr); }
 bool parseOrientation(std::string_view part, Config& c) {
-  return parseName(part, c.orientation, {"port"sv, "land"sv, "square"sv});
+  return parseName(part, c.orientation, names::kOrientation);
 }
 bool parseUiModeType(std::string_view part, Config& c) {
-  // "normal" is a screen size; UiModeType::Normal has no qualifier.
-  if (part == "normal"sv) return false;
-  return parseName(
-      part, c.uiModeType,
-      {"normal"sv, "desk"sv, "car"sv, "television"sv, "appliance"sv, "watch"sv, "vrheadset"sv});
+  return parseName(part, c.uiModeType, names::kUiModeType);
 }
 bool parseUiModeNight(std::string_view part, Config& c) {
-  return parseName(part, c.uiModeNight, {"notnight"sv, "night"sv});
+  return parseName(part, c.uiModeNight, names::kUiModeNight);
 }
 
 bool parseDensity(std::string_view part, Config& c) {
@@ -265,19 +261,19 @@ bool parseDensity(std::string_view part, Config& c) {
 }
 
 bool parseTouchscreen(std::string_view part, Config& c) {
-  return parseName(part, c.touchscreen, {"notouch"sv, "stylus"sv, "finger"sv});
+  return parseName(part, c.touchscreen, names::kTouchscreen);
 }
 bool parseKeysHidden(std::string_view part, Config& c) {
-  return parseName(part, c.keysHidden, {"keysexposed"sv, "keyshidden"sv, "keyssoft"sv});
+  return parseName(part, c.keysHidden, names::kKeysHidden);
 }
 bool parseKeyboard(std::string_view part, Config& c) {
-  return parseName(part, c.keyboard, {"nokeys"sv, "qwerty"sv, "12key"sv});
+  return parseName(part, c.keyboard, names::kKeyboard);
 }
 bool parseNavHidden(std::string_view part, Config& c) {
-  return parseName(part, c.navHidden, {"navexposed"sv, "navhidden"sv});
+  return parseName(part, c.navHidden, names::kNavHidden);
 }
 bool parseNavigation(std::string_view part, Config& c) {
-  return parseName(part, c.navigation, {"nonav"sv, "dpad"sv, "trackball"sv, "wheel"sv});
+  return parseName(part, c.navigation, names::kNavigation);
 }
 
 // <W>x<H> with W >= H. aapt2 lets H be empty: "640x" is 640x0.
