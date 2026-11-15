@@ -12,6 +12,7 @@ namespace hydroid::res {
 // clang-format off
 enum class ValueKind : uint8_t {
   Null, Empty,                       // @null, @empty: see Value::null() and Value::empty()
+  Id,                                // an id resource: <id name="..."/>, @+id/...
   Reference, AttrRef,                // @type/name, ?attr/name
   String, StyledString,              // StyledString: text with spans such as <b>
   Color, Dimension, Fraction, Float, Int, Bool,
@@ -54,6 +55,9 @@ class Value {
   // @empty: a value that is there but empty (TYPE_NULL, data DATA_NULL_EMPTY = 1), so
   // TypedArray.hasValueOrEmpty is true, unlike for @null.
   static Value empty() { return Value(ValueKind::Empty); }
+  // The value of an id resource, which only stands for its ResId. aapt2 writes it as false
+  // (TYPE_INT_BOOLEAN, data 0).
+  static Value id() { return Value(ValueKind::Id); }
 
   // `id` is not 0: a reference to 0 is how aapt2 writes @null, so it reads back as null(), and
   // reference(0) or attrRef(0) would not. They stop a debug build of the library.
@@ -166,7 +170,8 @@ class Value {
   static constexpr Payload payloadOf(ValueKind kind) {
     switch (kind) {
       case ValueKind::Null:
-      case ValueKind::Empty: return Payload::None;
+      case ValueKind::Empty:
+      case ValueKind::Id: return Payload::None;
       case ValueKind::Reference:
       case ValueKind::AttrRef: return Payload::Ref;
       case ValueKind::Color: return Payload::Color;

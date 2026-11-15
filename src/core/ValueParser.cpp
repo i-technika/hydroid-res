@@ -278,6 +278,7 @@ uint32_t formatOf(ValueKind kind) {
     case ValueKind::Fraction: return kFormatFraction;
     case ValueKind::Null:
     case ValueKind::Empty:
+    case ValueKind::Id:
     case ValueKind::Reference:
     case ValueKind::AttrRef:
     case ValueKind::String:
