@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Arrays, which the dump breaks every four items, and plurals. -->
+<resources>
+    <array name="mixed">
+        <item>@color/rgb4</item>
+        <item>1</item>
+        <item>hello</item>
+        <item>#fff</item>
+        <item>16dp</item>
+        <item>true</item>
+        <item>@null</item>
+        <item/>
+        <item><b>styled</b></item>
+    </array>
+    <array name="formatted" format="integer">
+        <item>1</item>
+        <item>@null</item>
+        <item/>
+    </array>
+    <string-array name="strings">
+        <item>@string/app_name</item>
+        <item>  a   b  </item>
+        <item>%s %s</item>
+        <item>#fff</item>
+    </string-array>
+    <integer-array name="integers">
+        <item>1</item>
+        <item>0x10</item>
+        <item/>
+        <item>@integer/dec</item>
+    </integer-array>
+    <array name="empty_array"/>
+    <plurals name="things">
+        <item quantity="other">%d things</item>
+        <item quantity="zero">nothing</item>
+        <item quantity=" few ">a few</item>
+        <item quantity="many">@string/app_name</item>
+        <item quantity="two"></item>
+        <item quantity="one"><b>one</b> thing</item>
+    </plurals>
+    <plurals name="empty_plurals"/>
+</resources>

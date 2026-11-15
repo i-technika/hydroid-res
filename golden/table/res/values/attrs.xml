@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Attributes: formats, enums and flags (whose names become ids), limits, and the attributes a
+     declare-styleable defines or only names. -->
+<resources>
+    <attr name="anyAttr"/>
+    <attr name="colorAttr" format="color|reference"/>
+    <attr name="stringAttr" format="string"/>
+    <attr name="stringOrInt" format="string|integer"/>
+    <attr name="boolAttr" format="boolean"/>
+    <attr name="sizeAttr" format="dimension|fraction|float"/>
+    <attr name="refAttr" format="reference"/>
+    <attr name="every" format="reference|string|integer|boolean|color|float|dimension|fraction|enum|flags"/>
+    <attr name="limited" format="integer" min="-2" max="5"/>
+    <attr name="mode">
+        <enum name="zero" value="0"/>
+        <enum name="five" value="5"/>
+        <enum name="minus" value="-1"/>
+        <enum name="hexed" value="0xff"/>
+    </attr>
+    <attr name="gravityFlags">
+        <!-- A comment before a flag. -->
+        <flag name="top" value="0x1"/>
+        <flag name="bottom" value="2"/>
+        <flag name="center" value="0x4"/>
+    </attr>
+    <attr name="intOrEnum" format="integer">
+        <enum name="auto" value="7"/>
+    </attr>
+    <attr name="shared"><enum name="five" value="5"/></attr>
+    <attr name="twice" format="color"/>
+    <attr name="twice" format="color"/>
+
+    <declare-styleable name="TableView">
+        <attr name="colorAttr"/>
+        <attr name="twice" format="color"/>
+        <attr name="styleableOwn" format="integer"/>
+        <attr name="styleableEnum">
+            <enum name="first" value="1"/>
+        </attr>
+    </declare-styleable>
+    <declare-styleable name="Empty"/>
+</resources>

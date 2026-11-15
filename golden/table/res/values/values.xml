@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Every kind of single value, and the ways of writing each. -->
+<resources>
+    <color name="rgb4">#f80</color>
+    <color name="argb4">#8f80</color>
+    <color name="rgb8">#6200EE</color>
+    <color name="argb8">#806200ee</color>
+    <color name="alias">@color/rgb8</color>
+    <color name="theme_color">?attr/colorAttr</color>
+    <color name="empty_color"/>
+    <drawable name="drawable_color">#123</drawable>
+    <item type="drawable" name="item_drawable">#fff</item>
+    <item type="drawable" name="null_drawable">@null</item>
+    <item type="drawable" name="empty_drawable">@empty</item>
+    <item type="color" name="any_text">not a color</item>
+
+    <dimen name="px">1px</dimen>
+    <dimen name="dp">16dp</dimen>
+    <dimen name="dip">8dip</dimen>
+    <dimen name="sp">14sp</dimen>
+    <dimen name="pt">12.5pt</dimen>
+    <dimen name="in">0.3in</dimen>
+    <dimen name="mm">1.7mm</dimen>
+    <dimen name="tenth">0.1dp</dimen>
+    <dimen name="negative">-1.5dp</dimen>
+    <dimen name="tiny_negative">-0.0000001dp</dimen>
+    <dimen name="wrap">9000000dp</dimen>
+    <dimen name="mixed">1234.5678dp</dimen>
+    <dimen name="halves">0.0078125dp</dimen>
+    <dimen name="plain_float">1.5</dimen>
+    <dimen name="zero_float">0</dimen>
+    <dimen name="negative_zero">-0</dimen>
+    <dimen name="big_float">1e30</dimen>
+    <dimen name="int_float">123456789</dimen>
+    <dimen name="small_float">1e-12</dimen>
+    <dimen name="tenth_float">0.1</dimen>
+    <dimen name="g_float">1234567.5</dimen>
+    <dimen name="fraction_as_dimen">50%</dimen>
+    <dimen name="empty_dimen">   </dimen>
+    <item type="dimen" name="item_float" format="float">0.25</item>
+
+    <fraction name="percent">30%</fraction>
+    <fraction name="parent">18%p</fraction>
+    <fraction name="negative_fraction">-0.5%</fraction>
+    <fraction name="large">250%p</fraction>
+
+    <integer name="dec">42</integer>
+    <integer name="neg">-7</integer>
+    <integer name="hex">0x7f</integer>
+    <integer name="all_bits">0xffffffff</integer>
+    <integer name="alias_int">@integer/dec</integer>
+    <integer name="new_id">@+id/made_by_reference</integer>
+    <integer name="spaced">  12  </integer>
+
+    <bool name="yes">true</bool>
+    <bool name="no">FALSE</bool>
+    <bool name="styled_bool"><b>yes</b></bool>
+
+    <id name="plain_id"/>
+    <item type="id" name="item_id"/>
+    <id name="alias_id">@id/plain_id</id>
+    <id name="null_id">@null</id>
+    <item type="layout" name="layout_alias">@layout/main</item>
+    <item type="raw" name="raw_alias">@raw/data</item>
+
+    <public type="string" name="app_name"/>
+    <public type="id" name="public_id"/>
+    <java-symbol type="string" name="korean"/>
+    <other:element xmlns:other="urn:example:other" name="skipped">ignored</other:element>
+</resources>

@@ -1,0 +1,1 @@
+<compiled ids="@+id/from_txt">aapt2 compiles anything in xml/ as XML, but the dump says no type=XML</compiled>

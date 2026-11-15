@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Strings as aapt2 compiles them: whitespace, quotes, escapes, tags, references and products.
+     golden/aapt2/strings.json has thousands more, one at a time. -->
+<resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2" xmlns:tools="urn:example:tools">
+    <string name="app_name">Hydroid Table</string>
+    <string name="spaces">  a   b
+        c  </string>
+    <string name="quoted">"  kept   as   is  "</string>
+    <string name="half_quoted">x "  in quotes  " y   z</string>
+    <string name="escapes">it\'s \"q\" \\ \t éA \@ \? \# \z</string>
+    <string name="multiline">first\nsecond\n\nfourth</string>
+    <string name="styled">a <b>bold</b>, <i>italic <u>under</u></i> and <font color="#ff0000" size="3">red</font></string>
+    <string name="styled_spaces"> <b> lead</b>  trail  </string>
+    <string name="styled_empty_tags"><b></b>x<i></i></string>
+    <string name="styled_quotes">"a <b>b  b</b> c"</string>
+    <string name="xliff">Hello, <xliff:g id="name" example="Bob">%1$s</xliff:g>!</string>
+    <string name="other_namespace">a<tools:x>b</tools:x>c</string>
+    <string name="emoji">😀 <b>a</b></string>
+    <string name="korean">안녕하세요</string>
+    <string name="reference">@string/app_name</string>
+    <string name="reference_spaces">  @string/app_name  </string>
+    <string name="not_reference">\@string/app_name</string>
+    <string name="at_text">@hello</string>
+    <string name="null_string">@null</string>
+    <string name="empty_value">@empty</string>
+    <string name="empty_string"></string>
+    <string name="formats">%1$s has %2$d items, 100%%</string>
+    <string name="unformatted" formatted="false">%s and %s</string>
+    <string name="untranslatable" translatable="false">%s or %s</string>
+    <string name="cdata"><![CDATA[  <b>not a tag</b>  ]]></string>
+    <string name="entities">&lt;&amp;&gt; &#x41;&#66;&#9;tab</string>
+    <string name="comment">a<!-- not text -->b</string>
+    <string name="product" product="tablet">tablet</string>
+    <string name="product" product="default">default</string>
+    <string name="product_none" product="phone">phone</string>
+    <string name="product_none">none</string>
+    <item type="string" name="item_string">%s %s</item>
+    <eat-comment/>
+    <skip/>
+</resources>
