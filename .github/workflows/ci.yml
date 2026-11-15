@@ -71,7 +71,7 @@ jobs:
         run: cmake --build --preset debug --parallel
       - name: Test
         run: ctest --preset debug
-      - name: Check that the pugixml inside is not exported
+      - name: Check that the pugixml and expat inside are not exported
         if: runner.os != 'Windows'
         run: |
           if [ "$RUNNER_OS" = Linux ]; then
@@ -79,9 +79,10 @@ jobs:
           else
             nm -gU build/debug/src/libhydroid-res.dylib > exports.txt
           fi
-          # With nothing exported, the pugixml check below would pass vacuously.
+          # With nothing exported, the checks below would pass vacuously.
           grep -q hydroid_res_version exports.txt
           if grep -i pugi exports.txt; then exit 1; fi
+          if grep XML_ exports.txt; then exit 1; fi
       - name: Check that the library names its ABI version
         if: runner.os != 'Windows'
         run: |
@@ -145,10 +146,10 @@ jobs:
             build/debug/_deps/*-src
             build/debug/_deps/*-subbuild
           key: ${{ steps.deps.outputs.key }}-${{ hashFiles('cmake/Dependencies.cmake') }}
-      - name: Install Ubuntu's pugixml, GoogleTest and nlohmann/json, which the default build must ignore
+      - name: Install Ubuntu's pugixml, expat, GoogleTest and nlohmann/json, which the default build must ignore
         run: |
           sudo apt-get update
-          sudo apt-get install -y libpugixml-dev libgtest-dev nlohmann-json3-dev
+          sudo apt-get install -y libpugixml-dev libexpat1-dev libgtest-dev nlohmann-json3-dev
       - name: Install a decimal-comma locale
         run: sudo locale-gen de_DE.UTF-8
       - name: Configure, fetching the dependencies
@@ -157,25 +158,36 @@ jobs:
         run: cmake --build --preset debug --parallel
       - name: Test
         run: ctest --preset debug
-      - name: Refuse Ubuntu's GoogleTest, which is not the pinned version
+      - name: Refuse Ubuntu's expat, which is not the pinned version
         run: |
           if cmake --preset debug -B build/mismatch -DHYDROID_RES_USE_SYSTEM_DEPS=ON > mismatch.log 2>&1; then
             cat mismatch.log; exit 1
           fi
           cat mismatch.log
           # CMake wraps the message, so its two halves are on separate lines.
-          grep -q 'package "GTest" that exactly' mismatch.log
-          grep -q 'matches requested version "1.15.2"' mismatch.log
+          grep -q 'package "expat" that exactly' mismatch.log
+          grep -q 'matches requested version "2.7.1"' mismatch.log
       - name: Install the pinned versions from the fetched sources
         run: |
           deps=build/debug/_deps
           cmake -S $deps/pugixml-src -B build/pinned/pugixml -DCMAKE_INSTALL_PREFIX="$HOME/pinned"
+          cmake -S $deps/expat-src -B build/pinned/expat -DCMAKE_INSTALL_PREFIX="$HOME/pinned" -DEXPAT_BUILD_TOOLS=OFF -DEXPAT_BUILD_EXAMPLES=OFF -DEXPAT_BUILD_TESTS=OFF -DEXPAT_BUILD_DOCS=OFF
           cmake -S $deps/googletest-src -B build/pinned/googletest -DCMAKE_INSTALL_PREFIX="$HOME/pinned" -DBUILD_GMOCK=OFF
           cmake -S $deps/nlohmann_json-src -B build/pinned/nlohmann_json -DCMAKE_INSTALL_PREFIX="$HOME/pinned" -DJSON_BuildTests=OFF
-          for dep in pugixml googletest nlohmann_json; do
+          for dep in pugixml expat googletest nlohmann_json; do
             cmake --build build/pinned/$dep --parallel
             cmake --install build/pinned/$dep
           done
+      - name: Refuse Ubuntu's GoogleTest, which is not the pinned version
+        run: |
+          # The pinned expat alone, as Ubuntu's would be refused before GoogleTest is looked for.
+          expat_dir=$(dirname "$(ls "$HOME"/pinned/lib*/cmake/expat-*/expat-config.cmake)")
+          if cmake --preset debug -B build/mismatch-gtest -DHYDROID_RES_USE_SYSTEM_DEPS=ON -Dexpat_DIR="$expat_dir" > mismatch.log 2>&1; then
+            cat mismatch.log; exit 1
+          fi
+          cat mismatch.log
+          grep -q 'package "GTest" that exactly' mismatch.log
+          grep -q 'matches requested version "1.15.2"' mismatch.log
       - name: Configure with HYDROID_RES_USE_SYSTEM_DEPS=ON
         run: >
           cmake --preset debug -B build/installed -DHYDROID_RES_USE_SYSTEM_DEPS=ON
@@ -183,8 +195,8 @@ jobs:
       - name: Check that the pinned installs were found, not Ubuntu's
         run: |
           # Ubuntu's pugixml and nlohmann/json are the pinned versions too, so only the paths tell.
-          grep -E '^(pugixml|GTest|nlohmann_json)_DIR:' build/installed/CMakeCache.txt
-          test "$(grep -cE "^(pugixml|GTest|nlohmann_json)_DIR:PATH=$HOME/pinned/" build/installed/CMakeCache.txt)" -eq 3
+          grep -E '^(pugixml|expat|GTest|nlohmann_json)_DIR:' build/installed/CMakeCache.txt
+          test "$(grep -cE "^(pugixml|expat|GTest|nlohmann_json)_DIR:PATH=$HOME/pinned/" build/installed/CMakeCache.txt)" -eq 4
       - name: Build
         run: cmake --build build/installed --parallel
       - name: Test

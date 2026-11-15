@@ -1,5 +1,6 @@
-// pugixml as aapt2's XML parser (expat, with namespaces) reads a file: element names and
-// namespaces, the text whitespace and all, and the line of each node, for errors.
+// A file as aapt2's XML parser (expat, with namespaces) reads it: expat itself decides whether it
+// is well-formed, and pugixml then reads the element names and namespaces, the text whitespace
+// and all, and the line of each node, for errors.
 
 #pragma once
 
@@ -15,10 +16,15 @@ namespace hydroid::res::detail {
 inline constexpr std::string_view kXliffNamespace = "urn:oasis:names:tc:xliff:document:1.2";
 inline constexpr std::string_view kAaptNamespace = "http://schemas.android.com/aapt";
 
+// How much of a file aapt2 reads: all of it (xml::Inflate, an XML file), or up to the end of its
+// root element (XmlPullParser, a values file), past which it looks for no error.
+enum class XmlExtent { Document, RootElement };
+
 class XmlDocument {
  public:
-  // false if `text` is not well-formed XML or has no element, with what and the line where.
-  bool load(std::string_view text, std::string* error, int* errorLine);
+  // false if `text`, as far as `extent` reads it, is not well-formed XML or has no element, with
+  // what and the line where.
+  bool load(std::string_view text, XmlExtent extent, std::string* error, int* errorLine);
   pugi::xml_node root() const { return doc_.document_element(); }
   // The line of `node`, from 1.
   int line(pugi::xml_node node) const;

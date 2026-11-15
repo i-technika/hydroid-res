@@ -83,6 +83,8 @@ CASES = {
                                 '<b z="@+id/one">@+id/not_text</b></a>'},
     "xml-id-invalid-name": {"layout/l.xml": f'<a {ANDROID} android:id="@+id/1bad"/>'},
     "xml-unbound-prefix": {"layout/l.xml": '<a q:x="1"/>'},
+    "xml-bare-ampersand": {"layout/l.xml": '<a x="&"/>'},
+    "xml-two-roots": {"layout/l.xml": "<a/><a/>"},
     "xml-raw-ids": {"raw/r.xml": '<a x="@+id/not_collected"/>'},
     "drawable-xml-ids": {"drawable/d.xml": f'<shape {ANDROID} android:id="@+id/in_shape"/>',
                          "drawable-v21/d.xml": f'<shape {ANDROID} android:id="@+id/in_shape"/>'},
@@ -93,12 +95,27 @@ CASES = {
     "values-bom": {"values/v.xml": "﻿<?xml version='1.0' encoding='utf-8'?><resources>"
                                    "<string name='s'>s</string></resources>"},
     "values-malformed": {"values/v.xml": "<resources><string name='q'>x</string>"},
+    # aapt2 reads a values file only up to the end of its root element.
+    "values-two-roots": {"values/v.xml": "<resources/><resources/>"},
+    "values-junk-after-root": {"values/v.xml": "<resources><string name='q'>x</string></resources>"
+                                               "&<a"},
     "values-wrong-root": {"values/v.xml": "<foo/>"},
     "values-namespaced-root": {"values/v.xml": "<a:resources xmlns:a='urn:a'/>"},
     "values-text": values("text<string name='q'>x</string>"),
     "values-other-namespace": {"values/v.xml": "<resources xmlns:t='urn:t'><t:string name='q'>x"
                                                "</t:string><skip/><eat-comment/></resources>"},
     "values-unbound-prefix": values("<t:string name='q'>x</t:string>"),
+    # Not well-formed XML, which expat rejects and pugixml would take (#78).
+    "values-bare-ampersand": values("<string name='q'>Tom & Jerry</string>"),
+    "values-unknown-entity": values("<string name='q'>a&nbsp;b</string>"),
+    "values-nul-reference": values("<string name='q'>a&#0;b</string>"),
+    "values-attribute-twice": values("<string name='q' name='r'>x</string>"),
+    "values-attribute-twice-namespaced": {
+        "values/v.xml": "<resources xmlns:a='urn:a' xmlns:b='urn:a'>"
+                        "<string name='q' a:x='1' b:x='2'>x</string></resources>"},
+    "values-lt-in-attribute": values("<string name='q' x='a<b'>x</string>"),
+    "values-space-in-namespace": {"values/v.xml": "<resources xmlns:a='urn:a b'>"
+                                                  "<string name='q' a:x='1'>x</string></resources>"},
     "values-unknown-element": values("<foo name='q'>x</foo>"),
     "values-no-name": values("<string>x</string>"),
     "values-empty-name": values("<string name='  '>x</string>"),

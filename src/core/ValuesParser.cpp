@@ -1022,7 +1022,7 @@ void parseValues(std::string_view xml, const std::filesystem::path& file, const 
   XmlDocument doc;
   std::string why;
   int line = 0;
-  if (!doc.load(xml, &why, &line)) {
+  if (!doc.load(xml, XmlExtent::RootElement, &why, &line)) {
     diag.error({file, line}, "xml parser error: " + why);
     return;
   }

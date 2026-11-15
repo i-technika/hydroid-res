@@ -167,7 +167,7 @@ void scanResFolder(const fs::path& res, ParsedFolder& out, Diagnostics& diag) {
         XmlDocument doc;
         std::string why;
         int line = 0;
-        if (!doc.load(text, &why, &line)) {
+        if (!doc.load(text, XmlExtent::Document, &why, &line)) {
           diag.error({file, line}, "xml parser error: " + why);
           continue;
         }

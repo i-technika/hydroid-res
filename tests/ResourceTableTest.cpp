@@ -342,6 +342,30 @@ TEST(ResourceTable, ErrorsSayWhere) {
   EXPECT_EQ(out.str(), "plain");
 }
 
+// What is not well-formed XML fails with expat's message and the line expat stops at (#78).
+// aapt2 gives the same message, but without "xml parser error: " for an XML file, and line 0 for
+// a values file, as XmlPullParser keeps no line for the error.
+TEST(ResourceTable, XmlErrorsAreExpats) {
+  TempDir dir;
+  ResourceTable table;
+  std::vector<Diagnostic> errors;
+  EXPECT_FALSE(load(table, dir,
+                    {{"values/v.xml",
+                      "<resources>\n<string name='a'>Tom & Jerry</string>\n"
+                      "</resources>\n"}},
+                    "com.a", 0x7f, &errors));
+  ASSERT_EQ(errors.size(), 1u);
+  EXPECT_EQ(errors[0].message, "xml parser error: not well-formed (invalid token)");
+  EXPECT_EQ(errors[0].line, 2);
+
+  // An XML file is read to its end, past the root element.
+  errors.clear();
+  EXPECT_FALSE(load(table, dir, {{"layout/l.xml", "<a/>\n\n<a/>\n"}}, "com.b", 0x7f, &errors));
+  ASSERT_EQ(errors.size(), 1u);
+  EXPECT_EQ(errors[0].message, "xml parser error: junk after document element");
+  EXPECT_EQ(errors[0].line, 3);
+}
+
 // The dump writes numbers as printf does in the C locale, whatever the host app set.
 TEST(TableDump, NumbersIgnoreTheLocale) {
   TempDir dir;
