@@ -31,12 +31,13 @@
 //   - Numbers past 65535 in sw<N>dp, w<N>dp, h<N>dp, <N>dpi and <W>x<H>, which aapt2 wraps to 16
 //     bits: aapt2 reads sw65536dp as sw0dp, which is no qualifier at all, and sw65537dp as
 //     sw1dp, a real one other than what was written. Past 2147483647 it depends on the host, as
-//     aapt2 reads the number with atoi. Build-tools 37.0.0 on Windows, which the golden comes
-//     from, first stops it at 0x7fffffff, so sw2147483648dp, w99999999999dp and h2147483648dp
-//     are sw65535dp, w65535dp and h65535dp, and 2147483648dpi is nodpi. 37.0.0 on Linux and
-//     macOS wraps it to 32 bits instead: sw2147483648dp and 2147483648dpi are the default
-//     Config, sw99999999999dp is sw59391dp, and 2147483648x1 fails. 36.1.0 on Windows wrapped
-//     too, sw99999999999dp and 99999999999dpi to 59391.
+//     aapt2 reads the number with atoi. Build-tools 37.0.0 on Windows first stops it at
+//     0x7fffffff, so sw2147483648dp, w99999999999dp and h2147483648dp are sw65535dp, w65535dp
+//     and h65535dp, and 2147483648dpi is nodpi. 37.0.0 on Linux and macOS wraps it to 32 bits
+//     instead: sw2147483648dp and 2147483648dpi are the default Config, sw99999999999dp is
+//     sw59391dp, and 2147483648x1 fails. 36.1.0 on Windows wrapped too, sw99999999999dp and
+//     99999999999dpi to 59391. The aapt2 golden comes from the build-tools and OS that
+//     BUILD_TOOLS and GOLDEN_HOST in scripts/golden/gen_aapt2_values.py pin.
 //     Versions past 65535 fail in aapt2 too.
 //   - In the b+ form: an empty subtag ("b+", "b+sr+Latn+RS+"), a language that is not 2 or 3
 //     letters ("b+e" comes out "e" and a NUL, "b+english" "eng"), a region of 3 letters (aapt2

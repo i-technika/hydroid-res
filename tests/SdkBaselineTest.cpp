@@ -113,15 +113,16 @@ TEST(SdkBaseline, Aapt2GoldenComesFromScriptPins) {
 // README.md names the build-tools, platform and OS of the aapt2 golden files, to say what to
 // install and where to run the scripts, so each of them must be what the script pins: raising a
 // pin and making the files again without the README fails here (#66). Version.h only points to
-// the pins, but any it names is held to them too. A README that no longer says one of them in
-// these words fails, so that rewording it means changing the pattern here.
+// the pins, but any it names is held to them too. The build-tools may follow a space, the ; of
+// sdkmanager or the / of a path. A README that no longer says one of them in these words fails,
+// so that rewording it means changing the pattern here.
 TEST(SdkBaseline, DocsNameScriptPins) {
   std::map<std::string, std::string> pins;
   for (const char* name : {"BUILD_TOOLS", "PLATFORM", "GOLDEN_HOST"}) {
     ASSERT_NO_FATAL_FAILURE(readAapt2ScriptPin(name, &pins[name]));
   }
   const std::pair<const char*, std::regex> mentions[] = {
-      {"BUILD_TOOLS", std::regex(R"(build-tools\s+(\d+(?:\.\d+)*))", std::regex::icase)},
+      {"BUILD_TOOLS", std::regex(R"(build-tools[\s;/]+(\d+(?:\.\d+)*))", std::regex::icase)},
       {"PLATFORM", std::regex(R"((android-\d+(?:\.\d+)*))")},
       {"GOLDEN_HOST", std::regex(R"((?:made\s+on|`GOLDEN_HOST`,)\s+(\w+))")},
   };
@@ -138,7 +139,9 @@ TEST(SdkBaseline, DocsNameScriptPins) {
         ++named;
         EXPECT_EQ((*m)[1].str(), pins[name]) << path << ": " << (*m)[0].str() << " is not " << name;
       }
-      if (mustName) EXPECT_NE(named, 0) << path << " does not name " << name;
+      if (mustName) {
+        EXPECT_NE(named, 0) << path << " does not name " << name;
+      }
     }
   }
 }
