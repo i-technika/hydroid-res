@@ -1,5 +1,6 @@
 #include "hydroid/res/Config.h"
 
+#include <cstddef>
 #include <ostream>
 #include <string>
 #include <string_view>
@@ -106,6 +107,7 @@ static_assert(kDensityAny == 0xfffe);   // DENSITY_ANY
 static_assert(kDensityNone == 0xffff);  // DENSITY_NONE
 static_assert(kMncZero == 0xffff);      // MNC_ZERO
 
+// Every field of Config, which operator== compares.
 auto fields(const Config& c) {
   return std::tie(c.mcc, c.mnc, c.lang, c.region, c.script, c.variant, c.grammaticalGender,
                   c.layoutDir, c.smallestWidthDp, c.widthDp, c.heightDp, c.screenSize, c.screenLong,
@@ -113,6 +115,33 @@ auto fields(const Config& c) {
                   c.uiModeNight, c.density, c.touchscreen, c.keysHidden, c.keyboard, c.navHidden,
                   c.navigation, c.screenWidth, c.screenHeight, c.sdkVersion, c.minorVersion);
 }
+
+// Converts to the type of any field, so that T{AnyField{}, ...} takes as many of them as the
+// aggregate T has fields. Only ever named in decltype.
+struct AnyField {
+  template <typename T>
+  operator T() const;
+};
+template <typename T, typename... F>
+constexpr auto takes(int) -> decltype(T{F{}...}, true) {
+  return true;
+}
+template <typename T, typename... F>
+constexpr bool takes(...) {
+  return false;
+}
+template <typename T, typename... F>
+constexpr size_t fieldCount() {
+  if constexpr (takes<T, F..., AnyField>(0)) {
+    return fieldCount<T, F..., AnyField>();
+  } else {
+    return sizeof...(F);
+  }
+}
+// A field added to Config and not to fields() would be one operator== does not see (#52). toString
+// writes each field by hand too, and nothing checks that.
+static_assert(std::tuple_size_v<decltype(fields(Config{}))> == fieldCount<Config>(),
+              "every field of Config must be in fields()");
 
 // The characters of a NUL-padded field.
 template <size_t N>
