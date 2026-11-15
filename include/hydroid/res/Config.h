@@ -52,7 +52,7 @@ inline constexpr uint16_t kDensityNone = 0xffff;  // nodpi
 inline constexpr uint16_t kMncZero = 0xffff;
 
 // The fields are in the order of the qualifiers in a folder name, which is also their precedence.
-// A field added here goes in fields() and toString() in Config.cpp too, and in the test
+// A field added here goes in fields() and write() in Config.cpp too, and in the test
 // Config.EveryFieldCountsForEquality; the build fails without the first and the last.
 struct Config {
   uint16_t mcc = 0;  // mcc310: 310
@@ -94,14 +94,20 @@ HYDROID_RES_API bool operator==(const Config& a, const Config& b);
 inline bool operator!=(const Config& a, const Config& b) { return !(a == b); }
 
 // The qualifiers as aapt2 writes them, which is how `aapt2 dump resources` prints a configuration:
-// "en-rUS-sw600dp-v13", "b+sr+Latn", "" for the default Config. Every set field is written, in
-// folder order, under its folder name: mnc as a number (kMncZero is "mnc65535"), a density
-// without a name as "400dpi", and a locale with a script or variant in the b+ form. A locale
-// with a 3-digit region and neither, such as b+es+419, is written "es-r419", as aapt2 does,
-// although no folder can be named so.
+// "en-rUS-sw600dp-v13", "b+sr+Latn", "" for the default Config. Every field with a folder name
+// is written, in folder order, under that name: mnc as a number (kMncZero is "mnc65535"), a
+// density without a name as "400dpi", and a locale with a script or variant in the b+ form. A
+// locale with a 3-digit region and neither, such as b+es+419, is written "es-r419", as aapt2
+// does, although no folder can be named so. What no folder names is left out: UiModeType::Normal,
+// an enum value out of range, and a region, script or variant without a language. Two Configs
+// that differ only there come out the same; operator<< tells them apart.
 HYDROID_RES_API std::string toString(const Config& config);
 
-// For logs and test failures: Config(en-rUS-v13), Config() for the default.
+// For logs and test failures: Config(en-rUS-v13), Config() for the default. Unlike toString, it
+// also writes what has no folder name, as <field>=<value>: Config(uiModeType=1-420dpi),
+// Config(orientation=9). A locale whose folder form would not read back as these very fields goes
+// field by field, every byte: Config(region=KR), Config(lang=sr-variant=Latn). Two Configs that
+// differ never print the same (#50).
 HYDROID_RES_API std::ostream& operator<<(std::ostream& os, const Config& config);
 
 }  // namespace hydroid::res
