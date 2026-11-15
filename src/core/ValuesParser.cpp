@@ -4,6 +4,7 @@
 #include <utility>
 #include <vector>
 
+#include "core/Utf8.h"
 #include "core/Xml.h"
 #include "hydroid/res/ValueParser.h"
 
@@ -33,38 +34,6 @@ int hexDigit(uint32_t c) {
   if (c >= 'A' && c <= 'F') return static_cast<int>(c - 'A' + 10);
   return -1;
 }
-
-// Reads the code points of UTF-8 text. A byte that starts no valid sequence reads as itself and
-// marks the text invalid.
-class Utf8Reader {
- public:
-  explicit Utf8Reader(std::string_view s) : s_(s) {}
-  bool hasNext() const { return pos_ < s_.size(); }
-  bool invalid() const { return invalid_; }
-  uint32_t next() {
-    const auto lead = static_cast<unsigned char>(s_[pos_++]);
-    int more = lead < 0x80 ? 0 : lead >= 0xf0 && lead < 0xf8 ? 3 : lead >= 0xe0 ? 2 : 1;
-    if (lead >= 0x80 && lead < 0xc0) more = -1;
-    if (more <= 0) {
-      invalid_ |= more < 0;
-      return lead;
-    }
-    uint32_t cp = lead & (0x3fu >> more);
-    for (int i = 0; i < more; i++) {
-      if (pos_ >= s_.size() || (static_cast<unsigned char>(s_[pos_]) & 0xc0) != 0x80) {
-        invalid_ = true;
-        return lead;
-      }
-      cp = (cp << 6) | (static_cast<unsigned char>(s_[pos_++]) & 0x3f);
-    }
-    return cp;
-  }
-
- private:
-  std::string_view s_;
-  size_t pos_ = 0;
-  bool invalid_ = false;
-};
 
 // AppendCodepointToUtf8, which writes nothing for a surrogate or past U+10FFFF.
 void appendCodepoint(uint32_t cp, std::string& out) {

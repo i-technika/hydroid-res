@@ -366,6 +366,26 @@ TEST(ResourceTable, XmlErrorsAreExpats) {
   EXPECT_EQ(errors[0].line, 3);
 }
 
+// Text that is not UTF-8 fails the whole file, as aapt2 rejects it, rather than reading as some
+// other text (#79).
+TEST(ResourceTable, RejectsWhatIsNotUtf8) {
+  // A lead byte 0xf8-0xff, C0 and F5-F7, overlong, a surrogate, past U+10FFFF.
+  const std::vector<std::string> cases = {"\xf8\x80\x80", "\xc0\xa0",     "\xf5\x80\x80\x80",
+                                          "\xe0\x80\xa0", "\xed\xa0\x80", "\xf4\x90\x80\x80"};
+  TempDir dir;
+  int package = 0;
+  for (const std::string& bytes : cases) {
+    ResourceTable table;
+    std::vector<Diagnostic> errors;
+    EXPECT_FALSE(
+        load(table, dir,
+             {{"values/v.xml", "<resources><string name='s'>a" + bytes + "b</string></resources>"}},
+             "com.p" + std::to_string(package++), 0x7f, &errors));
+    ASSERT_EQ(errors.size(), 1u);
+    EXPECT_EQ(errors[0].message, "xml parser error: not well-formed (invalid token)");
+  }
+}
+
 // The dump writes numbers as printf does in the C locale, whatever the host app set.
 TEST(TableDump, NumbersIgnoreTheLocale) {
   TempDir dir;
