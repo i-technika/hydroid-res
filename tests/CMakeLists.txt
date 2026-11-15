@@ -14,7 +14,8 @@ add_executable(hydroid-res-tests
   SmokeTest.cpp
   Utf8Test.cpp
   ValueParserTest.cpp
-  ValueTest.cpp)
+  ValueTest.cpp
+  WhitespaceTest.cpp)
 # src/ for the internal headers some tests use, as core/FieldCount.h.
 target_include_directories(hydroid-res-tests PRIVATE ${PROJECT_SOURCE_DIR}/src)
 target_link_libraries(hydroid-res-tests PRIVATE

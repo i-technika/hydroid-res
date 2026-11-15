@@ -5,28 +5,12 @@
 #include <vector>
 
 #include "core/Utf8.h"
+#include "core/Whitespace.h"
 #include "core/Xml.h"
 #include "hydroid/res/ValueParser.h"
 
 namespace hydroid::res::detail {
 namespace {
-
-// isspace in the C locale, which aapt2 trims and collapses with.
-bool isSpace(uint32_t c) {
-  return c == ' ' || c == '\t' || c == '\n' || c == '\v' || c == '\f' || c == '\r';
-}
-
-std::string_view trimLeading(std::string_view s) {
-  while (!s.empty() && isSpace(static_cast<unsigned char>(s.front()))) s.remove_prefix(1);
-  return s;
-}
-
-std::string_view trimTrailing(std::string_view s) {
-  while (!s.empty() && isSpace(static_cast<unsigned char>(s.back()))) s.remove_suffix(1);
-  return s;
-}
-
-std::string_view trim(std::string_view s) { return trimTrailing(trimLeading(s)); }
 
 int hexDigit(uint32_t c) {
   if (c >= '0' && c <= '9') return static_cast<int>(c - '0');
