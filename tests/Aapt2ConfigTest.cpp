@@ -164,14 +164,14 @@ TEST(Aapt2Config, NumbersPast16Bits) {
 }
 
 // Whether toString writes `c` in a form aapt2 prints but no folder can be named, so that it cannot
-// read back: an mcc below 100 or an mnc below 10 without its leading zeros (mcc001 is mcc1),
-// kMncZero as mnc65535, a 3-digit region in the legacy form (b+es+419 is es-r419), and the
-// language "any", which reads back as the wildcard.
+// read back: an mcc below 100 without its leading zeros (mcc001 is mcc1; an mnc may have 1 to 3
+// digits), kMncZero as mnc65535, a 3-digit region in the legacy form (b+es+419 is es-r419), and
+// the language "any" with no mnc before it, where it reads back as the mnc's wildcard.
 bool writtenAsNoFolderIs(const Config& c) {
-  const bool digitRegion = c.region[0] >= '0' && c.region[0] <= '9';
-  return (c.mcc != 0 && c.mcc < 100) || (c.mnc != 0 && (c.mnc < 10 || c.mnc == kMncZero)) ||
-         (digitRegion && c.script[0] == '\0' && c.variant[0] == '\0') ||
-         (c.lang[0] == 'a' && c.lang[1] == 'n' && c.lang[2] == 'y');
+  const bool threeDigitRegion = c.region[2] >= '0' && c.region[2] <= '9';
+  return (c.mcc != 0 && c.mcc < 100) || c.mnc == kMncZero ||
+         (threeDigitRegion && c.script[0] == '\0' && c.variant[0] == '\0') ||
+         (c.mnc == 0 && c.lang[0] == 'a' && c.lang[1] == 'n' && c.lang[2] == 'y');
 }
 
 // Every name hydroid takes reads back as the same Config from what toString makes of it, field by
@@ -199,7 +199,7 @@ TEST(Aapt2Config, ReadsBackFromToString) {
     EXPECT_EQ(*back, *c) << where << " is written \"" << written << '"';
     EXPECT_EQ(toString(*back), written) << where;
   }
-  EXPECT_GT(roundTrips, 4500) << "left out " << leftOut;
+  EXPECT_GT(roundTrips, 4800) << "left out " << leftOut;
 }
 
 // The golden file reaches every qualifier, and both outcomes.

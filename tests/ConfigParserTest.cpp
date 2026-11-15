@@ -8,6 +8,7 @@
 #include <iterator>
 #include <map>
 #include <optional>
+#include <set>
 #include <sstream>
 #include <string>
 #include <utility>
@@ -225,6 +226,11 @@ TEST(ParseConfig, EveryNameGivesItsValue) {
   };
   // clang-format on
   static_assert(std::size(kNames) == names::countNamed(), "a qualifier name is missing here");
+  // As many as the tables hold, and none twice, so each of theirs is here once.
+  std::set<std::string> listed;
+  for (const auto& entry : kNames) {
+    EXPECT_TRUE(listed.insert(entry.first).second) << entry.first << " is listed twice";
+  }
   for (const auto& [name, gives] : kNames) {
     const std::optional<Config> c = parseConfig(name);
     ASSERT_TRUE(c) << name;
