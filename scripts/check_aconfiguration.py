@@ -22,9 +22,13 @@ def main() -> None:
 
     ndk = {m[1]: int(m[2], 0) for m in re.finditer(
         r"^\s*(ACONFIGURATION_\w+)\s*=\s*(0x[0-9a-fA-F]+|\d+)", ndk_h, re.M)}
-    declared = {f"{m[1]}::{e}" for m in re.finditer(r"enum class (\w+) : \w+ \{([^}]*)\}", config_h)
-                for e in re.findall(r"(\w+)\s*=", m[2])}
-    declared |= set(re.findall(r"inline constexpr \w+ (k\w+) =", config_h))
+    # Every enumerator, with its value written or not, and every constant.
+    enums = list(re.finditer(r"enum\s+class\s+(\w+)(?:\s*:\s*[\w:]+)?\s*\{([^}]*)\}", config_h))
+    if len(enums) != len(re.findall(r"\benum\s+class\b", config_h)):
+        sys.exit("Config.h has an enum class this script cannot read")
+    declared = {f"{m[1]}::{e.split('=')[0].strip()}" for m in enums
+                for e in re.sub(r"//[^\n]*", "", m[2]).split(",") if e.strip()}
+    declared |= set(re.findall(r"(?:inline\s+)?constexpr\s+[\w:]+\s+(k\w+)\s*=", config_h))
 
     # static_assert(value(Orientation::Port) == 1);  // ORIENTATION_PORT
     # static_assert(kDensityAny == 0xfffe);          // DENSITY_ANY
