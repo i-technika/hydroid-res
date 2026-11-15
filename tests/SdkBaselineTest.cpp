@@ -89,8 +89,9 @@ TEST(SdkBaseline, Aapt2ScriptPinsEmulatedLevel) {
 // on Windows (AMD64). ...". All three must be what the script pins, so that changing a pin without
 // making the files again fails too (#64). The OS is GOLDEN_HOST (#62): on Linux or macOS, aapt2
 // 37.0.0 wraps sw2147483648dp to the default Config rather than stop it at sw65535dp, and writes
-// other NaN bits, and the aapt2 tests miss nearly all of it, as they are deliberate rejections.
-// The CPU in parentheses is only recorded.
+// other NaN bits. The aapt2 tests fail on those, as they pin what aapt2 makes of each deliberate
+// rejection (#61), but only the header says which OS that is. The CPU in parentheses is only
+// recorded.
 TEST(SdkBaseline, Aapt2GoldenComesFromScriptPins) {
   std::map<std::string, std::string> pins;
   for (const char* name : {"BUILD_TOOLS", "PLATFORM", "GOLDEN_HOST"}) {

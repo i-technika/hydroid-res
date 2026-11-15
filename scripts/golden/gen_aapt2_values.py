@@ -49,8 +49,9 @@ PLATFORM = "android-37.0"
 #     32 bits, the default Config, and sw99999999999dp to sw59391dp.
 #   - strtof sets the quiet bit of "-nan(1)" on Linux and macOS, not on Windows.
 #   - On macOS arm64, a dimension past 2^41 ("1e39dp", "3e12dp") gets other data than on x86.
-# Nearly all of these would pass Aapt2ConfigTest and Aapt2ValueTest: made on Linux, only
-# 2147483648x1, which aapt2 rejects there, fails. Changing it means making both files on that OS.
+# Aapt2ConfigTest and Aapt2ValueTest pin what aapt2 makes of each deliberate rejection (#61), so
+# files made on another OS fail them. Changing it means making both files on that OS, and those
+# tests' lists again.
 GOLDEN_HOST = "Windows"
 HOST = platform.system()
 # The header records the CPU too, which only the OS does not tell: on macOS, aapt2 runs as arm64

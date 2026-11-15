@@ -55,7 +55,8 @@ const std::vector<Row>& rows() {
 // ConfigParser.h. Every one must still be in the golden file as aapt2 took it then, and rejected
 // by hydroid, so the list cannot go stale. SdkBaseline takes any build-tools of the level, so a
 // golden made with another that writes one of these otherwise fails here too (#61). What aapt2
-// makes of them is as on the host of the golden file, Windows: on Linux, it rejects 2147483648x1.
+// makes of them is as on the host of the golden file, Windows: on Linux and macOS it rejects some,
+// 2147483648x1 among them, and makes others of more (see ConfigParser.h).
 // clang-format off
 const std::map<std::string, std::string> kDeliberateRejects = {
     // Past 16 bits, which aapt2 wraps: sw65536dp is sw0dp, the default, and sw65537dp sw1dp, a
