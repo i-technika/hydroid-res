@@ -4,10 +4,13 @@
 
 #include <gtest/gtest.h>
 
+#include <iterator>
 #include <optional>
 #include <sstream>
 #include <string>
+#include <utility>
 
+#include "core/FieldCount.h"
 #include "hydroid/res/ConfigParser.h"
 
 namespace hydroid::res {
@@ -353,6 +356,50 @@ TEST(Config, DeviceValuesWithoutAQualifier) {
   device.uiModeType = UiModeType::Normal;
   device.density = 420;
   EXPECT_EQ(toString(device), "420dpi");
+}
+
+// Each field alone makes a Config other than the default, so operator== compares each (#52). A
+// field missing from Config.cpp's fields() fails its build; this catches one listed twice there
+// in place of another, and a field added to Config fails this file's build until it is here.
+TEST(Config, EveryFieldCountsForEquality) {
+  const std::pair<const char*, void (*)(Config&)> kFields[] = {
+      {"mcc", [](Config& c) { c.mcc = 310; }},
+      {"mnc", [](Config& c) { c.mnc = 260; }},
+      {"lang", [](Config& c) { c.lang = {'k', 'o'}; }},
+      {"region", [](Config& c) { c.region = {'K', 'R'}; }},
+      {"script", [](Config& c) { c.script = {'L', 'a', 't', 'n'}; }},
+      {"variant", [](Config& c) { c.variant = {'p', 'o', 's', 'i', 'x'}; }},
+      {"grammaticalGender", [](Config& c) { c.grammaticalGender = GrammaticalGender::Feminine; }},
+      {"layoutDir", [](Config& c) { c.layoutDir = LayoutDir::Rtl; }},
+      {"smallestWidthDp", [](Config& c) { c.smallestWidthDp = 600; }},
+      {"widthDp", [](Config& c) { c.widthDp = 720; }},
+      {"heightDp", [](Config& c) { c.heightDp = 480; }},
+      {"screenSize", [](Config& c) { c.screenSize = ScreenSize::Large; }},
+      {"screenLong", [](Config& c) { c.screenLong = ScreenLong::Yes; }},
+      {"screenRound", [](Config& c) { c.screenRound = ScreenRound::Yes; }},
+      {"wideColorGamut", [](Config& c) { c.wideColorGamut = WideColorGamut::Yes; }},
+      {"hdr", [](Config& c) { c.hdr = Hdr::Yes; }},
+      {"orientation", [](Config& c) { c.orientation = Orientation::Land; }},
+      {"uiModeType", [](Config& c) { c.uiModeType = UiModeType::Normal; }},
+      {"uiModeNight", [](Config& c) { c.uiModeNight = UiModeNight::Yes; }},
+      {"density", [](Config& c) { c.density = kDensityHdpi; }},
+      {"touchscreen", [](Config& c) { c.touchscreen = Touchscreen::Finger; }},
+      {"keysHidden", [](Config& c) { c.keysHidden = KeysHidden::Soft; }},
+      {"keyboard", [](Config& c) { c.keyboard = Keyboard::Qwerty; }},
+      {"navHidden", [](Config& c) { c.navHidden = NavHidden::Yes; }},
+      {"navigation", [](Config& c) { c.navigation = Navigation::Dpad; }},
+      {"screenWidth", [](Config& c) { c.screenWidth = 640; }},
+      {"screenHeight", [](Config& c) { c.screenHeight = 480; }},
+      {"sdkVersion", [](Config& c) { c.sdkVersion = 21; }},
+      {"minorVersion", [](Config& c) { c.minorVersion = 1; }},
+  };
+  static_assert(std::size(kFields) == detail::fieldCount<Config>(), "a Config field is missing");
+  for (const auto& [name, set] : kFields) {
+    Config c;
+    set(c);
+    EXPECT_FALSE(c == Config{}) << name;
+    EXPECT_TRUE(c == c) << name;
+  }
 }
 
 }  // namespace

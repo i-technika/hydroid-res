@@ -5,6 +5,7 @@
 #include <string_view>
 #include <tuple>
 
+#include "core/FieldCount.h"
 #include "core/QualifierNames.h"
 
 namespace hydroid::res {
@@ -106,6 +107,7 @@ static_assert(kDensityAny == 0xfffe);   // DENSITY_ANY
 static_assert(kDensityNone == 0xffff);  // DENSITY_NONE
 static_assert(kMncZero == 0xffff);      // MNC_ZERO
 
+// Every field of Config, which operator== compares.
 auto fields(const Config& c) {
   return std::tie(c.mcc, c.mnc, c.lang, c.region, c.script, c.variant, c.grammaticalGender,
                   c.layoutDir, c.smallestWidthDp, c.widthDp, c.heightDp, c.screenSize, c.screenLong,
@@ -113,6 +115,11 @@ auto fields(const Config& c) {
                   c.uiModeNight, c.density, c.touchscreen, c.keysHidden, c.keyboard, c.navHidden,
                   c.navigation, c.screenWidth, c.screenHeight, c.sdkVersion, c.minorVersion);
 }
+
+// A field added to Config and not to fields() would be one operator== does not see (#52). toString
+// writes each field by hand too, and nothing checks that.
+static_assert(std::tuple_size_v<decltype(fields(Config{}))> == detail::fieldCount<Config>(),
+              "every field of Config must be in fields()");
 
 // The characters of a NUL-padded field.
 template <size_t N>
