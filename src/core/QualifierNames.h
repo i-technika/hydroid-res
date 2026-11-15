@@ -28,7 +28,8 @@ inline constexpr std::string_view kKeyboard[] = {"", "nokeys", "qwerty", "12key"
 inline constexpr std::string_view kNavHidden[] = {"", "navexposed", "navhidden"};
 inline constexpr std::string_view kNavigation[] = {"", "nonav", "dpad", "trackball", "wheel"};
 
-// Each table has a name, or "", for every value up to the enum's last.
+// Each table has a name, or "", for every value up to the enumerator its assert names, which is
+// the enum's last. An enumerator added after it needs its assert moved too: nothing else sees it.
 template <typename E, size_t N>
 constexpr bool endsAt(const std::string_view (&)[N], E last) {
   return N == static_cast<size_t>(last) + 1;
