@@ -2886,6 +2886,7 @@ mnc1000	-
 mnc01x	-
 sw1dp	sw1dp-v13
 sw65536dp	
+sw65537dp	sw1dp-v13
 sw2147483647dp	sw65535dp-v13
 sw2147483648dp	sw65535dp-v13
 sw4294967296dp	sw65535dp-v13
@@ -2896,13 +2897,21 @@ sw600px	-
 sw-600dp	-
 sw600dpx	-
 w65536dp	
+w65537dp	w1dp-v13
+w2147483648dp	w65535dp-v13
+w99999999999dp	w65535dp-v13
 wdp	wdp
 h65536dp	
+h65537dp	h1dp-v13
+h2147483648dp	h65535dp-v13
+h99999999999dp	h65535dp-v13
 hdp	hdp
 0dpi	-
 65534dpi	anydpi-v21
 65535dpi	nodpi-v4
 65536dpi	
+65537dpi	1dpi-v4
+2147483648dpi	nodpi-v4
 99999999999dpi	nodpi-v4
 dpi	dpi
 xxxxhdpi	-
