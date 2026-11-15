@@ -403,6 +403,12 @@ TEST(Config, PrintsWhatNoFolderNames) {
   EXPECT_EQ(locale({'k', 'o'}, {}, {}, {}), "Config(ko)");
   EXPECT_EQ(locale({'k', 'o', '\0', 'x'}, {}, {}, {}), "Config(lang=ko\\x00x)");
   EXPECT_EQ(locale({'\0', 'k'}, {}, {}, {}), "Config(lang=\\x00k)");
+  // Field by field, a byte that is not a letter or digit is \xNN too, so that a '-' or a '\'
+  // inside a field cannot read as the next part or as an \xNN.
+  EXPECT_EQ(locale({}, {}, {}, {'x', '-', 'p', 'o', 'r', 't'}), "Config(variant=x\\x2dport)");
+  EXPECT_EQ(locale({}, {}, {}, {'x'}), "Config(variant=x)");
+  EXPECT_EQ(locale({}, {}, {}, {'\\', 'x', '0', '0', 'a'}), "Config(variant=\\x5cx00a)");
+  EXPECT_EQ(locale({}, {}, {}, {'\0', 'a'}), "Config(variant=\\x00a)");
 }
 
 // Each field alone makes a Config other than the default, so operator== compares each (#52). A

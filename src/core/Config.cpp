@@ -168,7 +168,8 @@ std::string_view nameOf(E value, const std::string_view (&names)[N]) {
   return i < N ? names[i] : std::string_view();
 }
 
-// Every byte of a field up to its last that is not NUL, \xNN for those that are not printable.
+// Every byte of a field up to its last that is not NUL, \xNN for those that are not ASCII letters
+// or digits: a '-' would read as the end of the field, and a '\' as the start of an \xNN.
 template <size_t N>
 std::string bytes(const std::array<char, N>& field) {
   size_t n = N;
@@ -176,7 +177,7 @@ std::string bytes(const std::array<char, N>& field) {
   std::string out;
   for (size_t i = 0; i < n; i++) {
     const auto b = static_cast<unsigned char>(field[i]);
-    if (b > 0x20 && b < 0x7f) {
+    if ((b >= '0' && b <= '9') || (b >= 'A' && b <= 'Z') || (b >= 'a' && b <= 'z')) {
       out += field[i];
     } else {
       static constexpr char kHex[] = "0123456789abcdef";
