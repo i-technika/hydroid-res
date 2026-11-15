@@ -6,6 +6,7 @@
 #include <gtest/gtest.h>
 
 #include <fstream>
+#include <map>
 #include <regex>
 #include <sstream>
 #include <string>
@@ -47,24 +48,53 @@ TEST(SdkBaseline, GoldenAppBuildsForEmulatedLevel) {
   }
 }
 
-// The first line of each file names them: "... with build-tools 37.0.0 and android-37.0 on
-// Windows (AMD64). ...". The platform must be <level>.0, not a minor release; any build-tools
-// <level>.x will do. The OS is GOLDEN_HOST in gen_aapt2_values.py (#62): on Linux or macOS, aapt2
+// The value of `NAME = "..."` in gen_aapt2_values.py, or "" if no line sets it. Read a line at a
+// time, as std::regex::multiline is not in every standard library.
+std::string aapt2ScriptPin(const std::string& name) {
+  std::ifstream in(HYDROID_AAPT2_SCRIPT);
+  const std::regex pin(name + R"re(\s*=\s*"([^"]*)"\s*)re");
+  for (std::string line; std::getline(in, line);) {
+    std::smatch m;
+    if (std::regex_match(line, m, pin)) return m[1].str();
+  }
+  return "";
+}
+
+// gen_aapt2_values.py pins the build-tools, platform and OS of the aapt2 golden files (#64). The
+// platform must be <level>.0, not a minor release; any build-tools <level>.x will do.
+TEST(SdkBaseline, Aapt2ScriptPinsEmulatedLevel) {
+  ASSERT_TRUE(std::ifstream(HYDROID_AAPT2_SCRIPT)) << "cannot open " << HYDROID_AAPT2_SCRIPT;
+  const std::string buildTools = aapt2ScriptPin("BUILD_TOOLS");
+  ASSERT_FALSE(buildTools.empty()) << "BUILD_TOOLS not found in " << HYDROID_AAPT2_SCRIPT;
+  EXPECT_TRUE(buildTools.rfind(kLevel + ".", 0) == 0)
+      << "BUILD_TOOLS " << buildTools << " is not of level " << kLevel;
+  EXPECT_EQ(aapt2ScriptPin("PLATFORM"), "android-" + kLevel + ".0") << "PLATFORM";
+}
+
+// The first line of each file names what made it: "... with build-tools 37.0.0 and android-37.0
+// on Windows (AMD64). ...". All three must be what the script pins, so that changing a pin without
+// making the files again fails too (#64). The OS is GOLDEN_HOST (#62): on Linux or macOS, aapt2
 // 37.0.0 wraps sw2147483648dp to the default Config rather than stop it at sw65535dp, and writes
 // other NaN bits, and the aapt2 tests miss nearly all of it, as they are deliberate rejections.
 // The CPU in parentheses is only recorded.
-TEST(SdkBaseline, Aapt2GoldenUsesEmulatedLevel) {
-  const std::regex tools(R"(build-tools (\d+)\.\S+ and (android-\d+(\.\d+)?) on (\w+) \(\w+\)\.)");
+TEST(SdkBaseline, Aapt2GoldenComesFromScriptPins) {
+  ASSERT_TRUE(std::ifstream(HYDROID_AAPT2_SCRIPT)) << "cannot open " << HYDROID_AAPT2_SCRIPT;
+  std::map<std::string, std::string> pins;
+  for (const char* name : {"BUILD_TOOLS", "PLATFORM", "GOLDEN_HOST"}) {
+    pins[name] = aapt2ScriptPin(name);
+    ASSERT_FALSE(pins[name].empty()) << name << " not found in " << HYDROID_AAPT2_SCRIPT;
+  }
+  const std::regex made(R"(build-tools (\S+) and (\S+) on (\w+) \(\w+\)\.)");
   for (const char* path : {HYDROID_AAPT2_VALUES, HYDROID_AAPT2_CONFIGS}) {
     std::ifstream in(path);
     ASSERT_TRUE(in) << "cannot open " << path;
     std::string header;
     std::getline(in, header);
     std::smatch m;
-    ASSERT_TRUE(std::regex_search(header, m, tools)) << path << ": " << header;
-    EXPECT_EQ(m[1].str(), kLevel) << path << ": build-tools";
-    EXPECT_EQ(m[2].str(), "android-" + kLevel + ".0") << path << ": platform";
-    EXPECT_EQ(m[4].str(), "Windows") << path << ": OS";
+    ASSERT_TRUE(std::regex_search(header, m, made)) << path << ": " << header;
+    EXPECT_EQ(m[1].str(), pins["BUILD_TOOLS"]) << path << ": build-tools";
+    EXPECT_EQ(m[2].str(), pins["PLATFORM"]) << path << ": platform";
+    EXPECT_EQ(m[3].str(), pins["GOLDEN_HOST"]) << path << ": OS";
   }
 }
 
