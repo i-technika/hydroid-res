@@ -13,7 +13,8 @@ Each input is written under one tag, which decides the formats aapt2 tries:
 and the file records the Res_value type and data aapt2 wrote, or "-" when it found no literal
 (a compile error, or a string under "any"). The C++ test Aapt2ValueTest checks hydroid's parsers
 against this file, so CI needs no Android SDK. Inputs are deterministic: hand-picked edge cases
-plus seeded random values.
+plus seeded random values, and @null and @empty under every tag, which the test reads with the
+values parser, as it does empty text.
 
 Usage: python scripts/golden/gen_aapt2_values.py [--any-host]
 Needs an Android SDK with build-tools BUILD_TOOLS (aapt2, aapt) and platform PLATFORM, on
@@ -121,6 +122,10 @@ DELIBERATE_REJECTS = {
     # 0x100000000 is past an integer, so aapt2 reads it as a hex float, 2^32.
     "any": ["-0x10", "0X10", "0x100000000", "-1e39dp"],
 }
+
+# What aapt2 makes of @null and @empty under every tag, which the values parser reads, not the
+# literal parsers (#36): @null a reference to 0, @empty TYPE_NULL with DATA_NULL_EMPTY.
+NULL_AND_EMPTY = ["@null", "@empty", " @null ", " @empty "]
 
 
 def long_numbers() -> list:
@@ -274,9 +279,12 @@ def inputs() -> list:
     pairs += [("integer", t) for t in ["0x10 ", " 0x10", " -0 "]]
     pairs += [("any", t) for t in any_inputs(rng, colors, integers, bools, floats)]
     pairs += [(tag, t) for tag, texts in DELIBERATE_REJECTS.items() for t in texts]
+    pairs += [(tag, t) for tag in TAGS for t in NULL_AND_EMPTY]
     for tag, text in pairs:
         # The values XML would change these before aapt2 parses them (quotes, escapes,
         # references, collapsed or trimmed whitespace), and the TSV cannot hold tabs.
+        if text in NULL_AND_EMPTY:
+            continue
         if re.search(r"[\"'\\@?\t\r\n]", text) or text.startswith(("@", "?")):
             sys.exit(f"bad input {text!r}")
     return list(dict.fromkeys(pairs))
