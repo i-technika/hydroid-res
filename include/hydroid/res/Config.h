@@ -105,7 +105,9 @@ HYDROID_RES_API std::string toString(const Config& config);
 
 // For logs and test failures: Config(en-rUS-v13), Config() for the default. Unlike toString, it
 // also writes what has no folder name, as <field>=<value>: Config(uiModeType=1-420dpi),
-// Config(orientation=9), Config(region=KR). Two Configs that differ never print the same (#50).
+// Config(orientation=9). A locale whose folder form would not read back as these very fields goes
+// field by field, every byte: Config(region=KR), Config(lang=sr-variant=Latn). Two Configs that
+// differ never print the same (#50).
 HYDROID_RES_API std::ostream& operator<<(std::ostream& os, const Config& config);
 
 }  // namespace hydroid::res

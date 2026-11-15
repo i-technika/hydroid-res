@@ -1,5 +1,6 @@
 #include "hydroid/res/Config.h"
 
+#include <optional>
 #include <ostream>
 #include <string>
 #include <string_view>
@@ -7,6 +8,7 @@
 
 #include "core/FieldCount.h"
 #include "core/QualifierNames.h"
+#include "hydroid/res/ConfigParser.h"
 
 namespace hydroid::res {
 namespace {
@@ -116,8 +118,9 @@ auto fields(const Config& c) {
                   c.navigation, c.screenWidth, c.screenHeight, c.sdkVersion, c.minorVersion);
 }
 
-// A field added to Config and not to fields() would be one operator== does not see (#52). toString
-// writes each field by hand too, and nothing checks that.
+// A field added to Config and not to fields() would be one operator== does not see (#52). write()
+// lists each field by hand too: Config.EveryFieldCountsForEquality fails on one that prints as the
+// default does.
 static_assert(std::tuple_size_v<decltype(fields(Config{}))> == detail::fieldCount<Config>(),
               "every field of Config must be in fields()");
 
@@ -165,10 +168,37 @@ std::string_view nameOf(E value, const std::string_view (&names)[N]) {
   return i < N ? names[i] : std::string_view();
 }
 
+// Every byte of a field up to its last that is not NUL, \xNN for those that are not printable.
+template <size_t N>
+std::string bytes(const std::array<char, N>& field) {
+  size_t n = N;
+  while (n > 0 && field[n - 1] == '\0') n--;
+  std::string out;
+  for (size_t i = 0; i < n; i++) {
+    const auto b = static_cast<unsigned char>(field[i]);
+    if (b > 0x20 && b < 0x7f) {
+      out += field[i];
+    } else {
+      static constexpr char kHex[] = "0123456789abcdef";
+      out += {'\\', 'x', kHex[b >> 4], kHex[b & 0xf]};
+    }
+  }
+  return out;
+}
+
+// Whether `locale`, as appendLocale wrote it, reads back as the locale fields of `c`. The b+ form
+// does not say which subtag is which, and a field may hold bytes after its first NUL, so one that
+// parseConfig would not have made may not.
+bool readsBack(const std::string& locale, const Config& c) {
+  const std::optional<Config> read = parseConfig(locale);
+  return read && read->lang == c.lang && read->region == c.region && read->script == c.script &&
+         read->variant == c.variant;
+}
+
 // ResTable_config::toString, which writes only what has a folder name. With `all`, also what has
 // none, as <field>=<value>: an enum value without a name (UiModeType::Normal, or one out of
-// range) and a region, script or variant without a language. Two Configs that differ then never
-// come out the same (#50).
+// range), and the locale field by field when its folder form would not read back as it, as for a
+// region without a language. Two Configs that differ then never come out the same (#50).
 std::string write(const Config& c, bool all) {
   std::string out;
   auto part = [&out](std::string_view s) {
@@ -188,11 +218,15 @@ std::string write(const Config& c, bool all) {
   if (c.mnc != 0) part("mnc" + std::to_string(c.mnc));
   std::string locale;
   appendLocale(locale, c);
-  part(locale);
-  if (all && c.lang[0] == '\0') {
-    if (c.region[0] != '\0') part("region=" + chars(c.region));
-    if (c.script[0] != '\0') part("script=" + chars(c.script));
-    if (c.variant[0] != '\0') part("variant=" + chars(c.variant));
+  const bool anyLocale = !bytes(c.lang).empty() || !bytes(c.region).empty() ||
+                         !bytes(c.script).empty() || !bytes(c.variant).empty();
+  if (all && anyLocale && !readsBack(locale, c)) {
+    if (const std::string b = bytes(c.lang); !b.empty()) part("lang=" + b);
+    if (const std::string b = bytes(c.region); !b.empty()) part("region=" + b);
+    if (const std::string b = bytes(c.script); !b.empty()) part("script=" + b);
+    if (const std::string b = bytes(c.variant); !b.empty()) part("variant=" + b);
+  } else {
+    part(locale);
   }
   named("grammaticalGender", c.grammaticalGender, names::kGrammaticalGender);
   named("layoutDir", c.layoutDir, names::kLayoutDir);
