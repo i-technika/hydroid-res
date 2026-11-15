@@ -72,7 +72,7 @@ All of it comes from one API level, `kEmulatedSdkVersion` in `include/hydroid/re
 (37): the emulator, the golden app's `compileSdk` and `targetSdk`, and the build-tools and
 platform the aapt2 scripts pin. `SdkBaseline` tests fail when one of them moves without the rest,
 or when the aapt2 files were not made with the build-tools, platform and OS (`GOLDEN_HOST`,
-Windows) that `scripts/golden/gen_aapt2_values.py` pins.
+Windows) that `scripts/golden/gen_aapt2_values.py` pins, or when this README names others.
 
 The dump needs an API 37.0 emulator or device, the Android SDK and JDK 17+ (Android Studio's
 bundled JDK works).

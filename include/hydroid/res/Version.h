@@ -13,11 +13,11 @@ HYDROID_RES_API const char* version();
 // on pinning the device sdkVersion). Every reference hydroid is checked against uses this level,
 // so that -vNN folders and anything else that depends on the SDK compare like for like: the
 // golden dump runs on an API 37.0 emulator and the golden app compiles and targets 37, the
-// aapt2 golden files come from build-tools 37.0.0 linking against platforms/android-37.0, and
-// the @android: framework resources, once bundled (#26), are to come from android-37.0 too
-// (golden/aosp lists the folders of android17-release). 37 is the newest level with all of
-// these, and 37.0 rather than 37.1 or 37.2 keeps a minor version out of the comparison. Raise
-// them all together (SdkBaseline tests).
+// aapt2 golden files come from the build-tools and platform that BUILD_TOOLS and PLATFORM in
+// scripts/golden/gen_aapt2_values.py pin, and the @android: framework resources, once bundled
+// (#26), are to come from that platform too (golden/aosp lists the folders of android17-release).
+// 37 is the newest level with all of these, and 37.0 rather than 37.1 or 37.2 keeps a minor
+// version out of the comparison. Raise them all together (SdkBaseline tests).
 inline constexpr int kEmulatedSdkVersion = 37;
 
 }  // namespace hydroid::res

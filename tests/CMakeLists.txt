@@ -25,7 +25,9 @@ target_compile_definitions(hydroid-res-tests PRIVATE
   HYDROID_GOLDEN_DIR="${PROJECT_SOURCE_DIR}/golden/data"
   HYDROID_PROJECT_VERSION="${PROJECT_VERSION}"
   HYDROID_PUBLIC_INCLUDE_DIRS="${public_include_dirs}"
-  HYDROID_TEST_RES_DIR="${PROJECT_SOURCE_DIR}/golden/app/src/main/res")
+  HYDROID_README="${PROJECT_SOURCE_DIR}/README.md"
+  HYDROID_TEST_RES_DIR="${PROJECT_SOURCE_DIR}/golden/app/src/main/res"
+  HYDROID_VERSION_HEADER="${PROJECT_SOURCE_DIR}/include/hydroid/res/Version.h")
 if(HYDROID_RES_REQUIRE_LOCALE_TESTS)
   target_compile_definitions(hydroid-res-tests PRIVATE HYDROID_REQUIRE_LOCALE_TESTS)
 endif()
