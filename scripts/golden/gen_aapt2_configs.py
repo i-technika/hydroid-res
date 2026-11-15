@@ -117,6 +117,8 @@ EDGE_CASES = [
     "hdpi-land", "land-port", "hdpi-hdpi", "v21-hdpi", "en-mcc310", "ldrtl-en", "night-car",
     "feminine-fr", "ldrtl-feminine", "-", "--", "hdpi-", "-hdpi", "hdpi--v21", "car-en",
     "fr-feminine", "fr-feminine-ldrtl", "en-neuter-v21",
+    # "normal" is a screen size, not the normal UI mode, which has no qualifier (#55).
+    "normal-car", "land-normal", "port-normal", "car-normal", "night-normal",
     # Everything at once.
     "mcc310-mnc260-en-rUS-feminine-ldrtl-sw600dp-w720dp-h480dp-large-long-round-widecg-highdr-"
     "land-car-night-xhdpi-finger-keysexposed-qwerty-navexposed-dpad-640x480-v26",
