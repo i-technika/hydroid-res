@@ -13,6 +13,7 @@
 #include <map>
 #include <optional>
 #include <set>
+#include <sstream>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -137,8 +138,8 @@ struct Element {
 };
 
 // What the values parser makes of `text` as the one resource of a values file under `tag`:
-// nullopt if the folder fails to load, and for a string under "any", which the golden file
-// records as no literal.
+// nullopt for a string under "any", which the golden file records as no literal. aapt2 compiles
+// every such file, so one that fails to load here is a failure, not "no literal".
 std::optional<Value> parseInValuesFile(const std::string& tag, const std::string& text) {
   static const std::map<std::string, Element> kElements = {
       {"color", {"<color", "</color>", ResType::Color}},
@@ -157,9 +158,18 @@ std::optional<Value> parseInValuesFile(const std::string& tag, const std::string
       << "</resources>\n";
   ResourceTable table;
   std::vector<Diagnostic> errors;
-  if (!table.addPackage(res, "com.probe", 0x7f, &errors)) return std::nullopt;
+  const std::string where = tag + " \"" + text + '"';
+  if (!table.addPackage(res, "com.probe", 0x7f, &errors)) {
+    std::ostringstream why;
+    for (const Diagnostic& d : errors) why << "\n  " << d;
+    ADD_FAILURE() << where << " fails to load:" << why.str();
+    return std::nullopt;
+  }
   const std::optional<ResId> id = table.find("com.probe", element.type, "v");
-  if (!id) return std::nullopt;
+  if (!id) {
+    ADD_FAILURE() << where << " loads, but makes no resource v";
+    return std::nullopt;
+  }
   const Value& v = table.entry(*id)->candidates.at(0).value;
   if (tag == "any" && v.kind() == ValueKind::String) return std::nullopt;
   return v;
@@ -249,7 +259,8 @@ TEST(Aapt2Value, CoversEveryTagAndOutcome) {
   std::map<std::string, std::set<int>> seen;  // tag -> types aapt2 wrote, -1 for none
   for (const Row& row : rows()) seen[row.tag].insert(row.aapt2 ? row.aapt2->first : -1);
   const std::map<std::string, std::set<int>> expected = {
-      // @null (a reference to 0) and @empty (TYPE_NULL) under every tag.
+      // TYPE_NULL is @empty's; a reference @null's, and an empty element's but in fraction and
+      // any, so EveryTagHasNullAndEmpty checks those rows by name.
       {"color", {-1, kTypeNull, kTypeReference, 0x1c, 0x1d, 0x1e, 0x1f}},
       {"bool", {-1, kTypeNull, kTypeReference, kTypeIntBoolean}},
       {"integer", {-1, kTypeNull, kTypeReference, kTypeIntDec, kTypeIntHex}},
@@ -260,6 +271,18 @@ TEST(Aapt2Value, CoversEveryTagAndOutcome) {
         kTypeIntHex, kTypeIntBoolean, 0x1c, 0x1d, 0x1e, 0x1f}},
   };
   EXPECT_EQ(seen, expected);
+}
+
+// @null and @empty, bare and with spaces around them, are in the golden file under every tag
+// (#36), so that ParsesLikeAapt2 reads each with the values parser.
+TEST(Aapt2Value, EveryTagHasNullAndEmpty) {
+  std::set<std::pair<std::string, std::string>> present;
+  for (const Row& row : rows()) present.insert({row.tag, row.text});
+  for (const char* tag : {"color", "bool", "integer", "dimen", "fraction", "any"}) {
+    for (const char* text : {"@null", "@empty", " @null ", " @empty "}) {
+      EXPECT_TRUE(present.count({tag, text})) << tag << " \"" << text << "\" is not in the file";
+    }
+  }
 }
 
 }  // namespace
