@@ -23,6 +23,7 @@ target_compile_definitions(hydroid-res-tests PRIVATE
   HYDROID_AOSP_RES_DIRS="${PROJECT_SOURCE_DIR}/golden/aosp/framework_res_dirs.txt"
   HYDROID_GOLDEN_APP_GRADLE="${PROJECT_SOURCE_DIR}/golden/app/build.gradle.kts"
   HYDROID_GOLDEN_DIR="${PROJECT_SOURCE_DIR}/golden/data"
+  HYDROID_NUMERIC_QUALIFIERS="${PROJECT_SOURCE_DIR}/scripts/golden/numeric_qualifiers.tsv"
   HYDROID_PROJECT_VERSION="${PROJECT_VERSION}"
   HYDROID_PUBLIC_INCLUDE_DIRS="${public_include_dirs}"
   HYDROID_README="${PROJECT_SOURCE_DIR}/README.md"

@@ -114,25 +114,38 @@ std::string describe(const std::optional<ResValue>& v) {
   return buf;
 }
 
-// Text aapt2 takes and hydroid rejects on purpose; see the top of ValueParser.h. Every one must
-// still be accepted by aapt2 and rejected by hydroid, so the list cannot go stale.
+// Text aapt2 takes and hydroid rejects on purpose, and the Res_value aapt2 writes for each; see the
+// top of ValueParser.h. Every one must still be in the golden file as aapt2 wrote it then, and
+// rejected by hydroid, so the list cannot go stale. SdkBaseline takes any build-tools of the
+// level, so a golden made with another that writes one of these otherwise fails here too (#61).
 // clang-format off
-const std::set<std::pair<std::string, std::string>> kDeliberateRejects = {
+const std::map<std::pair<std::string, std::string>, std::string> kDeliberateRejects = {
     // Infinity and NaN through strtof.
-    {"dimen", "-inf"}, {"dimen", "+inf"}, {"dimen", "-nan"}, {"dimen", "+nan"},
-    {"dimen", "-infinity"}, {"dimen", "+Infinity"}, {"dimen", "-INF"}, {"dimen", "-NaN"},
-    {"dimen", "-nan(1)"}, {"dimen", "-infdp"}, {"dimen", "+nan%"}, {"fraction", "-inf"},
+    {{"dimen", "-inf"}, "t=0x04 d=0xff800000"}, {{"dimen", "+inf"}, "t=0x04 d=0x7f800000"},
+    {{"dimen", "-nan"}, "t=0x04 d=0xffc00000"}, {{"dimen", "+nan"}, "t=0x04 d=0x7fc00000"},
+    {{"dimen", "-infinity"}, "t=0x04 d=0xff800000"},
+    {{"dimen", "+Infinity"}, "t=0x04 d=0x7f800000"}, {{"dimen", "-INF"}, "t=0x04 d=0xff800000"},
+    {{"dimen", "-NaN"}, "t=0x04 d=0xffc00000"},
+    {{"dimen", "-nan(1)"}, "t=0x04 d=0xff800001"}, {{"dimen", "-infdp"}, "t=0x05 d=0x00000001"},
+    {{"dimen", "+nan%"}, "t=0x06 d=0x00000000"}, {{"fraction", "-inf"}, "t=0x04 d=0xff800000"},
     // Hex floats.
-    {"dimen", "0x10"}, {"dimen", "0X10"}, {"dimen", "0x10px"}, {"dimen", "-0x10px"},
-    {"dimen", "0x1p4"}, {"dimen", "0x1.8p1dp"}, {"dimen", "0x.8"}, {"fraction", "0x10%"},
-    {"any", "-0x10"}, {"any", "0X10"}, {"any", "0x100000000"},
+    {{"dimen", "0x10"}, "t=0x04 d=0x41800000"}, {{"dimen", "0X10"}, "t=0x04 d=0x41800000"},
+    {{"dimen", "0x10px"}, "t=0x05 d=0x00001000"}, {{"dimen", "-0x10px"}, "t=0x05 d=0xfffff000"},
+    {{"dimen", "0x1p4"}, "t=0x04 d=0x41800000"}, {{"dimen", "0x1.8p1dp"}, "t=0x05 d=0x00000301"},
+    {{"dimen", "0x.8"}, "t=0x04 d=0x3f000000"}, {{"fraction", "0x10%"}, "t=0x06 d=0x147ae130"},
+    {{"any", "-0x10"}, "t=0x04 d=0xc1800000"}, {{"any", "0X10"}, "t=0x04 d=0x41800000"},
+    {{"any", "0x100000000"}, "t=0x04 d=0x4f800000"},
     // Past FLT_MAX.
-    {"dimen", "1e39"}, {"dimen", "-1e39"}, {"dimen", "1e400"}, {"dimen", "3.4028236e38"},
-    {"dimen", "3.4028235677973367e38"},
-    {"dimen", "1e39dp"}, {"dimen", "-1e39dp"}, {"dimen", "1e39%"}, {"fraction", "1e39%"},
-    {"fraction", "-1e39%"}, {"any", "-1e39dp"},
+    {{"dimen", "1e39"}, "t=0x04 d=0x7f800000"}, {{"dimen", "-1e39"}, "t=0x04 d=0xff800000"},
+    {{"dimen", "1e400"}, "t=0x04 d=0x7f800000"}, {{"dimen", "3.4028236e38"}, "t=0x04 d=0x7f800000"},
+    {{"dimen", "3.4028235677973367e38"}, "t=0x04 d=0x7f800000"},
+    {{"dimen", "1e39dp"}, "t=0x05 d=0x00000001"}, {{"dimen", "-1e39dp"}, "t=0x05 d=0x00000001"},
+    {{"dimen", "1e39%"}, "t=0x06 d=0x00000000"}, {{"fraction", "1e39%"}, "t=0x06 d=0x00000000"},
+    {{"fraction", "-1e39%"}, "t=0x06 d=0x00000000"}, {{"any", "-1e39dp"}, "t=0x05 d=0x00000001"},
     // Dimensions of 2^41 and up, undefined in aapt2.
-    {"dimen", "3e12dp"}, {"dimen", "-3e12dp"}, {"dimen", "2199023255552dp"}, {"dimen", "1e20px"},
+    {{"dimen", "3e12dp"}, "t=0x05 d=0x00000001"}, {{"dimen", "-3e12dp"}, "t=0x05 d=0x00000001"},
+    {{"dimen", "2199023255552dp"}, "t=0x05 d=0x00000001"},
+    {{"dimen", "1e20px"}, "t=0x05 d=0x00000000"},
 };
 // clang-format on
 
@@ -154,16 +167,19 @@ TEST(Aapt2Value, ParsesLikeAapt2) {
       EXPECT_FALSE(hydroid) << where;
       continue;
     }
-    if (row.aapt2 && !hydroid && kDeliberateRejects.count({row.tag, row.text})) {
+    const auto listed = kDeliberateRejects.find({row.tag, row.text});
+    if (row.aapt2 && !hydroid && listed != kDeliberateRejects.end()) {
       deliberate.insert({row.tag, row.text});
+      EXPECT_EQ(describe(row.aapt2), listed->second) << where << ": aapt2 writes another now";
       continue;
     }
     EXPECT_EQ(describe(hydroid), describe(row.aapt2)) << where;
   }
   // Each listed text is in the golden file, aapt2 took it, and hydroid did not.
   for (const auto& entry : kDeliberateRejects) {
-    EXPECT_TRUE(deliberate.count(entry))
-        << entry.first << " \"" << entry.second << "\" is no longer a deliberate rejection";
+    const auto& [tag, text] = entry.first;
+    EXPECT_TRUE(deliberate.count(entry.first))
+        << tag << " \"" << text << "\" is no longer a deliberate rejection";
   }
 }
 

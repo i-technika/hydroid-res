@@ -119,11 +119,9 @@ TEST(ParseConfig, ScreenDp) {
   EXPECT_EQ(canonical("sw65535dp"), "sw65535dp-v13");
   // aapt2 wraps 65536 to 0 and 65537 to 1, so it takes sw65537dp as sw1dp. Past 0x7fffffff,
   // 37.0.0 on Windows stops there first: w99999999999dp is w65535dp. hydroid rejects them (see
-  // ConfigParser.h, also for Linux and macOS).
-  for (const char* s :
-       {"sw65536dp", "sw65537dp", "sw2147483647dp", "sw2147483648dp", "sw4294967296dp",
-        "sw99999999999dp", "w65536dp", "w65537dp", "w2147483648dp", "w99999999999dp", "h65536dp",
-        "h65537dp", "h2147483648dp", "h99999999999dp"}) {
+  // ConfigParser.h, also for Linux and macOS). Aapt2Config.NumbersPast16Bits has the rest, every
+  // number of scripts/golden/numeric_qualifiers.tsv.
+  for (const char* s : {"sw65536dp", "sw65537dp", "sw2147483648dp", "w99999999999dp", "h65537dp"}) {
     EXPECT_EQ(canonical(s), "rejected") << s;
   }
   for (const char* s : {"sw600", "sw600px", "sw-600dp", "SW600DPX", "swdp"}) {
@@ -177,8 +175,9 @@ TEST(ParseConfig, Density) {
     EXPECT_EQ(canonical(s), "rejected") << s;
   }
   // aapt2 wraps 65536 to 0 and 65537 to 1dpi. Past 0x7fffffff, 37.0.0 on Windows stops there
-  // first: 2147483648dpi is 65535dpi, nodpi. hydroid rejects them (see ConfigParser.h).
-  for (const char* s : {"65536dpi", "65537dpi", "2147483648dpi", "99999999999dpi"}) {
+  // first: 2147483648dpi is 65535dpi, nodpi. hydroid rejects them (see ConfigParser.h), and the
+  // rest of numeric_qualifiers.tsv (Aapt2Config.NumbersPast16Bits).
+  for (const char* s : {"65536dpi", "65537dpi", "2147483648dpi"}) {
     EXPECT_EQ(canonical(s), "rejected") << s;
   }
 }
@@ -195,9 +194,9 @@ TEST(ParseConfig, ScreenPixels) {
   EXPECT_EQ(canonical("65535x1"), "65535x1");
   // aapt2 wraps 65536 to 0, so it takes 65536x0 as the default and 1x65536 as 1x0, and 65537x1
   // as 1x1. Past 0x7fffffff, 37.0.0 on Windows stops there first: 99999999999x1 is 65535x1.
-  // hydroid rejects them (see ConfigParser.h).
-  for (const char* s :
-       {"65536x0", "65536x", "131072x0", "1x65536", "65537x1", "2147483648x1", "99999999999x1"}) {
+  // hydroid rejects them (see ConfigParser.h), and the rest of numeric_qualifiers.tsv
+  // (Aapt2Config.NumbersPast16Bits).
+  for (const char* s : {"65536x0", "65536x", "131072x0", "1x65536", "65537x1", "99999999999x1"}) {
     EXPECT_EQ(canonical(s), "rejected") << s;
   }
 }

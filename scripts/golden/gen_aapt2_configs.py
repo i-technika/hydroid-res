@@ -9,9 +9,9 @@ compile error ("invalid configuration", or a minor version before v36), or a lin
 some locales compile takes.
 
 The inputs are every directory of AOSP's framework res/ (golden/aosp/framework_res_dirs.txt) and
-of the golden app, hand-picked edge cases for each qualifier, and seeded random combinations,
-in order and out of it. The C++ test Aapt2ConfigTest checks hydroid's parser against this file,
-so CI needs no Android SDK.
+of the golden app, hand-picked edge cases for each qualifier, every numeric qualifier with every
+number of numeric_qualifiers.tsv, and seeded random combinations, in order and out of it. The
+C++ test Aapt2ConfigTest checks hydroid's parser against this file, so CI needs no Android SDK.
 
 Usage: python scripts/golden/gen_aapt2_configs.py [--any-host]
 Needs an Android SDK with the build-tools (aapt2) and platform gen_aapt2_values.py pins, on its
@@ -34,6 +34,18 @@ ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / "golden" / "aapt2" / "configs.tsv"
 AOSP_DIRS = ROOT / "golden" / "aosp" / "framework_res_dirs.txt"
 APP_RES = ROOT / "golden" / "app" / "src" / "main" / "res"
+NUMERIC = Path(__file__).with_name("numeric_qualifiers.tsv")
+
+
+def numeric_edges() -> list:
+    """Each template of numeric_qualifiers.tsv with each of its values, which Aapt2ConfigTest
+    reads too."""
+    table = {}
+    for line in NUMERIC.read_text(encoding="utf-8").splitlines():
+        if line and not line.startswith("#"):
+            key, *cells = line.split("\t")
+            table[key] = cells
+    return [t.replace("{}", v) for t in table["templates"] for v in table["values"]]
 
 # Each qualifier in aapt2's order, with values it takes and some it does not.
 QUALIFIERS = [
@@ -73,17 +85,13 @@ EDGE_CASES = [
     "any", "any-any", "any-any-any", "any-any-any-any", "en-any", "any-hdpi", "land-any",
     "any-en", "feminine-any", "en-any-any", "mcc310-any", "any-mnc260",
     "-".join(["any"] * 23), "-".join(["any"] * 24), "-".join(["any"] * 22) + "-v21",
-    # Numbers: how many digits, zero, and past 16 bits.
+    # Numbers: how many digits, zero, and past 16 bits, which numeric_qualifiers.tsv has.
     "mcc000", "mcc31", "mcc3100", "mcc", "mccabc", "mnc", "mnc1000", "mnc01x",
-    "sw1dp", "sw65536dp", "sw65537dp", "sw2147483647dp", "sw2147483648dp", "sw4294967296dp",
-    "sw99999999999dp", "swdp", "sw600", "sw600px", "sw-600dp", "sw600dpx",
-    "w65536dp", "w65537dp", "w2147483648dp", "w99999999999dp", "wdp", "h65536dp", "h65537dp",
-    "h2147483648dp", "h99999999999dp", "hdp", "0dpi", "65534dpi", "65535dpi", "65536dpi",
-    "65537dpi", "2147483648dpi", "99999999999dpi", "dpi", "xxxxhdpi", "120dpi", "160dpi",
-    "640dpi", "-1dpi",
-    "480x640", "x480", "65536x1", "65536x0", "65536x", "131072x0", "131072x5", "1x65536",
-    "65537x1", "2147483648x1", "99999999999x1", "1x99999999999", "1x0", "640x480x2", "640+480",
-    "v", "v-1", "v65536", "v99999999999", "v021", "21",
+    *numeric_edges(),
+    "sw1dp", "swdp", "sw600", "sw600px", "sw-600dp", "sw600dpx", "wdp", "hdp",
+    "0dpi", "65534dpi", "dpi", "xxxxhdpi", "120dpi", "160dpi", "640dpi", "-1dpi",
+    "480x640", "x480", "65536x0", "65536x", "131072x0", "131072x5", "1x0", "640x480x2",
+    "640+480", "v", "v-1", "v021", "21",
     # Minor versions, which aapt2 takes from v36 on.
     "v21.1", "v35.1", "v36.0", "v36.1", "v36.01", "v37.2", "v36.-hdpi", "v.1", "v36.1.1",
     "v36.65535", "v36.65536", "v36.x", "v36-1", "hdpi-v36.1", "anydpi-v36.2", "watch-v36.1",
