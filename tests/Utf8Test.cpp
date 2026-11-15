@@ -1,16 +1,18 @@
 // Utf8Reader, which the values parser reads strings with: every valid sequence reads as its code
-// point, and everything else marks the text invalid (#79). expat rejects such a file first, so the
-// table tests never reach the reader with it.
+// point, and everything else marks the text invalid, which fails the string (#79). expat rejects
+// such a file first, so the table tests never reach the reader with it.
 
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <optional>
 #include <sstream>
 #include <string>
 #include <string_view>
 #include <vector>
 
 #include "core/Utf8.h"
+#include "core/ValuesParser.h"
 
 namespace hydroid::res::detail {
 namespace {
@@ -83,6 +85,25 @@ TEST(Utf8Reader, InvalidByteReadsAsItself) {
             (std::vector<uint32_t>{'a', 0xc0, 0xa0, 'b'}));
   EXPECT_TRUE(invalid);
 }
+
+// A shared hydroid-res exports no detail:: function to link against.
+#ifndef HYDROID_RES_SHARED
+TEST(BuildString, RejectsWhatIsNotUtf8) {
+  // The issue's kinds: a lead byte 0xf8-0xff, C0 and F5-F7, overlong, a surrogate, past U+10FFFF.
+  for (const std::string bytes : {"\xf8\x80\x80", "\xc0\xa0", "\xf5\x80\x80\x80", "\xe0\x80\xa0",
+                                  "\xed\xa0\x80", "\xf4\x90\x80\x80"}) {
+    std::string error;
+    EXPECT_EQ(buildString("a" + bytes + "b", &error), std::nullopt);
+    EXPECT_EQ(error, "invalid unicode code point in string");
+  }
+  std::string error;
+  EXPECT_EQ(buildString("a\xf0\x9f\x98\x80"
+                        "b",
+                        &error),
+            "a\xf0\x9f\x98\x80"
+            "b");
+}
+#endif
 
 }  // namespace
 }  // namespace hydroid::res::detail
