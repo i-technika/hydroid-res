@@ -59,6 +59,11 @@ With GCC or Clang, the `sanitize` preset does the same under AddressSanitizer an
 UndefinedBehaviorSanitizer, and stops at the first error; CI runs it with Clang on Linux. It is
 not offered on Windows, where MSVC would ignore its flags.
 
+With an Android NDK and Python at hand, `ctest` also runs `AConfiguration.MatchesNdk`, which
+checks the values of `Config.h` against the NDK's `android/configuration.h`. It finds the NDK in
+`HYDROID_RES_ANDROID_NDK`, `ANDROID_NDK_HOME`, `ANDROID_NDK_ROOT` or the SDK's `ndk/`, and
+configure says which it took; without one, the test is left out.
+
 The C++ sources follow `.clang-format`, as clang-format 23.1.5 applies it (`pipx install
 clang-format==23.1.5`); CI fails on any other formatting. To reformat:
 

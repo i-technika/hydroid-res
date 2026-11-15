@@ -11,9 +11,12 @@ namespace hydroid::res {
 namespace {
 
 // Every value of the Config enums, and the density constants and kMncZero, is the one Android's
-// AConfiguration gives it (#53), so an adapter or a binary table can copy them. The numbers and
-// names are those of the NDK's android/configuration.h, r28c (28.2.13676358): the comment after
-// each is the constant's name after ACONFIGURATION_.
+// AConfiguration gives it (#53), so an adapter or a binary table can copy them. The comment after
+// each is the constant's name after ACONFIGURATION_, in the NDK's
+// toolchains/llvm/prebuilt/<host>/sysroot/usr/include/android/configuration.h (r28c,
+// 28.2.13676358). The compiler checks Config.h against the numbers here; with an NDK at hand,
+// AConfiguration.MatchesNdk (scripts/check_aconfiguration.py) checks the numbers against the NDK,
+// and that a value added to Config.h has an assert here too. Without one, nothing does.
 template <typename E>
 constexpr int value(E e) {
   return static_cast<int>(e);
