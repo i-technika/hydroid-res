@@ -312,6 +312,9 @@ CASES = {
                                 "<style name='S'><item name='a'>x|y</item></style>"
                                 "<style name='T'><item name='a'>   </item></style>"
                                 "<style name='U'><item name='a'>y | x | y</item></style>"),
+    # The whitespace TryParseFlagSymbol trims around each name is isspace's, not only spaces.
+    "style-flags-whitespace": values("<attr name='a'><flag name='x' value='1'/><flag name='y' value='0x6'/></attr>"
+                                     "<style name='S'><item name='a'>y&#9;|&#10;x&#13;|&#9;y</item></style>"),
     "style-string-attr": values("<attr name='a' format='string'/>"
                                 "<style name='S'><item name='a'>  a  \\'b\\'  </item></style>"
                                 "<style name='T'><item name='a'>it's</item></style>"
