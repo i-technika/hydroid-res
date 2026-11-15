@@ -11,7 +11,7 @@ namespace hydroid::res {
 
 // The qualifiers of one resource folder, or the state of the device. Every qualifier takes the
 // values of Android's AConfiguration (and ResTable_config), and 0 is "any": not given in a folder
-// name, or not known on a device.
+// name, or not known on a device. A value added here needs its static_assert in Config.cpp.
 //
 // parseConfig (ConfigParser.h) makes one from a folder name, and toString prints it back as aapt2
 // does. Matching a resource's Config against the device's is step 5.

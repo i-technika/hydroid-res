@@ -79,3 +79,44 @@ add_test(NAME CMake.DependenciesFollowOption
     -DUSE_SYSTEM_DEPS=${HYDROID_RES_USE_SYSTEM_DEPS}
     "-DDEPENDENCIES=${dependency_sources}"
     -P ${CMAKE_CURRENT_SOURCE_DIR}/CheckDependencySource.cmake)
+
+# Config.cpp's numbers are the NDK's AConfiguration, and every value of Config.h has one (#53).
+# It needs an NDK: HYDROID_RES_ANDROID_NDK, which must hold one, else ANDROID_NDK_HOME,
+# ANDROID_NDK_ROOT or the newest under the SDK's ndk/. Without one, or without Python, the test is
+# left out, or configure fails with HYDROID_RES_REQUIRE_NDK_TESTS.
+set(HYDROID_RES_ANDROID_NDK "" CACHE PATH "An Android NDK for AConfiguration.MatchesNdk")
+set(ndk_candidates "$ENV{ANDROID_NDK_HOME}" "$ENV{ANDROID_NDK_ROOT}")
+foreach(sdk IN ITEMS "$ENV{ANDROID_HOME}" "$ENV{ANDROID_SDK_ROOT}" "$ENV{LOCALAPPDATA}/Android/Sdk")
+  file(GLOB sdk_ndks LIST_DIRECTORIES true "${sdk}/ndk/*")
+  list(SORT sdk_ndks COMPARE NATURAL ORDER DESCENDING)
+  list(APPEND ndk_candidates ${sdk_ndks})
+endforeach()
+set(ndk_header "toolchains/llvm/prebuilt/*/sysroot/usr/include/android/configuration.h")
+if(HYDROID_RES_ANDROID_NDK)
+  file(GLOB found "${HYDROID_RES_ANDROID_NDK}/${ndk_header}")
+  if(NOT found)
+    message(FATAL_ERROR "HYDROID_RES_ANDROID_NDK has no android/configuration.h: "
+      "${HYDROID_RES_ANDROID_NDK}")
+  endif()
+endif()
+set(ndk_configuration_h "")
+foreach(ndk IN LISTS HYDROID_RES_ANDROID_NDK ndk_candidates)
+  file(GLOB found "${ndk}/${ndk_header}")
+  if(ndk AND found)
+    list(GET found 0 ndk_configuration_h)
+    break()
+  endif()
+endforeach()
+find_package(Python3 COMPONENTS Interpreter)
+if(ndk_configuration_h AND Python3_Interpreter_FOUND)
+  message(STATUS "AConfiguration.MatchesNdk: ${ndk_configuration_h}")
+  add_test(NAME AConfiguration.MatchesNdk
+    COMMAND Python3::Interpreter ${PROJECT_SOURCE_DIR}/scripts/check_aconfiguration.py
+      ${ndk_configuration_h} ${PROJECT_SOURCE_DIR}/include/hydroid/res/Config.h
+      ${PROJECT_SOURCE_DIR}/src/core/Config.cpp)
+elseif(HYDROID_RES_REQUIRE_NDK_TESTS)
+  message(FATAL_ERROR "AConfiguration.MatchesNdk needs an NDK and Python "
+    "(HYDROID_RES_REQUIRE_NDK_TESTS is ON); set HYDROID_RES_ANDROID_NDK")
+else()
+  message(STATUS "AConfiguration.MatchesNdk: no NDK or no Python, left out")
+endif()
