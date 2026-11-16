@@ -386,6 +386,31 @@ TEST(ResourceTable, RejectsWhatIsNotUtf8) {
   }
 }
 
+// An attr named in a style item or a declare-styleable keeps a leading * unless a package follows
+// it, and is its whole text when nothing follows the ':', as ParseXmlAttributeName names it: the
+// error names what aapt2 looks for (#84). The golden cases see only that each one fails.
+TEST(ResourceTable, AttrNameIsParseXmlAttributeNames) {
+  const std::vector<std::pair<std::string, std::string>> cases = {
+      {"<attr name='n' format='integer'/><style name='S'><item name='*n'>3</item></style>",
+       "attr/*n not found"},
+      {"<attr name='n' format='integer'/><style name='S'><item "
+       "name='com.example:'>3</item></style>",
+       "attr/com.example: not found"},
+      {"<declare-styleable name='S'><attr name='*a' format='color'/></declare-styleable>",
+       "invalid entry name '*a'"},
+  };
+  for (const auto& [body, expected] : cases) {
+    TempDir dir;
+    ResourceTable table;
+    std::vector<Diagnostic> errors;
+    EXPECT_FALSE(load(table, dir, {{"values/v.xml", "<resources>" + body + "</resources>"}},
+                      "com.example", 0x7f, &errors))
+        << body;
+    ASSERT_EQ(errors.size(), 1u) << body << errorsOf(errors);
+    EXPECT_NE(errors[0].message.find(expected), std::string::npos) << errors[0];
+  }
+}
+
 // The dump writes numbers as printf does in the C locale, whatever the host app set.
 TEST(TableDump, NumbersIgnoreTheLocale) {
   TempDir dir;
