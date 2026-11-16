@@ -50,18 +50,28 @@ int dump(const fs::path& res, const std::string& package) {
 // Takes the arguments as paths, so that the folder reaches addPackage whole and the package as
 // UTF-8: on Windows, the narrow argv of main holds them in the ANSI code page, which writes ? for
 // a character it lacks, so wmain takes them in UTF-16 instead (#87). UTF-16 that is not Unicode
-// text, as a lone surrogate is, has no UTF-8: u8string() throws, and that is an error, not an
-// abort.
+// text, as a lone surrogate is, has no UTF-8: u8string() throws, for the package here and for a
+// name of or in the folder in the library (#111), and that is an error, not an abort.
 int run(const std::vector<fs::path>& args) {
   if (args.size() == 2 && args[1] == "--version") {
     std::printf("hydroid-rc %s\n", hydroid::res::version());
     return 0;
   }
   if ((args.size() == 3 || args.size() == 4) && args[1] == "dump") {
+    std::string package = "com.example";
+    if (args.size() == 4) {
+      try {
+        package = utf8(args[3]);
+      } catch (const std::system_error&) {
+        std::cerr << "error: the package name is not Unicode text\n";
+        return 1;
+      }
+    }
     try {
-      return dump(args[2], args.size() == 4 ? utf8(args[3]) : "com.example");
+      return dump(args[2], package);
     } catch (const std::system_error& e) {
-      std::cerr << "error: an argument is not Unicode text (" << e.what() << ")\n";
+      // Not the folder's path, which may be what has no UTF-8.
+      std::cerr << "error: cannot read the res folder: " << e.what() << '\n';
       return 1;
     }
   }
