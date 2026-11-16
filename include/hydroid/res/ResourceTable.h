@@ -192,8 +192,9 @@ struct Diagnostic {
   std::string message;
 };
 
-// "file:line: message", the file in UTF-8. A Windows path that is not Unicode text (a lone
-// surrogate) has no UTF-8, and is written with U+FFFD for what it lacks rather than throwing.
+// "file:line: message", the file in UTF-8 on Windows and as its bytes elsewhere. A Windows path
+// that is not Unicode text (a lone surrogate) has no UTF-8, and is written with U+FFFD for what it
+// lacks rather than throwing.
 HYDROID_RES_API std::ostream& operator<<(std::ostream& os, const Diagnostic& d);
 
 class ResourceTable {
@@ -202,8 +203,8 @@ class ResourceTable {
   // here, which its references may name by their package name, as aapt2 link takes them with -I.
   // On failure the table is left as it was, and the problems are added to `errors` if it is not
   // null. Pointers into the table do not survive a call that adds a package. A name in the folder
-  // that is not Unicode text is read as aapt2 reads it: such a folder has nothing in it, and such
-  // a file is an error, "file not found".
+  // that is not Unicode text (on Windows) is read as aapt2 reads it: a folder of res/ so named has
+  // nothing in it, and a file or folder so named in a type folder is an error, "file not found".
   HYDROID_RES_API bool addPackage(const std::filesystem::path& res, std::string_view name,
                                   uint8_t id, std::vector<Diagnostic>* errors = nullptr);
 

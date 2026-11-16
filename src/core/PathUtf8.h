@@ -6,7 +6,7 @@
 
 // The UTF-8 of a path, which never throws. On Windows a path is UTF-16, which may hold what is not
 // Unicode text, a lone surrogate, and u8string() throws on it (#111). Elsewhere a path is bytes,
-// which u8string() gives as they are.
+// taken to be UTF-8 as aapt2 takes them there, and given as they are, UTF-8 or not.
 
 namespace hydroid::res::detail {
 
@@ -28,7 +28,8 @@ void forEachCodePoint(const std::wstring& w, F f) {
 }
 #endif
 
-// Whether `p` is Unicode text, and so has a UTF-8 that names it.
+// Whether `p` is Unicode text, and so has a UTF-8 that names it: on Windows, whether it has no
+// lone surrogate; elsewhere always, as its bytes are what names it.
 inline bool isUnicode(const std::filesystem::path& p) {
 #ifdef _WIN32
   bool unicode = true;
@@ -40,7 +41,8 @@ inline bool isUnicode(const std::filesystem::path& p) {
 #endif
 }
 
-// The UTF-8 of `p`, with U+FFFD for a lone surrogate, which has none.
+// The UTF-8 of `p`, with U+FFFD for a lone surrogate, which has none; elsewhere than Windows, its
+// bytes.
 inline std::string utf8(const std::filesystem::path& p) {
 #ifdef _WIN32
   std::string out;

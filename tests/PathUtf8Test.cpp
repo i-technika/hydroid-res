@@ -81,6 +81,32 @@ TEST(PathUtf8, FolderNotUnicodeHasNothingInIt) {
   EXPECT_FALSE(table.find("com.example:string/t"));
 }
 
+// In a type folder, aapt2 does not find a folder so named either, though it skips one with a
+// Unicode name: raw/sub<U+D800>/x.txt, values/sub<U+D800>/ and an empty raw/e<U+D800>/ each fail.
+TEST(PathUtf8, FolderNotUnicodeInATypeFolderIsNotFound) {
+  for (const fs::path& sub :
+       {fs::path("raw") / L"sub\xd800" / "x.txt", fs::path("values") / L"sub\xd800" / "v.xml",
+        fs::path("raw") / L"e\xd800"}) {
+    test::TempDir dir;
+    const fs::path res = dir.path() / "res";
+    if (sub.has_extension()) {
+      write(res / sub, "<resources/>");
+    } else {
+      fs::create_directories(res / sub);
+    }
+    ResourceTable table;
+    std::vector<Diagnostic> errors;
+    EXPECT_FALSE(table.addPackage(res, "com.example", kAppPackageId, &errors)) << detail::utf8(sub);
+    ASSERT_EQ(errors.size(), 1u) << detail::utf8(sub);
+    EXPECT_EQ(errors[0].message, "file not found");
+  }
+  // A Unicode name, as file-in-subfolder of the golden cases.
+  test::TempDir dir;
+  write(dir.path() / "res" / "raw" / "sub" / "x.txt", "x");
+  ResourceTable table;
+  EXPECT_TRUE(table.addPackage(dir.path() / "res", "com.example", kAppPackageId));
+}
+
 TEST(PathUtf8, ResFolderNotUnicodeIsWrittenWithReplacement) {
   test::TempDir dir;
   ResourceTable table;

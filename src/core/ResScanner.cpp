@@ -21,9 +21,12 @@ namespace {
 
 namespace fs = std::filesystem;
 
-// The entries of `dir` that are not hidden and are of the kind asked, by UTF-8 name. aapt2 opens
-// each by its name in UTF-8, so one whose name is not Unicode text (a lone surrogate of Windows)
-// it does not find: a folder so named has nothing in it, and a file so named is not found (#111).
+// The entries of `dir` that are not hidden and are of the kind asked, by UTF-8 name. On Windows,
+// aapt2 lists names in the ANSI code page and opens each by that name read as UTF-8, so it does
+// not find one whose name is not Unicode text, a lone surrogate (#111): a folder of res/ so named
+// has nothing in it, and anything so named in a type folder, a folder too, is not found. (It
+// does not find a name past the ANSI code page either, é.txt as e.txt, which hydroid reads, as
+// aapt2 does on other systems.)
 std::vector<std::pair<std::string, fs::path>> list(const fs::path& dir, bool directories,
                                                    Diagnostics& diag) {
   std::vector<std::pair<std::string, fs::path>> out;
@@ -31,11 +34,11 @@ std::vector<std::pair<std::string, fs::path>> list(const fs::path& dir, bool dir
   for (const fs::directory_entry& e : fs::directory_iterator(dir, ec)) {
     std::string name = utf8(e.path().filename());
     if (name.empty() || name[0] == '.') continue;  // file::IsHidden
-    if (directories ? !e.is_directory(ec) : !e.is_regular_file(ec)) continue;
     if (!isUnicode(e.path().filename())) {
       if (!directories) diag.error({e.path(), 0}, "file not found");
       continue;
     }
+    if (directories ? !e.is_directory(ec) : !e.is_regular_file(ec)) continue;
     out.emplace_back(std::move(name), e.path());
   }
   std::sort(out.begin(), out.end());

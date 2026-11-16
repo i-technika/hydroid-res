@@ -4,7 +4,6 @@
 #include <cstdio>
 #include <filesystem>
 #include <iostream>
-#include <sstream>
 #include <string>
 #include <system_error>
 #include <vector>
@@ -35,12 +34,7 @@ int dump(const fs::path& res, const std::string& package) {
   hydroid::res::ResourceTable table;
   std::vector<hydroid::res::Diagnostic> errors;
   if (!table.addPackage(res, package, hydroid::res::kAppPackageId, &errors)) {
-    for (const hydroid::res::Diagnostic& e : errors) {
-      // Whole lines, so that a path with no UTF-8 for it fails before any of its line is out.
-      std::ostringstream line;
-      line << "error: " << e << '\n';
-      std::cerr << line.str();
-    }
+    for (const hydroid::res::Diagnostic& e : errors) std::cerr << "error: " << e << '\n';
     return 1;
   }
   hydroid::res::dump(std::cout, table);
@@ -70,7 +64,7 @@ int run(const std::vector<fs::path>& args) {
     try {
       return dump(args[2], package);
     } catch (const std::system_error& e) {
-      // Not the folder's path, which may be what has no UTF-8.
+      // A folder that fails to read as it is walked, which the library throws on still (#85).
       std::cerr << "error: cannot read the res folder: " << e.what() << '\n';
       return 1;
     }
