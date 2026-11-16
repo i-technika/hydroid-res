@@ -791,14 +791,17 @@ class Parser {
     return ResName{std::string(package), ResType::Style, std::string(entry)};
   }
 
-  // ResourceUtils::ParseXmlAttributeName: [*][package:]entry, an attr.
+  // ResourceUtils::ParseXmlAttributeName: [*][package:]entry, an attr, where * only marks a
+  // private reference. Without a package, or with nothing after its ':', the entry is the whole
+  // trimmed text, * and all: aapt2 then looks for attr/*n or com.probe:attr/com.probe: (#84).
   static ResName attributeName(pugi::xml_node el, std::string_view s) {
-    s = trim(s);
+    const std::string_view trimmed = trim(s);
+    s = trimmed;
     if (!s.empty() && s[0] == '*') s.remove_prefix(1);
-    ResName name{"", ResType::Attr, std::string(s)};
+    ResName name{"", ResType::Attr, std::string(trimmed)};
     if (const size_t colon = s.find(':'); colon != std::string_view::npos) {
       name.package = resolvePackage(el, std::string(s.substr(0, colon)));
-      name.entry = std::string(s.substr(colon + 1));
+      if (colon + 1 < s.size()) name.entry = std::string(s.substr(colon + 1));
     }
     return name;
   }
