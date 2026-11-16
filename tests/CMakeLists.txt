@@ -107,6 +107,12 @@ if(TARGET hydroid-rc)
       "-DRC=$<TARGET_FILE:hydroid-rc>"
       "-DDIR=${CMAKE_CURRENT_BINARY_DIR}/rc-unicode-path"
       -P ${CMAKE_CURRENT_SOURCE_DIR}/CheckRcUnicodePath.cmake)
+  # And ends with an error, not an abort, on an argument with no UTF-8, which only Windows passes.
+  if(WIN32)
+    add_test(NAME HydroidRc.FailsOnNonUnicodeArgument
+      COMMAND powershell -NoProfile -ExecutionPolicy Bypass
+        -File ${CMAKE_CURRENT_SOURCE_DIR}/CheckRcNotUnicode.ps1 -Rc $<TARGET_FILE:hydroid-rc>)
+  endif()
 endif()
 
 # Config.cpp's numbers are the NDK's AConfiguration, and every value of Config.h has one (#53).
