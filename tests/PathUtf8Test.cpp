@@ -1,6 +1,7 @@
 // core/PathUtf8.h, the UTF-8 of a path that never throws, and how a load takes a Windows name that
-// is not Unicode text (a lone surrogate), as aapt2 37.0.0 does (#111): such a file is not found,
-// such a folder has nothing in it, and a diagnostic writes either with U+FFFD.
+// is not Unicode text (a lone surrogate), as aapt2 37.0.0 does (#111): such a folder of res/ has
+// nothing in it, such a file or folder in a type folder is not found, and a diagnostic writes
+// either with U+FFFD.
 
 #include <gtest/gtest.h>
 
