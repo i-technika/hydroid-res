@@ -263,6 +263,13 @@ CASES = {
     "styleable-in-config": values("<declare-styleable name='S'/>", "values-land"),
     "styleable-unknown-child": values("<declare-styleable name='S'><foo/></declare-styleable>"),
     "styleable-attr-no-name": values("<declare-styleable name='S'><attr/></declare-styleable>"),
+    # ParseXmlAttributeName keeps a leading * in the name unless a package comes before the name.
+    "styleable-attr-star": values("<declare-styleable name='S'><attr name='*a' format='color'/>"
+                                  "</declare-styleable>"),
+    "styleable-attr-star-package": values("<declare-styleable name='S'><attr name='*com.probe:a'/>"
+                                          "</declare-styleable><attr name='a' format='color'/>"),
+    "styleable-attr-empty-after-colon": values("<declare-styleable name='S'><attr name='com.probe:'/>"
+                                               "</declare-styleable>"),
 
     # Styles.
     "style-parents": values("<style name='A'/><style name='B' parent='A'/><style name='C' parent='@style/A'/>"
@@ -286,6 +293,12 @@ CASES = {
                                         "<attr name='a' format='integer'/><style name='S'>"
                                         "<item name='app:a'>1</item><item name=' a '>2</item>"
                                         "<item name='com.probe:a'>3</item></style></resources>"},
+    "style-key-star": values("<attr name='n' format='integer'/><style name='S'><item name='*n'>3</item></style>"),
+    "style-key-star-package": values("<attr name='n' format='integer'/>"
+                                     "<style name='S'><item name='*com.probe:n'>3</item></style>"),
+    "style-key-empty-after-colon": values("<attr name='n' format='integer'/>"
+                                          "<style name='S'><item name='com.probe:'>3</item></style>"),
+    "style-key-star-only": values("<style name='S'><item name='*'>3</item></style>"),
     "style-integer-bad": values("<attr name='a' format='integer'/><style name='S'><item name='a'>x</item></style>"),
     "style-integer-range": values("<attr name='a' format='integer' min='0' max='3'/>"
                                   "<style name='S'><item name='a'>4</item></style>"),
