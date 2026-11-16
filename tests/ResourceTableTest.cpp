@@ -387,8 +387,10 @@ TEST(ResourceTable, RejectsWhatIsNotUtf8) {
 }
 
 // An attr named in a style item or a declare-styleable keeps a leading * unless a package follows
-// it, and is its whole text when nothing follows the ':', as ParseXmlAttributeName names it: the
-// error names what aapt2 looks for (#84). The golden cases see only that each one fails.
+// it, and is its whole text when nothing follows the ':', with the package before the ':' kept,
+// as ParseXmlAttributeName names it: the error names what aapt2 looks for (#84). The golden cases
+// see only that each one fails, and an error leaves out the package being loaded, so android:
+// shows that the package is kept.
 TEST(ResourceTable, AttrNameIsParseXmlAttributeNames) {
   const std::vector<std::pair<std::string, std::string>> cases = {
       {"<attr name='n' format='integer'/><style name='S'><item name='*n'>3</item></style>",
@@ -396,6 +398,7 @@ TEST(ResourceTable, AttrNameIsParseXmlAttributeNames) {
       {"<attr name='n' format='integer'/><style name='S'><item "
        "name='com.example:'>3</item></style>",
        "attr/com.example: not found"},
+      {"<style name='S'><item name='android:'>3</item></style>", "android:attr/android:"},
       {"<declare-styleable name='S'><attr name='*a' format='color'/></declare-styleable>",
        "invalid entry name '*a'"},
   };
