@@ -11,6 +11,7 @@
 #include <utility>
 #include <vector>
 
+#include "core/PathUtf8.h"
 #include "core/ValuesParser.h"
 #include "core/Xml.h"
 #include "hydroid/res/ConfigParser.h"
@@ -20,19 +21,23 @@ namespace {
 
 namespace fs = std::filesystem;
 
-// The UTF-8 name of a path, whether u8string() returns std::string (C++17) or std::u8string.
-std::string utf8(const fs::path& p) {
-  const auto s = p.u8string();
-  return std::string(s.begin(), s.end());
-}
-
-// The entries of `dir` that are not hidden and are of the kind asked, by UTF-8 name.
-std::vector<std::pair<std::string, fs::path>> list(const fs::path& dir, bool directories) {
+// The entries of `dir` that are not hidden and are of the kind asked, by UTF-8 name. On Windows,
+// aapt2 lists names in the ANSI code page and opens each by that name read as UTF-8, so it does
+// not find one whose name is not Unicode text, a lone surrogate (#111): a folder of res/ so named
+// has nothing in it, and anything so named in a type folder, a folder too, is not found. (It
+// does not find a name past the ANSI code page either, é.txt as e.txt, which hydroid reads, as
+// aapt2 does on other systems.)
+std::vector<std::pair<std::string, fs::path>> list(const fs::path& dir, bool directories,
+                                                   Diagnostics& diag) {
   std::vector<std::pair<std::string, fs::path>> out;
   std::error_code ec;
   for (const fs::directory_entry& e : fs::directory_iterator(dir, ec)) {
     std::string name = utf8(e.path().filename());
     if (name.empty() || name[0] == '.') continue;  // file::IsHidden
+    if (!isUnicode(e.path().filename())) {
+      if (!directories) diag.error({e.path(), 0}, "file not found");
+      continue;
+    }
     if (directories ? !e.is_directory(ec) : !e.is_regular_file(ec)) continue;
     out.emplace_back(std::move(name), e.path());
   }
@@ -123,11 +128,11 @@ void scanResFolder(const fs::path& res, ParsedFolder& out, Diagnostics& diag) {
     diag.error({res, 0}, "not a folder");
     return;
   }
-  for (const auto& [dirName, dir] : list(res, /*directories=*/true)) {
+  for (const auto& [dirName, dir] : list(res, /*directories=*/true, diag)) {
     const std::optional<ResDir> resDir = parseResDir(dirName);
     const bool values = resDir && resDir->type == "values";
     const std::optional<ResType> type = resDir ? parseResType(resDir->type) : std::nullopt;
-    for (const auto& [fileName, file] : list(dir, /*directories=*/false)) {
+    for (const auto& [fileName, file] : list(dir, /*directories=*/false, diag)) {
       if (!resDir) {
         diag.error({file, 0}, "invalid configuration in folder name '" + dirName + "'");
         continue;

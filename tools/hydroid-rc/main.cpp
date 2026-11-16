@@ -4,7 +4,6 @@
 #include <cstdio>
 #include <filesystem>
 #include <iostream>
-#include <sstream>
 #include <string>
 #include <system_error>
 #include <vector>
@@ -35,12 +34,7 @@ int dump(const fs::path& res, const std::string& package) {
   hydroid::res::ResourceTable table;
   std::vector<hydroid::res::Diagnostic> errors;
   if (!table.addPackage(res, package, hydroid::res::kAppPackageId, &errors)) {
-    for (const hydroid::res::Diagnostic& e : errors) {
-      // Whole lines, so that a path with no UTF-8 for it fails before any of its line is out.
-      std::ostringstream line;
-      line << "error: " << e << '\n';
-      std::cerr << line.str();
-    }
+    for (const hydroid::res::Diagnostic& e : errors) std::cerr << "error: " << e << '\n';
     return 1;
   }
   hydroid::res::dump(std::cout, table);
@@ -50,8 +44,8 @@ int dump(const fs::path& res, const std::string& package) {
 // Takes the arguments as paths, so that the folder reaches addPackage whole and the package as
 // UTF-8: on Windows, the narrow argv of main holds them in the ANSI code page, which writes ? for
 // a character it lacks, so wmain takes them in UTF-16 instead (#87). UTF-16 that is not Unicode
-// text, as a lone surrogate is, has no UTF-8: u8string() throws, for the package here and for a
-// name of or in the folder in the library (#111), and that is an error, not an abort.
+// text, as a lone surrogate is, has no UTF-8: u8string() throws on it, and for the package that is
+// an error, not an abort. The library writes such a path with U+FFFD for what it lacks (#111).
 int run(const std::vector<fs::path>& args) {
   if (args.size() == 2 && args[1] == "--version") {
     std::printf("hydroid-rc %s\n", hydroid::res::version());
@@ -70,7 +64,7 @@ int run(const std::vector<fs::path>& args) {
     try {
       return dump(args[2], package);
     } catch (const std::system_error& e) {
-      // Not the folder's path, which may be what has no UTF-8.
+      // A folder that fails to read as it is walked, which the library throws on still (#85).
       std::cerr << "error: cannot read the res folder: " << e.what() << '\n';
       return 1;
     }

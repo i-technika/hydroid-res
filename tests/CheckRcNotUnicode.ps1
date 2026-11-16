@@ -12,12 +12,14 @@ New-Item -ItemType Directory -Force (Join-Path $res 'values') | Out-Null
 [System.IO.File]::WriteAllText((Join-Path $res "values\b$lone.xml"), '<resources/>')
 
 # Arguments, the exit code (1 as for a folder that fails to load, 2 for usage) and what stderr
-# must say.
+# must say: for a path, the library's diagnostic, which writes it with U+FFFD (#111), and of which
+# only ASCII words are checked, as PowerShell reads stderr in the console's code page, where the
+# bytes of U+FFFD may run into what follows.
 $cases = @(
-  @{ Args = @('dump', "$missing$lone"); Exit = 1; Says = 'error: cannot read the res folder' },
+  @{ Args = @('dump', "$missing$lone"); Exit = 1; Says = 'not a folder' },
   @{ Args = @('dump', $missing, "com.a$lone"); Exit = 1;
      Says = 'error: the package name is not Unicode text' },
-  @{ Args = @('dump', $res); Exit = 1; Says = 'error: cannot read the res folder' },
+  @{ Args = @('dump', $res); Exit = 1; Says = 'file not found' },
   @{ Args = @("dump$lone", $missing); Exit = 2; Says = 'usage:' },
   @{ Args = @("--version$lone"); Exit = 2; Says = 'usage:' }
 )
