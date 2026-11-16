@@ -40,7 +40,7 @@ std::string qualifiedName(const XML_Char* expanded) {
 // The tree of what expat reads, as aapt2 gets it: the entities a DTD declares expanded, an
 // undeclared one skipped past an external DTD, and the attributes an ATTLIST defaults added after
 // those written. Elements keep their prefixed names and xmlns attributes; text is one node from
-// one tag, comment or CDATA section to the next, as pugixml makes it.
+// one tag, comment, processing instruction or CDATA section to the next, as pugixml makes it.
 struct TreeBuilder {
   XML_Parser parser;
   XmlExtent extent;
@@ -48,10 +48,10 @@ struct TreeBuilder {
   // The element being read, or the document before and after the root.
   pugi::xml_node node;
   // xmlns attributes for the next element, which expat reports before it.
-  std::vector<std::pair<std::string, std::string>> namespaces;
+  std::vector<std::pair<std::string, std::string>> namespaces{};
   // Text read since the last node, and the line where it starts, if there is any.
-  std::string text;
-  std::optional<int> textLine;
+  std::string text{};
+  std::optional<int> textLine{};
   bool inCdata = false;
 
   int currentLine() const { return static_cast<int>(XML_GetCurrentLineNumber(parser)); }
@@ -123,9 +123,7 @@ void XMLCALL endCdata(void* data) {
 
 void XMLCALL comment(void* data, const XML_Char*) { builder(data).endText(); }
 
-void XMLCALL instruction(void* data, const XML_Char*, const XML_Char*) {
-  builder(data).endText();
-}
+void XMLCALL instruction(void* data, const XML_Char*, const XML_Char*) { builder(data).endText(); }
 
 }  // namespace
 

@@ -5,8 +5,8 @@
 #include <string_view>
 
 // Reads the code points of UTF-8 text, as the values parser reads a string. expat rejects a file
-// that is not UTF-8 before the parser sees it (#78), and pugixml checks nothing, so this is the
-// check for what reaches the parser some other way (#79).
+// that is not UTF-8 before the parser sees it (#78), so this is the check for what reaches the
+// parser some other way (#79).
 
 namespace hydroid::res::detail {
 

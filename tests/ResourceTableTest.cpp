@@ -359,6 +359,24 @@ TEST(ResourceTable, ErrorsSayWherePastADtd) {
   EXPECT_EQ(errors[0].message, "invalid integer");
   EXPECT_EQ(errors[1].line, 7) << errors[1];
   EXPECT_EQ(errors[1].message, "plain text not allowed here");
+
+  // What an entity over several lines holds is on the line that refers to it, as in aapt2.
+  const std::vector<std::pair<std::string, int>> entities = {
+      {"<!DOCTYPE resources [\n<!ENTITY s \"<integer name='a'>\n\nx</integer>\">\n]>\n"
+       "<resources>\n\n&s;\n</resources>\n",
+       8},
+      {"<!DOCTYPE resources [\n<!ENTITY s \"\n<foo name='a'>x</foo>\">\n]>\n"
+       "<resources>\n\n&s;\n</resources>\n",
+       7},
+  };
+  int package = 0;
+  for (const auto& [xml, line] : entities) {
+    errors.clear();
+    EXPECT_FALSE(load(table, dir, {{"values/v.xml", xml}}, "com.e" + std::to_string(package++),
+                      0x7f, &errors));
+    ASSERT_EQ(errors.size(), 1u) << xml;
+    EXPECT_EQ(errors[0].line, line) << errors[0];
+  }
 }
 
 // What is not well-formed XML fails with expat's message and the line expat stops at (#78).
