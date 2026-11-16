@@ -100,6 +100,21 @@ add_test(NAME CMake.DependenciesFollowOption
     "-DDEPENDENCIES=${dependency_sources}"
     -P ${CMAKE_CURRENT_SOURCE_DIR}/CheckDependencySource.cmake)
 
+# hydroid-rc opens a res/ folder whose path has characters outside the ANSI code page (#87).
+if(TARGET hydroid-rc)
+  add_test(NAME HydroidRc.DumpsUnicodePath
+    COMMAND ${CMAKE_COMMAND}
+      "-DRC=$<TARGET_FILE:hydroid-rc>"
+      "-DDIR=${CMAKE_CURRENT_BINARY_DIR}/rc-unicode-path"
+      -P ${CMAKE_CURRENT_SOURCE_DIR}/CheckRcUnicodePath.cmake)
+  # And ends with an error, not an abort, on an argument with no UTF-8, which only Windows passes.
+  if(WIN32)
+    add_test(NAME HydroidRc.FailsOnNonUnicodeArgument
+      COMMAND powershell -NoProfile -ExecutionPolicy Bypass
+        -File ${CMAKE_CURRENT_SOURCE_DIR}/CheckRcNotUnicode.ps1 -Rc $<TARGET_FILE:hydroid-rc>)
+  endif()
+endif()
+
 # Config.cpp's numbers are the NDK's AConfiguration, and every value of Config.h has one (#53).
 # It needs an NDK: HYDROID_RES_ANDROID_NDK, which must hold one, else ANDROID_NDK_HOME,
 # ANDROID_NDK_ROOT or the newest under the SDK's ndk/. Without one, or without Python, the test is
