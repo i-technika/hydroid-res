@@ -7,7 +7,6 @@
 
 #include <pugixml.hpp>
 
-#include <optional>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -40,8 +39,9 @@ class XmlDocument {
 std::string_view localName(const char* name);
 
 // The namespace of `element`, from the xmlns of its prefix (or xmlns="" without one) on it or
-// an ancestor: "" for none, nullopt for a prefix that no xmlns declares, which expat rejects.
-std::optional<std::string> elementNamespace(pugi::xml_node element);
+// an ancestor: "" for none. Every prefix has one, as load() fails on a prefix that no xmlns
+// declares, as expat does (#78), so a caller looks for no other case (#91).
+std::string elementNamespace(pugi::xml_node element);
 
 // Whether `attr` declares a namespace (xmlns="", xmlns:p=""), which expat does not report as an
 // attribute.

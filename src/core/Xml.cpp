@@ -6,6 +6,7 @@
 #include <climits>
 #include <cstring>
 #include <memory>
+#include <optional>
 #include <utility>
 #include <vector>
 
@@ -145,11 +146,11 @@ std::string_view localName(const char* name) {
   return colon ? std::string_view(colon + 1) : std::string_view(name);
 }
 
-std::optional<std::string> elementNamespace(pugi::xml_node element) {
+std::string elementNamespace(pugi::xml_node element) {
   const std::string_view name = element.name();
   const size_t colon = name.find(':');
-  if (colon == std::string_view::npos) return namespaceOf(element, "").value_or("");
-  return namespaceOf(element, name.substr(0, colon));
+  return namespaceOf(element, colon == std::string_view::npos ? "" : name.substr(0, colon))
+      .value_or("");
 }
 
 bool isNamespaceDeclaration(pugi::xml_attribute attr) {
