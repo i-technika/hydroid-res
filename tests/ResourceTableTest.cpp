@@ -342,6 +342,72 @@ TEST(ResourceTable, ErrorsSayWhere) {
   EXPECT_EQ(out.str(), "plain");
 }
 
+// The tree comes from expat, which gives the line of each element and text, past a DTD over
+// several lines and the entities it expands, as aapt2 says (#104).
+TEST(ResourceTable, ErrorsSayWherePastADtd) {
+  TempDir dir;
+  ResourceTable table;
+  std::vector<Diagnostic> errors;
+  EXPECT_FALSE(load(table, dir,
+                    {{"values/v.xml",
+                      "<!DOCTYPE resources [\n<!ENTITY n '1'>\n]>\n<resources>\n"
+                      "<integer name='a'>&n;</integer>\n<integer name='b'>&n;x</integer>\n"
+                      "<!-- c -->\n\ntext</resources>\n"}},
+                    "com.example", 0x7f, &errors));
+  ASSERT_EQ(errors.size(), 2u);
+  EXPECT_EQ(errors[0].line, 6) << errors[0];
+  EXPECT_EQ(errors[0].message, "invalid integer");
+  EXPECT_EQ(errors[1].line, 9) << errors[1];
+  EXPECT_EQ(errors[1].message, "plain text not allowed here");
+
+  // What an entity over several lines holds, element or text, is on the line that refers to it.
+  const std::vector<std::pair<std::string, int>> entities = {
+      {"<!DOCTYPE resources [\n<!ENTITY s \"<integer name='a'>\n\nx</integer>\">\n]>\n"
+       "<resources>\n\n&s;\n</resources>\n",
+       8},
+      {"<!DOCTYPE resources [\n<!ENTITY s \"\n<foo name='a'>x</foo>\">\n]>\n"
+       "<resources>\n\n&s;\n</resources>\n",
+       7},
+      {"<!DOCTYPE resources [\n<!ENTITY s \"\n\ntext\">\n]>\n"
+       "<resources>\n\n&s;\n</resources>\n",
+       8},
+  };
+  int package = 0;
+  for (const auto& [xml, line] : entities) {
+    errors.clear();
+    EXPECT_FALSE(load(table, dir, {{"values/v.xml", xml}}, "com.e" + std::to_string(package++),
+                      0x7f, &errors));
+    ASSERT_EQ(errors.size(), 1u) << xml;
+    EXPECT_EQ(errors[0].line, line) << errors[0];
+  }
+}
+
+// Plain text between resources is an error for each piece of text expat reports, on its line, as
+// XmlPullParser makes a text event of each: a line, an entity or character reference, and the
+// text on either side of a comment or processing instruction.
+TEST(ResourceTable, PlainTextIsAnErrorForEachPiece) {
+  const std::vector<std::pair<std::string, std::vector<int>>> cases = {
+      {"<resources>\n\n\ntext</resources>\n", {4}},
+      {"<resources>\n a\n b\n</resources>\n", {2, 3}},
+      {"<resources>a&amp;b</resources>\n", {1, 1, 1}},
+      {"<resources>z<?pi?>w<!-- c -->\nv</resources>\n", {1, 1, 2}},
+  };
+  TempDir dir;
+  int package = 0;
+  for (const auto& [xml, lines] : cases) {
+    ResourceTable table;
+    std::vector<Diagnostic> errors;
+    EXPECT_FALSE(load(table, dir, {{"values/v.xml", xml}}, "com.p" + std::to_string(package++),
+                      0x7f, &errors));
+    std::vector<int> got;
+    for (const Diagnostic& e : errors) {
+      EXPECT_EQ(e.message, "plain text not allowed here") << e;
+      got.push_back(e.line);
+    }
+    EXPECT_EQ(got, lines) << xml;
+  }
+}
+
 // What is not well-formed XML fails with expat's message and the line expat stops at (#78).
 // aapt2 gives the same message, but without "xml parser error: " for an XML file, and line 0 for
 // a values file, as XmlPullParser keeps no line for the error.

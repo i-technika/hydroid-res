@@ -16,7 +16,7 @@ endif()
 # which pugixml's cmake_minimum_required(VERSION 3.5) leaves unset.
 set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 
-# pugixml: the only runtime dependency of the core (values, layout, drawable XML).
+# pugixml: the tree the core keeps of what expat reads of an XML file (#104).
 if(HYDROID_RES_USE_SYSTEM_DEPS)
   find_package(pugixml 1.14 EXACT REQUIRED CONFIG)
   set(hydroid_res_fetched_pugixml OFF)
@@ -49,7 +49,7 @@ else()
   endif()
 endif()
 
-# expat: aapt2's XML parser, which decides what is well-formed XML before pugixml reads it (#78).
+# expat: aapt2's XML parser, which decides what is well-formed XML (#78) and reads it (#104).
 if(HYDROID_RES_USE_SYSTEM_DEPS)
   find_package(expat 2.7.1 EXACT REQUIRED CONFIG)
   set(hydroid_res_fetched_expat OFF)

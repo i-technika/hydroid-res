@@ -116,6 +116,32 @@ CASES = {
     "values-lt-in-attribute": values("<string name='q' x='a<b'>x</string>"),
     "values-space-in-namespace": {"values/v.xml": "<resources xmlns:a='urn:a b'>"
                                                   "<string name='q' a:x='1'>x</string></resources>"},
+    # A DTD, which expat reads as aapt2 gets it and pugixml would not (#104): its entities
+    # expanded in text and attributes, one in another and one with elements, an entity no DTD
+    # declares skipped past an external one, and the default attributes of an ATTLIST.
+    "values-doctype": {"values/v.xml": "<!DOCTYPE resources><resources>"
+                                       "<string name='q'>x</string></resources>"},
+    "values-dtd-entity": {"values/v.xml": "<!DOCTYPE resources [<!ENTITY who 'Tom'>]><resources>"
+                                          "<string name='q'>&who; and Jerry</string></resources>"},
+    "values-dtd-entity-in-attribute": {
+        "values/v.xml": "<!DOCTYPE resources [<!ENTITY n 'q'><!ENTITY f 'fault'>]><resources>"
+                        "<string name='&n;'>x</string><string name='r' product='de&f;'>y</string>"
+                        "</resources>"},
+    "values-dtd-entity-in-entity": {
+        "values/v.xml": "<!DOCTYPE resources [<!ENTITY a 'A'><!ENTITY b '&a;-&a;'>]><resources>"
+                        "<string name='q'>&b;</string></resources>"},
+    "values-dtd-entity-elements": {
+        "values/v.xml": "<!DOCTYPE resources [<!ENTITY s \"<string name='q'>in</string>\">"
+                        "<!ENTITY bold '<b>B</b>'>]>"
+                        "<resources>&s;<string name='r'>a&bold;c</string></resources>"},
+    "values-dtd-external-skips-entity": {
+        "values/v.xml": "<!DOCTYPE resources SYSTEM 'x.dtd'><resources>"
+                        "<string name='q'>a&foo;b</string></resources>"},
+    "values-dtd-attlist-default": {
+        "values/v.xml": "<!DOCTYPE resources [<!ATTLIST string name CDATA 'dflt'>]><resources>"
+                        "<string>x</string><string name='q'>y</string></resources>"},
+    "xml-dtd-entity-id": {"layout/l.xml": f"<!DOCTYPE a [<!ENTITY i '@+id/from_entity'>]>"
+                                          f"<a {ANDROID} android:id='&i;'/>"},
     "values-unknown-element": values("<foo name='q'>x</foo>"),
     "values-no-name": values("<string>x</string>"),
     "values-empty-name": values("<string name='  '>x</string>"),
