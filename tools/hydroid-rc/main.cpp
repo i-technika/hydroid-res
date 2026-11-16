@@ -50,8 +50,8 @@ int dump(const fs::path& res, const std::string& package) {
 // Takes the arguments as paths, so that the folder reaches addPackage whole and the package as
 // UTF-8: on Windows, the narrow argv of main holds them in the ANSI code page, which writes ? for
 // a character it lacks, so wmain takes them in UTF-16 instead (#87). UTF-16 that is not Unicode
-// text, as a lone surrogate is, has no UTF-8: u8string() throws, for the package here and for a
-// name of or in the folder in the library (#111), and that is an error, not an abort.
+// text, as a lone surrogate is, has no UTF-8: u8string() throws on it, and for the package that is
+// an error, not an abort. The library writes such a path with U+FFFD for what it lacks (#111).
 int run(const std::vector<fs::path>& args) {
   if (args.size() == 2 && args[1] == "--version") {
     std::printf("hydroid-rc %s\n", hydroid::res::version());

@@ -6,6 +6,7 @@
 #include <utility>
 
 #include "core/Parsed.h"
+#include "core/PathUtf8.h"
 #include "core/ResScanner.h"
 #include "core/TableBuilder.h"
 #include "core/ValuesParser.h"
@@ -47,8 +48,7 @@ std::optional<ResType> parseResType(std::string_view name) {
 }
 
 std::ostream& operator<<(std::ostream& os, const Diagnostic& d) {
-  const auto file = d.file.u8string();
-  if (!d.file.empty()) os << std::string(file.begin(), file.end()) << ':';
+  if (!d.file.empty()) os << detail::utf8(d.file) << ':';
   if (d.line > 0) os << d.line << ':';
   if (!d.file.empty() || d.line > 0) os << ' ';
   return os << d.message;
