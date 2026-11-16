@@ -296,6 +296,34 @@ CASES = {
                                           "</declare-styleable><attr name='a' format='color'/>"),
     "styleable-attr-empty-after-colon": values("<declare-styleable name='S'><attr name='com.probe:'/>"
                                                "</declare-styleable>"),
+    # An <attr> with a format is defined in the package before its name: the one being linked
+    # (written, or res-auto) keeps it, and another leaves it out, so that the styleable finds that
+    # package's attr or fails to (#109).
+    "styleable-define-own-package": values("<declare-styleable name='S'>"
+                                           "<attr name='com.probe:a' format='color'/>"
+                                           "</declare-styleable>"),
+    "styleable-define-own-package-star": values("<declare-styleable name='S'>"
+                                                "<attr name='*com.probe:b' format='color'/>"
+                                                "</declare-styleable>"),
+    "styleable-define-own-package-enum": values("<declare-styleable name='S'>"
+                                                "<attr name='com.probe:a'><enum name='e' value='1'/>"
+                                                "</attr></declare-styleable>"),
+    "styleable-define-res-auto": {
+        "values/v.xml": "<resources xmlns:app='http://schemas.android.com/apk/res-auto'>"
+                        "<declare-styleable name='S'><attr name='app:a' format='color'/>"
+                        "</declare-styleable></resources>"},
+    "styleable-define-own-and-plain": values("<declare-styleable name='S'>"
+                                             "<attr name='com.probe:a' format='color'/>"
+                                             "<attr name='a' format='color'/></declare-styleable>"),
+    "styleable-define-own-conflict": values("<attr name='a' format='integer'/>"
+                                            "<declare-styleable name='S'>"
+                                            "<attr name='com.probe:a' format='color'/>"
+                                            "</declare-styleable>"),
+    "styleable-define-android": values("<declare-styleable name='S'>"
+                                       "<attr name='android:a' format='color'/></declare-styleable>"),
+    "styleable-define-not-loaded": values("<declare-styleable name='S'>"
+                                          "<attr name='com.other:a' format='color'/>"
+                                          "</declare-styleable>"),
 
     # Styles.
     "style-parents": values("<style name='A'/><style name='B' parent='A'/><style name='C' parent='@style/A'/>"

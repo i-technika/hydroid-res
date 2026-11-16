@@ -897,19 +897,16 @@ class Parser {
         error(child, "<attr> tag must have a 'name' attribute");
         return false;
       }
-      ParsedResource attr;
-      attr.name = attributeName(child, *name).entry;
       ResName ref = attributeName(child, *name);
+      ParsedResource attr;
+      attr.name = ref.entry;
+      attr.package = ref.package;
       attr.source = at(child);
       if (!parseAttr(child, attr, /*weak=*/true)) return false;
-      // An <attr> with no format only refers to one defined elsewhere.
-      if (std::get<ParsedAttr>(attr.value).formats != kFormatAny) {
-        if (!ref.package.empty()) {
-          error(child, "can not define the attribute " + ref.package + ":" + ref.entry + " here");
-          return false;
-        }
-        add(std::move(attr));
-      }
+      // An <attr> with no format only refers to one defined elsewhere. One with a package is
+      // defined in that package, as ParseDeclareStyleable names it, which the table builder sees
+      // is the one being loaded (#109).
+      if (std::get<ParsedAttr>(attr.value).formats != kFormatAny) add(std::move(attr));
       styleable.attrs.push_back(std::move(ref));
       return true;
     });
