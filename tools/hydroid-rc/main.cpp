@@ -2,14 +2,17 @@
 // Compilation lands in step 9; for now it prints a res/ folder as `aapt2 dump resources` does.
 
 #include <cstdio>
-#include <cstring>
+#include <filesystem>
 #include <iostream>
+#include <string>
 #include <vector>
 
 #include "hydroid/res/ResourceTable.h"
 #include "hydroid/res/Version.h"
 
 namespace {
+
+namespace fs = std::filesystem;
 
 int usage() {
   std::fprintf(stderr,
@@ -20,18 +23,25 @@ int usage() {
   return 2;
 }
 
-}  // namespace
+// The UTF-8 text of an argument, whether u8string() returns std::string (C++17) or std::u8string.
+std::string utf8(const fs::path& p) {
+  const auto s = p.u8string();
+  return std::string(s.begin(), s.end());
+}
 
-int main(int argc, char** argv) {
-  if (argc == 2 && std::strcmp(argv[1], "--version") == 0) {
+// Takes the arguments as paths, so that the folder reaches addPackage whole and the package as
+// UTF-8: on Windows, the narrow argv of main holds them in the ANSI code page, which writes ? for
+// a character it lacks, so wmain takes them in UTF-16 instead (#87).
+int run(const std::vector<fs::path>& args) {
+  if (args.size() == 2 && utf8(args[1]) == "--version") {
     std::printf("hydroid-rc %s\n", hydroid::res::version());
     return 0;
   }
-  if ((argc == 3 || argc == 4) && std::strcmp(argv[1], "dump") == 0) {
+  if ((args.size() == 3 || args.size() == 4) && utf8(args[1]) == "dump") {
     hydroid::res::ResourceTable table;
     std::vector<hydroid::res::Diagnostic> errors;
-    if (!table.addPackage(argv[2], argc == 4 ? argv[3] : "com.example", hydroid::res::kAppPackageId,
-                          &errors)) {
+    if (!table.addPackage(args[2], args.size() == 4 ? utf8(args[3]) : "com.example",
+                          hydroid::res::kAppPackageId, &errors)) {
       for (const hydroid::res::Diagnostic& e : errors) std::cerr << "error: " << e << '\n';
       return 1;
     }
@@ -40,3 +50,11 @@ int main(int argc, char** argv) {
   }
   return usage();
 }
+
+}  // namespace
+
+#ifdef _WIN32
+int wmain(int argc, wchar_t** argv) { return run(std::vector<fs::path>(argv, argv + argc)); }
+#else
+int main(int argc, char** argv) { return run(std::vector<fs::path>(argv, argv + argc)); }
+#endif
