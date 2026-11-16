@@ -39,8 +39,9 @@ std::string qualifiedName(const XML_Char* expanded) {
 
 // The tree of what expat reads, as aapt2 gets it: the entities a DTD declares expanded, an
 // undeclared one skipped past an external DTD, and the attributes an ATTLIST defaults added after
-// those written. Elements keep their prefixed names and xmlns attributes; text is one node from
-// one tag, comment, processing instruction or CDATA section to the next, as pugixml makes it.
+// those written. Elements keep their prefixed names and xmlns attributes. Text is a node for each
+// piece expat reports, with the line expat gives it, as XmlPullParser makes a text event of each:
+// a value joins them, and each piece of plain text between resources is an error of its own.
 struct TreeBuilder {
   XML_Parser parser;
   XmlExtent extent;
@@ -49,22 +50,10 @@ struct TreeBuilder {
   pugi::xml_node node;
   // xmlns attributes for the next element, which expat reports before it.
   std::vector<std::pair<std::string, std::string>> namespaces{};
-  // Text read since the last node, and the line where it starts, if there is any.
-  std::string text{};
-  std::optional<int> textLine{};
   bool inCdata = false;
 
-  int currentLine() const { return static_cast<int>(XML_GetCurrentLineNumber(parser)); }
-  void add(pugi::xml_node added, int line) { (*lines)[added.internal_object()] = line; }
-
-  // Ends the text read so far as a node.
-  void endText() {
-    if (!textLine) return;
-    pugi::xml_node added = node.append_child(inCdata ? pugi::node_cdata : pugi::node_pcdata);
-    added.set_value(text.c_str());
-    add(added, *textLine);
-    text.clear();
-    textLine.reset();
+  void add(pugi::xml_node added) {
+    (*lines)[added.internal_object()] = static_cast<int>(XML_GetCurrentLineNumber(parser));
   }
 };
 
@@ -77,7 +66,6 @@ void XMLCALL startNamespace(void* data, const XML_Char* prefix, const XML_Char* 
 
 void XMLCALL startElement(void* data, const XML_Char* name, const XML_Char** attrs) {
   TreeBuilder& b = builder(data);
-  b.endText();
   pugi::xml_node element = b.node.append_child(pugi::node_element);
   element.set_name(qualifiedName(name).c_str());
   for (const auto& [attr, uri] : b.namespaces) {
@@ -87,13 +75,12 @@ void XMLCALL startElement(void* data, const XML_Char* name, const XML_Char** att
   for (; *attrs; attrs += 2) {
     element.append_attribute(qualifiedName(attrs[0]).c_str()).set_value(attrs[1]);
   }
-  b.add(element, b.currentLine());
+  b.add(element);
   b.node = element;
 }
 
 void XMLCALL endElement(void* data, const XML_Char*) {
   TreeBuilder& b = builder(data);
-  b.endText();
   b.node = b.node.parent();
   // XmlExtent::RootElement: past the root's end tag, expat reads no more.
   if (b.extent == XmlExtent::RootElement && b.node.type() == pugi::node_document) {
@@ -103,27 +90,14 @@ void XMLCALL endElement(void* data, const XML_Char*) {
 
 void XMLCALL characters(void* data, const XML_Char* s, int length) {
   TreeBuilder& b = builder(data);
-  if (!b.textLine) b.textLine = b.currentLine();
-  b.text.append(s, static_cast<size_t>(length));
+  pugi::xml_node text = b.node.append_child(b.inCdata ? pugi::node_cdata : pugi::node_pcdata);
+  text.set_value(s, static_cast<size_t>(length));
+  b.add(text);
 }
 
-void XMLCALL startCdata(void* data) {
-  TreeBuilder& b = builder(data);
-  b.endText();
-  b.inCdata = true;
-  // <![CDATA[]]> too is a node.
-  b.textLine = b.currentLine();
-}
+void XMLCALL startCdata(void* data) { builder(data).inCdata = true; }
 
-void XMLCALL endCdata(void* data) {
-  TreeBuilder& b = builder(data);
-  b.endText();
-  b.inCdata = false;
-}
-
-void XMLCALL comment(void* data, const XML_Char*) { builder(data).endText(); }
-
-void XMLCALL instruction(void* data, const XML_Char*, const XML_Char*) { builder(data).endText(); }
+void XMLCALL endCdata(void* data) { builder(data).inCdata = false; }
 
 }  // namespace
 
@@ -145,8 +119,6 @@ bool XmlDocument::load(std::string_view text, XmlExtent extent, std::string* err
   XML_SetElementHandler(parser.get(), startElement, endElement);
   XML_SetCharacterDataHandler(parser.get(), characters);
   XML_SetCdataSectionHandler(parser.get(), startCdata, endCdata);
-  XML_SetCommentHandler(parser.get(), comment);
-  XML_SetProcessingInstructionHandler(parser.get(), instruction);
   // XML_Parse takes an int length, so a text past INT_MAX goes in parts.
   for (std::string_view rest = text;;) {
     const size_t size = std::min<size_t>(rest.size(), INT_MAX);
