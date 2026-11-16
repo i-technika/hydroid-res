@@ -412,6 +412,10 @@ std::optional<Package> buildPackage(ParsedFolder folder, const std::string& name
   // Every value of every entry, one for each configuration and product.
   std::map<Key, PendingEntry> entries;
   for (ParsedResource& r : folder.resources) {
+    // aapt2 link merges only what is defined in the package being linked: an <attr> a
+    // <declare-styleable> defines in another package is left out, and the styleable then finds
+    // that package's attr, or fails to (#109).
+    if (!r.package.empty() && r.package != name) continue;
     PendingEntry& entry = entries[{r.type, r.name}];
     auto same = std::find_if(entry.values.begin(), entry.values.end(), [&](const PendingValue& v) {
       return v.config == r.config && v.product == r.product;

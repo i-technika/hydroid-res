@@ -109,6 +109,9 @@ struct ParsedResource {
   std::string name;
   Config config;
   std::string product;  // product="", which only the table builder looks at
+  // The package written before the name, resolved, of an <attr> a <declare-styleable> defines:
+  // "" or the package being loaded defines it there, and another package's is left out.
+  std::string package;
   ParsedValue value;
   Source source;
 };

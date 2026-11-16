@@ -283,6 +283,41 @@ TEST(ResourceTable, RefersIntoAnotherPackage) {
   EXPECT_NE(out.str().find("(style) size=2 parent=0x7e040000\n"), std::string::npos) << out.str();
 }
 
+// An <attr> with a format in a <declare-styleable> is defined in the package before its name, as
+// aapt2 link merges it: the package being loaded keeps it, and another leaves it out, so that the
+// styleable refers to that package's attr, or fails to find one (#109). The golden cases load no
+// other package.
+TEST(ResourceTable, StyleableDefinesAttrsOnlyInItsOwnPackage) {
+  TempDir dir;
+  ResourceTable table;
+  std::vector<Diagnostic> errors;
+  ASSERT_TRUE(load(table, dir,
+                   {{"values/v.xml", "<resources><attr name='a' format='color'/></resources>"}},
+                   "com.lib", 0x7e, &errors))
+      << errorsOf(errors);
+  ASSERT_TRUE(
+      load(table, dir,
+           {{"values/v.xml",
+             "<resources><declare-styleable name='S'>"
+             "<attr name='com.lib:a' format='integer'/>"
+             "<attr name='com.example:b' format='color'/></declare-styleable></resources>"}},
+           "com.example", 0x7f, &errors))
+      << errorsOf(errors);
+  const Package& app = *table.package("com.example");
+  EXPECT_EQ(app.styleables[valueOf(table, "com.example:styleable/S").index()].attrs,
+            (std::vector<ResId>{*table.find("com.lib:attr/a"), *table.find("com.example:attr/b")}));
+  EXPECT_FALSE(table.find("com.example:attr/a"));
+
+  EXPECT_FALSE(load(table, dir,
+                    {{"values/v.xml",
+                      "<resources><declare-styleable name='S'>"
+                      "<attr name='com.lib:c' format='color'/></declare-styleable></resources>"}},
+                    "com.other", 0x7d, &errors));
+  ASSERT_EQ(errors.size(), 1u);
+  EXPECT_EQ(errors[0].message, "resource com.lib:attr/c not found");
+  EXPECT_FALSE(table.package("com.other"));
+}
+
 TEST(ResourceTable, PackageMustBeLoaded) {
   TempDir dir;
   ResourceTable table;
