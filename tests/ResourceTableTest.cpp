@@ -342,6 +342,25 @@ TEST(ResourceTable, ErrorsSayWhere) {
   EXPECT_EQ(out.str(), "plain");
 }
 
+// The tree comes from expat, which gives the line of each element and text, past a DTD over
+// several lines and the entities it expands (#104).
+TEST(ResourceTable, ErrorsSayWherePastADtd) {
+  TempDir dir;
+  ResourceTable table;
+  std::vector<Diagnostic> errors;
+  EXPECT_FALSE(load(table, dir,
+                    {{"values/v.xml",
+                      "<!DOCTYPE resources [\n<!ENTITY n '1'>\n]>\n<resources>\n"
+                      "<integer name='a'>&n;</integer>\n<integer name='b'>&n;x</integer>\n"
+                      "<!-- c -->\n\ntext</resources>\n"}},
+                    "com.example", 0x7f, &errors));
+  ASSERT_EQ(errors.size(), 2u);
+  EXPECT_EQ(errors[0].line, 6) << errors[0];
+  EXPECT_EQ(errors[0].message, "invalid integer");
+  EXPECT_EQ(errors[1].line, 7) << errors[1];
+  EXPECT_EQ(errors[1].message, "plain text not allowed here");
+}
+
 // What is not well-formed XML fails with expat's message and the line expat stops at (#78).
 // aapt2 gives the same message, but without "xml parser error: " for an XML file, and line 0 for
 // a values file, as XmlPullParser keeps no line for the error.

@@ -1,6 +1,7 @@
 // A file as aapt2's XML parser (expat, with namespaces) reads it: expat itself decides whether it
-// is well-formed, and pugixml then reads the element names and namespaces, the text whitespace
-// and all, and the line of each node, for errors.
+// is well-formed and reads it, and its elements, attributes and text, the whitespace and all,
+// are kept in a pugixml tree with the line of each node, for errors. pugixml reads no file
+// itself, as it does not read a DTD's entities and default attributes as expat does (#104).
 
 #pragma once
 
@@ -9,7 +10,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
-#include <vector>
+#include <unordered_map>
 
 namespace hydroid::res::detail {
 
@@ -30,10 +31,9 @@ class XmlDocument {
   int line(pugi::xml_node node) const;
 
  private:
-  int lineAt(ptrdiff_t offset) const;
-
   pugi::xml_document doc_;
-  std::vector<size_t> lineStarts_;
+  // The line of each node, by its pugi::xml_node::internal_object().
+  std::unordered_map<const void*, int> lines_;
 };
 
 // "g" of "xliff:g", and the name itself when it has no prefix.
