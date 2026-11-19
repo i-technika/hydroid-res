@@ -188,7 +188,9 @@ struct Package {
   }
 };
 
-// A problem that keeps a res/ folder from loading.
+// A problem that keeps a res/ folder from loading. There are no warnings: where aapt2 only warns
+// and goes on, as of an id @+android:id/ makes in an XML file or a <public> in a folder with
+// qualifiers, hydroid goes on too and says nothing (#130).
 struct Diagnostic {
   std::filesystem::path file;  // empty for none
   int line = 0;                // 0 for none
