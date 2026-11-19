@@ -7,10 +7,14 @@
   golden/aapt2/table_cases.json small res/ folders, each with what aapt2 dumps of it, or null
                                 where aapt2 rejects it (and the error it gives, to read)
 
-Each folder is compiled with `aapt2 compile --dir`, linked against PLATFORM with LINK_FLAGS and
-dumped with `aapt2 dump resources`. The flags turn off what aapt2 link does beyond what the
-folder says, which hydroid's ResourceTable does not do either: versioning styles and XML files,
-removing values of a locale with no default, and removing values another configuration repeats.
+Each folder is compiled with `aapt2 compile --dir` into a folder of .flat files, linked against
+PLATFORM with LINK_FLAGS and dumped with `aapt2 dump resources`. Link takes the .flat files in the
+order of the folder/name each came from, and merges them in that order, the order hydroid reads
+them in too (#80). Linked as the one zip compile can write instead, they merge in an order that
+changes with the names in it, so that the first of two values that agree is not the one of the
+first path. The flags turn off what aapt2 link does beyond what the folder says, which hydroid's
+ResourceTable does not do either: versioning styles and XML files, removing values of a locale
+with no default, and removing values another configuration repeats.
 The C++ test Aapt2TableTest loads each folder and checks that it dumps the same, so CI needs no
 Android SDK.
 
@@ -262,8 +266,9 @@ CASES = {
     "attr-in-config": values("<attr name='a' format='color'/>", "values-land"),
     "attr-in-two-configs": {"values/v.xml": "<resources><attr name='a' format='color'/></resources>",
                             "values-land/v.xml": "<resources><attr name='a' format='integer'/></resources>"},
-    # aapt2 compiles files in the order of their whole path, so res/values-land/a.xml ('-' is
-    # 0x2D) before res/values/a.xml ('/' is 0x2F), and the first of two <attr> that agree stays.
+    # Link merges the .flat files in the order of their folder/name (see link_dump), so
+    # res/values-land/a.xml ('-' is 0x2D) before res/values/a.xml ('/' is 0x2F), and the first of
+    # two <attr> that agree stays.
     "order-whole-path": {"values/a.xml": "<resources><attr name='n' format='integer' min='5'/>"
                                          "<style name='S'><item name='n'>3</item></style></resources>",
                          "values-land/a.xml": "<resources><attr name='n' format='integer' min='0'/>"
@@ -272,6 +277,15 @@ CASES = {
                                                  "<style name='S'><item name='n'>3</item></style></resources>",
                                  "values-land/a.xml": "<resources><attr name='n' format='integer' min='5'/>"
                                                       "</resources>"},
+    # The same as styles.xml, which, linked as a zip, merged in the other order.
+    "order-whole-path-styles": {"values/styles.xml": "<resources><attr name='n' format='integer' min='5'/>"
+                                                     "<style name='S'><item name='n'>3</item></style></resources>",
+                                "values-land/styles.xml": "<resources><attr name='n' format='integer' min='0'/>"
+                                                          "</resources>"},
+    "order-whole-path-styles-swapped": {
+        "values/styles.xml": "<resources><attr name='n' format='integer' min='0'/>"
+                             "<style name='S'><item name='n'>3</item></style></resources>",
+        "values-land/styles.xml": "<resources><attr name='n' format='integer' min='5'/></resources>"},
     "attr-unknown-child": values("<attr name='a'><foo/></attr>"),
     "attr-text-child": values("<attr name='a' format='color'>text<skip/></attr>"),
     "enum-values": values("<attr name='a'><enum name='x' value=' 5 '/><enum name='y' value='0x7fffffff'/>"
@@ -444,20 +458,34 @@ CASES = {
 }
 
 
+def flat_source(flat: str) -> str:
+    """The folder/name of res/ that compile made the .flat file `flat` of: values/a.xml makes
+    values_a.arsc.flat, and any other file raw/a.txt makes raw_a.txt.flat. A folder name has no '_'."""
+    folder, rest = flat.split("_", 1)
+    if rest.endswith(".arsc.flat"):
+        return f"{folder}/{rest[:-len('.arsc.flat')]}.xml"
+    return f"{folder}/{rest[:-len('.flat')]}"
+
+
 def link_dump(aapt2: Path, jar: Path, res: Path, package: str, work: Path):
     """Compiles and links `res`: (the dump, None), or (None, the first error)."""
     work.mkdir(parents=True, exist_ok=True)
-    flat = work / "c.zip"
-    result = subprocess.run([str(aapt2), "compile", "--dir", str(res), "-o", str(flat)],
+    flats = work / "flat"
+    flats.mkdir(exist_ok=True)
+    result = subprocess.run([str(aapt2), "compile", "--dir", str(res), "-o", str(flats)],
                             capture_output=True, text=True, encoding="utf-8")
     if result.returncode == 0:
         manifest = work / "AndroidManifest.xml"
         manifest.write_text('<manifest xmlns:android="http://schemas.android.com/apk/res/android" '
                             f'package="{package}"/>\n')
         apk = work / "out.apk"
+        # By folder/name, compared as Python compares strings: by code point, as UTF-8 bytes order.
+        order = sorted((p.name for p in flats.iterdir()), key=flat_source)
+        # Relative to the folder of .flat files, so that a large res/ stays within Windows's limit
+        # on the length of a command line.
         result = subprocess.run([str(aapt2), "link", "-I", str(jar), "--manifest", str(manifest),
-                                 *LINK_FLAGS, "-o", str(apk), str(flat)],
-                                capture_output=True, text=True, encoding="utf-8")
+                                 *LINK_FLAGS, "-o", str(apk), *order],
+                                capture_output=True, text=True, encoding="utf-8", cwd=flats)
         if result.returncode == 0:
             dump = subprocess.run([str(aapt2), "dump", "resources", str(apk)], check=True,
                                   capture_output=True, text=True, encoding="utf-8").stdout

@@ -114,13 +114,15 @@ void scanResFolder(const fs::path& res, ParsedFolder& out, Diagnostics& diag) {
     diag.error({res, 0}, "not a folder");
     return;
   }
-  // aapt2 compile --dir reads the files in the order of their whole path (a std::map of them), so
-  // res/values-land/a.xml ('-' is 0x2D) comes before res/values/a.xml ('/' is 0x2F), not each
-  // folder's files after the folder before it, and link keeps the first of two values that agree
-  // (#80). A folder name that starts another is followed by '-' in that one, which orders before
-  // Windows's '\' too.
+  // The files in the order of their folder/name as bytes, the order in which the golden files have
+  // aapt2 link merge the .flat files (#80): res/values-land/a.xml ('-' is 0x2D) before
+  // res/values/a.xml ('/' is 0x2F), not each folder's files after the folder before it. Link keeps
+  // the first of two values that agree, so the order shows. aapt2 has no one order of its own:
+  // compile --dir keeps the files by their native path, where Windows's '\' (0x5C) puts
+  // values-v21/ before values-v2/, and link merges the zip compile writes in an order that
+  // changes with the names in it.
   struct File {
-    std::string path;  // folder/name, by which aapt2 orders
+    std::string path;  // folder/name, by which the files are read
     std::string dirName;
     std::string fileName;
     fs::path file;
