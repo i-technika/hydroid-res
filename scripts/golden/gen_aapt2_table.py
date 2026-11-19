@@ -13,9 +13,10 @@ LINK_FLAGS and dumped with `aapt2 dump resources`. Link takes the .flat files in
 folder/name each came from and merges them in that order, the order hydroid reads them in too
 (#80). Linked as the one zip compile --dir writes instead, they merge in an order that changes
 with the names in it, so that the first of two values that agree is not the one of the first
-path. The flags turn off what aapt2 link does beyond what the folder says, which hydroid's
-ResourceTable does not do either: versioning styles and XML files, removing values of a locale
-with no default, and removing values another configuration repeats.
+path. Where the zip holds one name twice, as of values-/a.xml and values/a.xml, link takes the
+zip as it is and fails on it (#122). The flags turn off what aapt2 link does beyond what the
+folder says, which hydroid's ResourceTable does not do either: versioning styles and XML files,
+removing values of a locale with no default, and removing values another configuration repeats.
 The C++ test Aapt2TableTest loads each folder and checks that it dumps the same, so CI needs no
 Android SDK.
 
@@ -84,6 +85,11 @@ CASES = {
     "file-layout-no-extension": {"layout/l": "<a/>"},
     "file-duplicate-name": {"raw/a.txt": "x", "raw/a.bin": "y"},
     "file-same-name-other-config": {"raw/a.txt": "x", "raw-land/a.bin": "y"},
+    # Two files that compile to one .flat name, which link fails on (#122).
+    "file-same-flat-values": {"values-/a.xml": "<resources><string name='s'>s</string></resources>",
+                              "values/a.xml": "<resources><string name='t'>t</string></resources>"},
+    "file-same-flat-raw": {"raw-/x.txt": "x", "raw/x.txt": "y"},
+    "file-same-flat-other-name": {"raw-/x.txt": "x", "raw/y.txt": "y"},
     "file-and-value": {"raw/s.txt": "x",
                        "values/v.xml": "<resources><item type='raw' name='s'>@raw/s</item></resources>"},
     "folder-unknown-type": {"foo/x.png": "x"},
@@ -522,11 +528,17 @@ def link_dump(aapt2: Path, jar: Path, res: Path, package: str, work: Path):
                             f'package="{package}"/>\n')
         apk = work / "out.apk"
         with zipfile.ZipFile(archive) as z:
-            compiled = {info.filename for info in z.infolist()}
+            names = [info.filename for info in z.infolist()]
         flats = work / "flat"
-        order = ordered_flats(aapt2, res, flats, compiled)
-        # Relative to the folder of .flat files, so that a large res/ stays within Windows's limit
-        # on the length of a command line.
+        if len(set(names)) == len(names):
+            # Relative to the folder of .flat files, so that a large res/ stays within Windows's
+            # limit on the length of a command line.
+            order = ordered_flats(aapt2, res, flats, set(names))
+        else:
+            # Two files that compile to one name, as values-/a.xml and values/a.xml: link takes
+            # the zip as it is and fails on it (#122).
+            flats.mkdir(parents=True)
+            order = [str(archive)]
         result = subprocess.run([str(aapt2), "link", "-I", str(jar), "--manifest", str(manifest),
                                  *LINK_FLAGS, "-o", str(apk), *order],
                                 capture_output=True, text=True, encoding="utf-8", cwd=flats)
