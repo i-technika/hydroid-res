@@ -198,6 +198,17 @@ void scanResFolder(const fs::path& res, ParsedFolder& out, Diagnostics& diag) {
       diag.error({file, 0}, "invalid file path: not an .xml file in " + dirName);
       continue;
     }
+    // aapt2 compiles everything in xml/ as XML, and .xml files elsewhere but in raw/.
+    const bool xml =
+        !values && *type != ResType::Raw && (*type == ResType::Xml || extension == "xml");
+    const bool png =
+        !values && *type != ResType::Raw && (extension == "png" || extension == "9.png");
+    // aapt2 reserves '.' in the name of a file it compiles, as values, XML or PNG, though not of
+    // one it copies as it is, as raw/a.b.txt or drawable/a.b.jpg (#121).
+    if ((values || xml || png) && name.find('.') != std::string::npos) {
+      diag.error({file, 0}, "file name cannot contain '.' other than for specifying the extension");
+      continue;
+    }
     std::string text;
     if (const char* why = read(file, &text)) {
       diag.error({file, 0}, why);
@@ -216,8 +227,7 @@ void scanResFolder(const fs::path& res, ParsedFolder& out, Diagnostics& diag) {
     if (const size_t dot = fileName.find('.'); dot != std::string::npos) {
       ref.path += fileName.substr(dot);
     }
-    // aapt2 compiles everything in xml/ as XML, and .xml files elsewhere but in raw/.
-    if (*type != ResType::Raw && (*type == ResType::Xml || extension == "xml")) {
+    if (xml) {
       ref.type = FileType::Xml;
       XmlDocument doc;
       std::string why;
@@ -227,7 +237,7 @@ void scanResFolder(const fs::path& res, ParsedFolder& out, Diagnostics& diag) {
         continue;
       }
       IdCollector(doc, file, out, diag).visit(doc.root());
-    } else if (*type != ResType::Raw && (extension == "png" || extension == "9.png")) {
+    } else if (png) {
       ref.type = FileType::Png;
     }
     ParsedResource resource;
