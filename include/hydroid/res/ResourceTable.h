@@ -26,8 +26,10 @@
 //     resource; hidden files and folders, those whose name starts with '.', and folders inside
 //     those folders are skipped. In values*/, each .xml file holds resources; everywhere else
 //     each file is one, named for the file up to its last '.' ("icon" of icon.png, "a.b" of
-//     a.b.txt), or up to .9.png. Its path is that name and what follows the first '.' of the
-//     file name: aapt2 keeps a.b.txt as res/raw/a.b.b.txt.
+//     raw/a.b.txt), or up to .9.png. Its path is that name and what follows the first '.' of the
+//     file name: aapt2 keeps raw/a.b.txt as res/raw/a.b.b.txt. Only a file kept as it is may
+//     have a '.' in its name: a values file, and one compiled as XML or PNG (layout/a.b.xml,
+//     drawable/a.b.png), fails the load, as aapt2 fails it.
 //   - Type ids go to the types there are, in the order of ResType from 1, styleable included,
 //     although it holds nothing at runtime. Entry ids go to the entries of a type in the order of
 //     their names, as bytes, from 0.
