@@ -1,8 +1,8 @@
 #include "core/ResScanner.h"
 
 #include <algorithm>
-#include <fstream>
-#include <iterator>
+#include <cstdio>
+#include <memory>
 #include <optional>
 #include <set>
 #include <sstream>
@@ -15,6 +15,10 @@
 #include "core/ValuesParser.h"
 #include "core/Xml.h"
 #include "hydroid/res/ConfigParser.h"
+
+#ifdef _WIN32
+#include <share.h>
+#endif
 
 namespace hydroid::res::detail {
 namespace {
@@ -33,7 +37,9 @@ namespace fs = std::filesystem;
 // nothing is behind it to lack. aapt2 37.0.0 on Windows leaves such a folder out without
 // a word; its own message for a folder it fails to open is "failed to open directory", which
 // hydroid's is, the same everywhere, as the system's may not be UTF-8 (Windows writes it in the
-// ANSI code page). A file whose kind cannot be told is #86's.
+// ANSI code page). In a type folder, as in aapt2's FileCollection, only folders are left out:
+// anything else, a link to nothing or one whose kind cannot be told too, is a file, which read()
+// fails on (#86).
 std::vector<std::pair<std::string, fs::path>> list(const fs::path& dir, bool directories,
                                                    Diagnostics& diag) {
   std::vector<std::pair<std::string, fs::path>> out;
@@ -53,12 +59,14 @@ std::vector<std::pair<std::string, fs::path>> list(const fs::path& dir, bool dir
       continue;
     }
     std::error_code kind;
-    if (directories ? !e.is_directory(kind) : !e.is_regular_file(kind)) {
-      if (directories && kind && kind != std::errc::no_such_file_or_directory) {
+    const bool directory = e.is_directory(kind);
+    if (directories && !directory) {
+      if (kind && kind != std::errc::no_such_file_or_directory) {
         diag.error({e.path(), 0}, "failed to open directory");
       }
       continue;
     }
+    if (!directories && directory) continue;
     out.emplace_back(std::move(name), e.path());
   }
   if (ec) diag.error({dir, 0}, "failed to read directory");
@@ -66,11 +74,26 @@ std::vector<std::pair<std::string, fs::path>> list(const fs::path& dir, bool dir
   return out;
 }
 
-bool read(const fs::path& path, std::string* text) {
-  std::ifstream in(path, std::ios::binary);
-  if (!in) return false;
-  text->assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
-  return !in.bad();
+// The bytes of `path` into `text`, or why they cannot be had: aapt2's "failed to open file" for a
+// file that cannot be opened, a link to nothing among them, and for what is not a file once links
+// are followed, as a pipe, which aapt2 would open and wait on until something wrote to it (#86).
+// It reads by stdio, whose ferror() tells a failed read from the end of the file: through an
+// ifstream, MSVC's ends a failed read as if the file ended there, and libstdc++'s throws.
+const char* read(const fs::path& path, std::string* text) {
+  std::error_code ec;
+  if (!fs::is_regular_file(path, ec)) return "failed to open file";
+#ifdef _WIN32
+  // Shared for reading and writing, as fopen() opens it; _wfopen_s() would not share it.
+  std::unique_ptr<std::FILE, int (*)(std::FILE*)> f(_wfsopen(path.c_str(), L"rb", _SH_DENYNO),
+                                                    std::fclose);
+#else
+  std::unique_ptr<std::FILE, int (*)(std::FILE*)> f(std::fopen(path.c_str(), "rb"), std::fclose);
+#endif
+  if (!f) return "failed to open file";
+  text->clear();
+  char buffer[16384];
+  while (const size_t n = std::fread(buffer, 1, sizeof buffer, f.get())) text->append(buffer, n);
+  return std::ferror(f.get()) ? "failed to read file" : nullptr;
 }
 
 // ExtractResourcePathData: the resource name is the file name up to .9.png, else up to its last
@@ -176,8 +199,8 @@ void scanResFolder(const fs::path& res, ParsedFolder& out, Diagnostics& diag) {
       continue;
     }
     std::string text;
-    if (!read(file, &text)) {
-      diag.error({file, 0}, "cannot read the file");
+    if (const char* why = read(file, &text)) {
+      diag.error({file, 0}, why);
       continue;
     }
     if (values) {

@@ -3,10 +3,23 @@
 // configurations.
 
 #include <gtest/gtest.h>
+#ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <windows.h>
+#else
+#include <sys/stat.h>
+#endif
 
+#include <cstdio>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <memory>
 #include <optional>
 #include <sstream>
 #include <string>
@@ -621,6 +634,112 @@ TEST(ResourceTable, FolderLinkToNothingIsLeftOut) {
   EXPECT_TRUE(table.addPackage(res, "com.example", 0x7f, &errors)) << errorsOf(errors);
   EXPECT_TRUE(table.find("com.example:string/s"));
 }
+
+// Loads `res` and expects it to fail on res/raw/data.bin alone, which cannot be opened (#86).
+void expectDataBinFails(const std::filesystem::path& res) {
+  ResourceTable table;
+  std::vector<Diagnostic> errors;
+  EXPECT_FALSE(table.addPackage(res, "com.example", 0x7f, &errors));
+  ASSERT_EQ(errors.size(), 1u) << errorsOf(errors);
+  EXPECT_EQ(errors[0].message, "failed to open file");
+  EXPECT_EQ(errors[0].file.filename(), "data.bin");
+}
+
+// In a type folder, though, a link to a file that is not there fails the load, as aapt2 fails to
+// open it, rather than leaving raw/data.bin out (#86). Windows lets only a privileged user make
+// the link.
+TEST(ResourceTable, FileLinkToNothingFails) {
+  TempDir dir;
+  const std::filesystem::path res = dir.path() / "res";
+  std::filesystem::create_directories(res / "raw");
+  std::ofstream(res / "raw" / "ok.bin") << "ok";
+  std::error_code ec;
+  std::filesystem::create_symlink(dir.path() / "gone.bin", res / "raw" / "data.bin", ec);
+  if (ec) GTEST_SKIP() << "cannot make a symbolic link: " << ec.message();
+  expectDataBinFails(res);
+}
+
+// So does a link there to a folder that is not there, which cannot be told from a link to a file
+// elsewhere than Windows. aapt2 on Windows leaves it out, taking it by its attributes for a folder,
+// which hydroid does not, so that a load never quietly lacks what such a name meant to bring.
+TEST(ResourceTable, FolderLinkToNothingInATypeFolderFails) {
+  TempDir dir;
+  const std::filesystem::path res = dir.path() / "res";
+  const std::filesystem::path target = dir.path() / "gone";
+  std::filesystem::create_directories(res / "raw" / "sub");  // a folder is still left out
+  std::filesystem::create_directories(target);
+  ASSERT_TRUE(linkFolder(res / "raw" / "data.bin", target));
+  std::filesystem::remove(target);
+  expectDataBinFails(res);
+}
+
+#ifndef _WIN32
+// A pipe is not opened, which would wait until something wrote to it.
+TEST(ResourceTable, PipeFails) {
+  TempDir dir;
+  const std::filesystem::path res = dir.path() / "res";
+  std::filesystem::create_directories(res / "raw");
+  ASSERT_EQ(mkfifo((res / "raw" / "data.bin").c_str(), 0600), 0);
+  expectDataBinFails(res);
+}
+#endif
+
+#ifdef _WIN32
+// A file that opens but cannot be read, as another holds a lock on its bytes, fails the load
+// rather than being taken for an empty file.
+TEST(ResourceTable, FileThatCannotBeReadFails) {
+  TempDir dir;
+  const std::filesystem::path res = dir.path() / "res";
+  const std::filesystem::path file = res / "raw" / "data.bin";
+  std::filesystem::create_directories(file.parent_path());
+  std::ofstream(file) << "data";
+  struct Locked {
+    HANDLE handle;
+    OVERLAPPED at{};
+    ~Locked() {
+      UnlockFileEx(handle, 0, 1, 0, &at);
+      CloseHandle(handle);
+    }
+  };
+  const HANDLE handle = CreateFileW(file.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
+                                    nullptr, OPEN_EXISTING, 0, nullptr);
+  ASSERT_NE(handle, INVALID_HANDLE_VALUE);
+  Locked locked{handle};  // after the TempDir, so that it goes first
+  ASSERT_TRUE(
+      LockFileEx(handle, LOCKFILE_EXCLUSIVE_LOCK | LOCKFILE_FAIL_IMMEDIATELY, 0, 1, 0, &locked.at));
+  ResourceTable table;
+  std::vector<Diagnostic> errors;
+  EXPECT_FALSE(table.addPackage(res, "com.example", 0x7f, &errors));
+  ASSERT_EQ(errors.size(), 1u) << errorsOf(errors);
+  EXPECT_EQ(errors[0].message, "failed to read file");
+  EXPECT_EQ(errors[0].file.filename(), "data.bin");
+}
+#endif
+
+#ifdef __linux__
+// So does one on Linux, here a link to /proc/self/mem: a regular file that opens, whose byte 0,
+// unmapped, cannot be read. Through an ifstream, libstdc++ threw out of addPackage on it.
+TEST(ResourceTable, FileThatCannotBeReadFailsOnLinux) {
+  {
+    std::unique_ptr<std::FILE, int (*)(std::FILE*)> mem(std::fopen("/proc/self/mem", "rb"),
+                                                        std::fclose);
+    char byte;
+    if (!mem || std::fread(&byte, 1, 1, mem.get()) != 0 || !std::ferror(mem.get())) {
+      GTEST_SKIP() << "/proc/self/mem does not fail to read here";
+    }
+  }
+  TempDir dir;
+  const std::filesystem::path res = dir.path() / "res";
+  std::filesystem::create_directories(res / "raw");
+  std::filesystem::create_symlink("/proc/self/mem", res / "raw" / "data.bin");
+  ResourceTable table;
+  std::vector<Diagnostic> errors;
+  EXPECT_FALSE(table.addPackage(res, "com.example", 0x7f, &errors));
+  ASSERT_EQ(errors.size(), 1u) << errorsOf(errors);
+  EXPECT_EQ(errors[0].message, "failed to read file");
+  EXPECT_EQ(errors[0].file.filename(), "data.bin");
+}
+#endif
 
 // The dump writes numbers as printf does in the C locale, whatever the host app set.
 TEST(TableDump, NumbersIgnoreTheLocale) {
