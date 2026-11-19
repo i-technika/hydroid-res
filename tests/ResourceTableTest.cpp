@@ -4,11 +4,14 @@
 
 #include <gtest/gtest.h>
 
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <optional>
 #include <sstream>
 #include <string>
+#include <system_error>
+#include <utility>
 #include <vector>
 
 #include "DecimalCommaLocale.h"
@@ -513,6 +516,60 @@ TEST(ResourceTable, AttrNameIsParseXmlAttributeNames) {
     ASSERT_EQ(errors.size(), 1u) << body << errorsOf(errors);
     EXPECT_NE(errors[0].message.find(expected), std::string::npos) << errors[0];
   }
+}
+
+// Keeps everyone from listing `dir` while it lives, and lets them again after: by an ACL on
+// Windows, where permissions() only sets the read-only flag, and by its mode elsewhere.
+class Unlistable {
+ public:
+  explicit Unlistable(std::filesystem::path dir) : dir_(std::move(dir)) {
+#ifdef _WIN32
+    icacls("/deny *S-1-1-0:(RX)");  // S-1-1-0 is Everyone
+#else
+    std::filesystem::permissions(dir_, std::filesystem::perms::none);
+#endif
+  }
+  ~Unlistable() {
+#ifdef _WIN32
+    icacls("/remove:d *S-1-1-0");
+#else
+    std::error_code ec;
+    std::filesystem::permissions(dir_, std::filesystem::perms::owner_all, ec);
+#endif
+  }
+  // Whether it took: a user who may list any folder, as root, still lists this one.
+  bool works() const {
+    std::error_code ec;
+    std::filesystem::directory_iterator(dir_, ec);
+    return static_cast<bool>(ec);
+  }
+
+ private:
+#ifdef _WIN32
+  void icacls(const std::string& args) const {
+    std::system(("icacls \"" + dir_.string() + "\" " + args + " >nul").c_str());
+  }
+#endif
+  std::filesystem::path dir_;
+};
+
+// A folder of res/ that cannot be opened fails the load, rather than leaving its values out as
+// aapt2 37.0.0 does without a word (#85).
+TEST(ResourceTable, FolderThatCannotBeOpenedFails) {
+  TempDir dir;
+  const std::filesystem::path res = dir.path() / "res";
+  for (const char* folder : {"values", "values-fr"}) {
+    std::filesystem::create_directories(res / folder);
+    std::ofstream(res / folder / "v.xml") << "<resources><string name='s'>x</string></resources>";
+  }
+  const Unlistable fr(res / "values-fr");  // after the TempDir, so that it goes first
+  if (!fr.works()) GTEST_SKIP() << "this user may list a folder that denies it";
+  ResourceTable table;
+  std::vector<Diagnostic> errors;
+  EXPECT_FALSE(table.addPackage(res, "com.example", 0x7f, &errors));
+  ASSERT_EQ(errors.size(), 1u) << errorsOf(errors);
+  EXPECT_EQ(errors[0].message, "failed to open directory");
+  EXPECT_EQ(errors[0].file.filename(), "values-fr");
 }
 
 // The dump writes numbers as printf does in the C locale, whatever the host app set.

@@ -27,20 +27,33 @@ namespace fs = std::filesystem;
 // has nothing in it, and anything so named in a type folder, a folder too, is not found. (It
 // does not find a name past the ANSI code page either, é.txt as e.txt, which hydroid reads, as
 // aapt2 does on other systems.)
+// A folder that cannot be opened or read to its end is an error (#85), where aapt2 37.0.0 leaves
+// its files out without a word, so that a load never quietly lacks, say, values-fr/. The message
+// is the same everywhere, as the system's own may not be UTF-8 (Windows writes it in the ANSI
+// code page).
 std::vector<std::pair<std::string, fs::path>> list(const fs::path& dir, bool directories,
                                                    Diagnostics& diag) {
   std::vector<std::pair<std::string, fs::path>> out;
   std::error_code ec;
-  for (const fs::directory_entry& e : fs::directory_iterator(dir, ec)) {
+  fs::directory_iterator it(dir, ec);
+  if (ec) {
+    diag.error({dir, 0}, "failed to open directory");
+    return out;
+  }
+  // increment(ec) rather than a range-for, whose ++ throws filesystem_error out of addPackage.
+  for (; !ec && it != fs::directory_iterator(); it.increment(ec)) {
+    const fs::directory_entry& e = *it;
     std::string name = utf8(e.path().filename());
     if (name.empty() || name[0] == '.') continue;  // file::IsHidden
     if (!isUnicode(e.path().filename())) {
       if (!directories) diag.error({e.path(), 0}, "file not found");
       continue;
     }
-    if (directories ? !e.is_directory(ec) : !e.is_regular_file(ec)) continue;
+    std::error_code kind;
+    if (directories ? !e.is_directory(kind) : !e.is_regular_file(kind)) continue;
     out.emplace_back(std::move(name), e.path());
   }
+  if (ec) diag.error({dir, 0}, "failed to read directory");
   std::sort(out.begin(), out.end());
   return out;
 }
