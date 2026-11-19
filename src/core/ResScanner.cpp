@@ -91,15 +91,7 @@ class IdCollector {
         continue;
       }
       if (!seen_.insert(ref->name.entry).second) continue;
-      ParsedResource id;
-      id.type = ResType::Id;
-      id.name = ref->name.entry;
-      ParsedItem item;
-      item.kind = ParsedItem::Kind::Id;
-      item.source = source;
-      id.value = std::move(item);
-      id.source = source;
-      out_.resources.push_back(std::move(id));
+      out_.resources.push_back(makeIdResource(ref->name.entry, source));
     }
     for (pugi::xml_node child : element.children()) {
       if (child.type() == pugi::node_element) visit(child);
