@@ -1,8 +1,8 @@
 #include "core/ResScanner.h"
 
 #include <algorithm>
-#include <fstream>
-#include <iterator>
+#include <cstdio>
+#include <memory>
 #include <optional>
 #include <set>
 #include <sstream>
@@ -15,6 +15,10 @@
 #include "core/ValuesParser.h"
 #include "core/Xml.h"
 #include "hydroid/res/ConfigParser.h"
+
+#ifdef _WIN32
+#include <share.h>
+#endif
 
 namespace hydroid::res::detail {
 namespace {
@@ -73,13 +77,23 @@ std::vector<std::pair<std::string, fs::path>> list(const fs::path& dir, bool dir
 // The bytes of `path` into `text`, or why they cannot be had: aapt2's "failed to open file" for a
 // file that cannot be opened, a link to nothing among them, and for what is not a file once links
 // are followed, as a pipe, which aapt2 would open and wait on until something wrote to it (#86).
+// It reads by stdio, whose ferror() tells a failed read from the end of the file: through an
+// ifstream, MSVC's ends a failed read as if the file ended there, and libstdc++'s throws.
 const char* read(const fs::path& path, std::string* text) {
   std::error_code ec;
   if (!fs::is_regular_file(path, ec)) return "failed to open file";
-  std::ifstream in(path, std::ios::binary);
-  if (!in) return "failed to open file";
-  text->assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
-  return in.bad() ? "failed to read file" : nullptr;
+#ifdef _WIN32
+  // Shared for reading and writing, as fopen() opens it; _wfopen_s() would not share it.
+  std::unique_ptr<std::FILE, int (*)(std::FILE*)> f(_wfsopen(path.c_str(), L"rb", _SH_DENYNO),
+                                                    std::fclose);
+#else
+  std::unique_ptr<std::FILE, int (*)(std::FILE*)> f(std::fopen(path.c_str(), "rb"), std::fclose);
+#endif
+  if (!f) return "failed to open file";
+  text->clear();
+  char buffer[16384];
+  while (const size_t n = std::fread(buffer, 1, sizeof buffer, f.get())) text->append(buffer, n);
+  return std::ferror(f.get()) ? "failed to read file" : nullptr;
 }
 
 // ExtractResourcePathData: the resource name is the file name up to .9.png, else up to its last

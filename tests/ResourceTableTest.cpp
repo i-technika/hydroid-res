@@ -3,7 +3,15 @@
 // configurations.
 
 #include <gtest/gtest.h>
-#ifndef _WIN32
+#ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <windows.h>
+#else
 #include <sys/stat.h>
 #endif
 
@@ -671,6 +679,38 @@ TEST(ResourceTable, PipeFails) {
   std::filesystem::create_directories(res / "raw");
   ASSERT_EQ(mkfifo((res / "raw" / "data.bin").c_str(), 0600), 0);
   expectDataBinFails(res);
+}
+#endif
+
+#ifdef _WIN32
+// A file that opens but cannot be read, as another holds a lock on its bytes, fails the load
+// rather than being taken for an empty file.
+TEST(ResourceTable, FileThatCannotBeReadFails) {
+  TempDir dir;
+  const std::filesystem::path res = dir.path() / "res";
+  const std::filesystem::path file = res / "raw" / "data.bin";
+  std::filesystem::create_directories(file.parent_path());
+  std::ofstream(file) << "data";
+  struct Locked {
+    HANDLE handle;
+    OVERLAPPED at{};
+    ~Locked() {
+      UnlockFileEx(handle, 0, 1, 0, &at);
+      CloseHandle(handle);
+    }
+  };
+  const HANDLE handle = CreateFileW(file.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
+                                    nullptr, OPEN_EXISTING, 0, nullptr);
+  ASSERT_NE(handle, INVALID_HANDLE_VALUE);
+  Locked locked{handle};  // after the TempDir, so that it goes first
+  ASSERT_TRUE(
+      LockFileEx(handle, LOCKFILE_EXCLUSIVE_LOCK | LOCKFILE_FAIL_IMMEDIATELY, 0, 1, 0, &locked.at));
+  ResourceTable table;
+  std::vector<Diagnostic> errors;
+  EXPECT_FALSE(table.addPackage(res, "com.example", 0x7f, &errors));
+  ASSERT_EQ(errors.size(), 1u) << errorsOf(errors);
+  EXPECT_EQ(errors[0].message, "failed to read file");
+  EXPECT_EQ(errors[0].file.filename(), "data.bin");
 }
 #endif
 
