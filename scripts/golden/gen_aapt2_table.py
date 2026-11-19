@@ -13,9 +13,10 @@ LINK_FLAGS and dumped with `aapt2 dump resources`. Link takes the .flat files in
 folder/name each came from and merges them in that order, the order hydroid reads them in too
 (#80). Linked as the one zip compile --dir writes instead, they merge in an order that changes
 with the names in it, so that the first of two values that agree is not the one of the first
-path. The flags turn off what aapt2 link does beyond what the folder says, which hydroid's
-ResourceTable does not do either: versioning styles and XML files, removing values of a locale
-with no default, and removing values another configuration repeats.
+path. Where the zip holds one name twice, as of values-/a.xml and values/a.xml, link takes the
+zip as it is and fails on it (#122). The flags turn off what aapt2 link does beyond what the
+folder says, which hydroid's ResourceTable does not do either: versioning styles and XML files,
+removing values of a locale with no default, and removing values another configuration repeats.
 The C++ test Aapt2TableTest loads each folder and checks that it dumps the same, so CI needs no
 Android SDK.
 
