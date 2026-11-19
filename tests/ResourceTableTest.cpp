@@ -15,9 +15,11 @@
 #include <sys/stat.h>
 #endif
 
+#include <cstdio>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <memory>
 #include <optional>
 #include <sstream>
 #include <string>
@@ -705,6 +707,31 @@ TEST(ResourceTable, FileThatCannotBeReadFails) {
   Locked locked{handle};  // after the TempDir, so that it goes first
   ASSERT_TRUE(
       LockFileEx(handle, LOCKFILE_EXCLUSIVE_LOCK | LOCKFILE_FAIL_IMMEDIATELY, 0, 1, 0, &locked.at));
+  ResourceTable table;
+  std::vector<Diagnostic> errors;
+  EXPECT_FALSE(table.addPackage(res, "com.example", 0x7f, &errors));
+  ASSERT_EQ(errors.size(), 1u) << errorsOf(errors);
+  EXPECT_EQ(errors[0].message, "failed to read file");
+  EXPECT_EQ(errors[0].file.filename(), "data.bin");
+}
+#endif
+
+#ifdef __linux__
+// So does one on Linux, here a link to /proc/self/mem: a regular file that opens, whose byte 0,
+// unmapped, cannot be read. Through an ifstream, libstdc++ threw out of addPackage on it.
+TEST(ResourceTable, FileThatCannotBeReadFailsOnLinux) {
+  {
+    std::unique_ptr<std::FILE, int (*)(std::FILE*)> mem(std::fopen("/proc/self/mem", "rb"),
+                                                        std::fclose);
+    char byte;
+    if (!mem || std::fread(&byte, 1, 1, mem.get()) != 0 || !std::ferror(mem.get())) {
+      GTEST_SKIP() << "/proc/self/mem does not fail to read here";
+    }
+  }
+  TempDir dir;
+  const std::filesystem::path res = dir.path() / "res";
+  std::filesystem::create_directories(res / "raw");
+  std::filesystem::create_symlink("/proc/self/mem", res / "raw" / "data.bin");
   ResourceTable table;
   std::vector<Diagnostic> errors;
   EXPECT_FALSE(table.addPackage(res, "com.example", 0x7f, &errors));
