@@ -27,10 +27,12 @@ namespace fs = std::filesystem;
 // has nothing in it, and anything so named in a type folder, a folder too, is not found. (It
 // does not find a name past the ANSI code page either, é.txt as e.txt, which hydroid reads, as
 // aapt2 does on other systems.)
-// A folder that cannot be opened or read to its end is an error (#85), where aapt2 37.0.0 leaves
-// its files out without a word, so that a load never quietly lacks, say, values-fr/. The message
-// is the same everywhere, as the system's own may not be UTF-8 (Windows writes it in the ANSI
-// code page).
+// A folder that cannot be opened or read to its end is an error (#85), and so is an entry of res/
+// whose kind cannot be told, as a junction or link to a folder that denies it, so that a load
+// never quietly lacks, say, values-fr/. aapt2 37.0.0 on Windows leaves such a folder out without
+// a word; its own message for a folder it fails to open is "failed to open directory", which
+// hydroid's is, the same everywhere, as the system's may not be UTF-8 (Windows writes it in the
+// ANSI code page). A file whose kind cannot be told is #86's.
 std::vector<std::pair<std::string, fs::path>> list(const fs::path& dir, bool directories,
                                                    Diagnostics& diag) {
   std::vector<std::pair<std::string, fs::path>> out;
@@ -50,7 +52,10 @@ std::vector<std::pair<std::string, fs::path>> list(const fs::path& dir, bool dir
       continue;
     }
     std::error_code kind;
-    if (directories ? !e.is_directory(kind) : !e.is_regular_file(kind)) continue;
+    if (directories ? !e.is_directory(kind) : !e.is_regular_file(kind)) {
+      if (directories && kind) diag.error({e.path(), 0}, "failed to open directory");
+      continue;
+    }
     out.emplace_back(std::move(name), e.path());
   }
   if (ec) diag.error({dir, 0}, "failed to read directory");

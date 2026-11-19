@@ -554,7 +554,7 @@ class Unlistable {
 };
 
 // A folder of res/ that cannot be opened fails the load, rather than leaving its values out as
-// aapt2 37.0.0 does without a word (#85).
+// aapt2 37.0.0 on Windows does without a word (#85).
 TEST(ResourceTable, FolderThatCannotBeOpenedFails) {
   TempDir dir;
   const std::filesystem::path res = dir.path() / "res";
@@ -563,6 +563,34 @@ TEST(ResourceTable, FolderThatCannotBeOpenedFails) {
     std::ofstream(res / folder / "v.xml") << "<resources><string name='s'>x</string></resources>";
   }
   const Unlistable fr(res / "values-fr");  // after the TempDir, so that it goes first
+  if (!fr.works()) GTEST_SKIP() << "this user may list a folder that denies it";
+  ResourceTable table;
+  std::vector<Diagnostic> errors;
+  EXPECT_FALSE(table.addPackage(res, "com.example", 0x7f, &errors));
+  ASSERT_EQ(errors.size(), 1u) << errorsOf(errors);
+  EXPECT_EQ(errors[0].message, "failed to open directory");
+  EXPECT_EQ(errors[0].file.filename(), "values-fr");
+}
+
+// So does a link to a folder that cannot be opened: a junction on Windows, which needs no
+// privilege as a symbolic link does there, whose kind cannot be told, and a symbolic link
+// elsewhere, which then fails to open.
+TEST(ResourceTable, FolderLinkThatCannotBeOpenedFails) {
+  TempDir dir;
+  const std::filesystem::path res = dir.path() / "res";
+  const std::filesystem::path target = dir.path() / "fr";
+  std::filesystem::create_directories(res / "values");
+  std::filesystem::create_directories(target);
+  std::ofstream(res / "values" / "v.xml") << "<resources><string name='s'>x</string></resources>";
+  std::ofstream(target / "v.xml") << "<resources><string name='s'>y</string></resources>";
+#ifdef _WIN32
+  const std::string mklink =
+      "mklink /J \"" + (res / "values-fr").string() + "\" \"" + target.string() + "\" >nul";
+  ASSERT_EQ(std::system(mklink.c_str()), 0);
+#else
+  std::filesystem::create_directory_symlink(target, res / "values-fr");
+#endif
+  const Unlistable fr(target);
   if (!fr.works()) GTEST_SKIP() << "this user may list a folder that denies it";
   ResourceTable table;
   std::vector<Diagnostic> errors;

@@ -206,7 +206,7 @@ class ResourceTable {
   // that is not Unicode text (on Windows) is read as aapt2 reads it: a folder of res/ so named has
   // nothing in it, and a file or folder so named in a type folder is an error, "file not found".
   // Nothing about the folder throws: a folder that cannot be opened or read, a file that cannot be
-  // read, is an error in `errors` too, where aapt2 leaves a folder it cannot open out.
+  // read, is an error in `errors` too, where aapt2 on Windows leaves a folder it cannot open out.
   HYDROID_RES_API bool addPackage(const std::filesystem::path& res, std::string_view name,
                                   uint8_t id, std::vector<Diagnostic>* errors = nullptr);
 
