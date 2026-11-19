@@ -323,18 +323,8 @@ class Parser {
     out_.resources.push_back(std::move(res));
   }
 
-  // An id that @+id/ or an <enum> or <flag> makes: weak, in the default configuration.
-  void addId(const std::string& name, const Source& source) {
-    ParsedResource id;
-    id.type = ResType::Id;
-    id.name = name;
-    ParsedItem item;
-    item.kind = ParsedItem::Kind::Id;
-    item.source = source;
-    id.value = std::move(item);
-    id.source = source;
-    add(std::move(id));
-  }
+  // An id that @+id/ or an <enum> or <flag> makes, its name checked as any resource's.
+  void addId(const std::string& name, const Source& source) { add(makeIdResource(name, source)); }
 
   bool parseResource(pugi::xml_node el, ParsedResource& res) {
     const std::string_view element = el.name();
@@ -957,6 +947,18 @@ bool isValidEntryName(std::string_view name) {
     if (!ok) return false;
   }
   return true;
+}
+
+ParsedResource makeIdResource(std::string name, const Source& source) {
+  ParsedResource id;
+  id.type = ResType::Id;
+  id.name = std::move(name);
+  ParsedItem item;
+  item.kind = ParsedItem::Kind::Id;
+  item.source = source;
+  id.value = std::move(item);
+  id.source = source;
+  return id;
 }
 
 void parseValues(std::string_view xml, const std::filesystem::path& file, const Config& config,

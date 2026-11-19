@@ -136,6 +136,11 @@ struct ParsedFolder {
 // letters or digits ("é", "가", but not "€"), which this takes them all for.
 bool isValidEntryName(std::string_view name);
 
+// The id resource that @+id/`name`, in a values file or an attribute of an XML file, or an <enum>
+// or <flag> makes: weak, in the default configuration, its value only standing for its ResId. The
+// one place that says what such a resource is, for the values parser and the scanner (#90).
+ParsedResource makeIdResource(std::string name, const Source& source);
+
 // Attribute::MaskString: "reference|color", "any" for kFormatAny.
 std::string formatsToString(uint32_t formats);
 
