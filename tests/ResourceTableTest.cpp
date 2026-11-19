@@ -741,6 +741,28 @@ TEST(ResourceTable, FileThatCannotBeReadFailsOnLinux) {
 }
 #endif
 
+// A '.' in the name of a file that is compiled fails the load with aapt2's message, one for each
+// such file, while a file that is copied as it is may have one (#121).
+TEST(ResourceTable, DotInTheNameOfACompiledFileFails) {
+  TempDir dir;
+  ResourceTable table;
+  std::vector<Diagnostic> errors;
+  EXPECT_FALSE(load(table, dir,
+                    {{"values/a.b.xml", "<resources/>"},
+                     {"layout/a.b.xml", "<a/>"},
+                     {"drawable/n.b.9.png", "x"},
+                     {"drawable/a.b.jpg", "x"},
+                     {"raw/a.b.txt", "x"}},
+                    "com.example", 0x7f, &errors));
+  ASSERT_EQ(errors.size(), 3u) << errorsOf(errors);
+  for (const Diagnostic& e : errors) {
+    EXPECT_EQ(e.message, "file name cannot contain '.' other than for specifying the extension");
+  }
+  EXPECT_EQ(errors[0].file.filename(), "n.b.9.png");
+  EXPECT_EQ(errors[1].file.filename(), "a.b.xml");
+  EXPECT_EQ(errors[2].file.filename(), "a.b.xml");
+}
+
 // The dump writes numbers as printf does in the C locale, whatever the host app set.
 TEST(TableDump, NumbersIgnoreTheLocale) {
   TempDir dir;

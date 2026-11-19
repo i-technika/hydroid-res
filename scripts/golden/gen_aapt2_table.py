@@ -69,6 +69,15 @@ CASES = {
     # "e.txt" and does not find.
     "file-names": {"raw/Upper.TXT": "x", "raw/1digit.txt": "x", "raw/da-sh.txt": "x",
                    "raw/noext": "x", "raw/two.dots.txt": "x"},
+    # aapt2 rejects a '.' in the name of a file it compiles, as values, XML or PNG, and not of one
+    # it copies as it is, as raw/two.dots.txt above and a.b.jpg here (#121).
+    "file-two-dots-values": {"values/a.b.xml": "<resources/>"},
+    "file-two-dots-layout": {"layout/a.b.xml": "<a/>"},
+    "file-two-dots-drawable-xml": {"drawable/a.b.xml": "<a/>"},
+    "file-two-dots-xml-folder": {"xml/a.b.txt": "<a/>"},
+    "file-two-dots-png": {"drawable/a.b.png": "x"},
+    "file-two-dots-nine-patch": {"drawable/a.b.9.png": "x"},
+    "file-two-dots-copied": {"drawable/a.b.jpg": "x"},
     "file-nine-patch-name": {"raw/n.9.png": "x", "raw/m.9.txt": "x"},
     "file-raw-png": {"raw/p.png": "not a PNG, but raw/ is not read"},
     "file-xml-folder-txt": {"xml/y.txt": "<not xml"},
