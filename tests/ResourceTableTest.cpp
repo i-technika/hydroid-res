@@ -3,6 +3,9 @@
 // configurations.
 
 #include <gtest/gtest.h>
+#ifndef _WIN32
+#include <sys/stat.h>
+#endif
 
 #include <cstdlib>
 #include <filesystem>
@@ -621,6 +624,55 @@ TEST(ResourceTable, FolderLinkToNothingIsLeftOut) {
   EXPECT_TRUE(table.addPackage(res, "com.example", 0x7f, &errors)) << errorsOf(errors);
   EXPECT_TRUE(table.find("com.example:string/s"));
 }
+
+// Loads `res` and expects it to fail on res/raw/data.bin alone, which cannot be opened (#86).
+void expectDataBinFails(const std::filesystem::path& res) {
+  ResourceTable table;
+  std::vector<Diagnostic> errors;
+  EXPECT_FALSE(table.addPackage(res, "com.example", 0x7f, &errors));
+  ASSERT_EQ(errors.size(), 1u) << errorsOf(errors);
+  EXPECT_EQ(errors[0].message, "failed to open file");
+  EXPECT_EQ(errors[0].file.filename(), "data.bin");
+}
+
+// In a type folder, though, a link to a file that is not there fails the load, as aapt2 fails to
+// open it, rather than leaving raw/data.bin out (#86). Windows lets only a privileged user make
+// the link.
+TEST(ResourceTable, FileLinkToNothingFails) {
+  TempDir dir;
+  const std::filesystem::path res = dir.path() / "res";
+  std::filesystem::create_directories(res / "raw");
+  std::ofstream(res / "raw" / "ok.bin") << "ok";
+  std::error_code ec;
+  std::filesystem::create_symlink(dir.path() / "gone.bin", res / "raw" / "data.bin", ec);
+  if (ec) GTEST_SKIP() << "cannot make a symbolic link: " << ec.message();
+  expectDataBinFails(res);
+}
+
+// So does a link there to a folder that is not there, which cannot be told from a link to a file
+// elsewhere than Windows. aapt2 on Windows leaves it out, taking it by its attributes for a folder,
+// which hydroid does not, so that a load never quietly lacks what such a name meant to bring.
+TEST(ResourceTable, FolderLinkToNothingInATypeFolderFails) {
+  TempDir dir;
+  const std::filesystem::path res = dir.path() / "res";
+  const std::filesystem::path target = dir.path() / "gone";
+  std::filesystem::create_directories(res / "raw" / "sub");  // a folder is still left out
+  std::filesystem::create_directories(target);
+  ASSERT_TRUE(linkFolder(res / "raw" / "data.bin", target));
+  std::filesystem::remove(target);
+  expectDataBinFails(res);
+}
+
+#ifndef _WIN32
+// A pipe is not opened, which would wait until something wrote to it.
+TEST(ResourceTable, PipeFails) {
+  TempDir dir;
+  const std::filesystem::path res = dir.path() / "res";
+  std::filesystem::create_directories(res / "raw");
+  ASSERT_EQ(mkfifo((res / "raw" / "data.bin").c_str(), 0600), 0);
+  expectDataBinFails(res);
+}
+#endif
 
 // The dump writes numbers as printf does in the C locale, whatever the host app set.
 TEST(TableDump, NumbersIgnoreTheLocale) {
