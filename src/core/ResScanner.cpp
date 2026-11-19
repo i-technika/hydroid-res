@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstdio>
+#include <map>
 #include <memory>
 #include <optional>
 #include <set>
@@ -179,6 +180,7 @@ void scanResFolder(const fs::path& res, ParsedFolder& out, Diagnostics& diag) {
   }
   std::sort(files.begin(), files.end(),
             [](const File& a, const File& b) { return a.path < b.path; });
+  std::map<std::string, std::string> flats;  // compiled name -> folder/name
   for (const auto& [path, dirName, fileName, file] : files) {
     const std::optional<ResDir> resDir = parseResDir(dirName);
     const bool values = resDir && resDir->type == "values";
@@ -207,6 +209,18 @@ void scanResFolder(const fs::path& res, ParsedFolder& out, Diagnostics& diag) {
     // one it copies as it is, as raw/a.b.txt or drawable/a.b.jpg (#121).
     if ((values || xml || png) && name.find('.') != std::string::npos) {
       diag.error({file, 0}, "file name cannot contain '.' other than for specifying the extension");
+      continue;
+    }
+    // The name aapt2 compile gives the file: the folder's name, less a '-' nothing follows, '_'
+    // and the file's name, with .arsc for the .xml of a values file, then .flat. aapt2 link
+    // fails on two files of one name, "Duplicate entries in archive", as values-/a.xml and
+    // values/a.xml (#122).
+    const size_t dash = dirName.find('-');
+    std::string flat =
+        dash != std::string::npos && dash + 1 == dirName.size() ? dirName.substr(0, dash) : dirName;
+    flat += "_" + (values ? name + ".arsc" : fileName) + ".flat";
+    if (const auto [it, added] = flats.emplace(flat, path); !added) {
+      diag.error({file, 0}, "compiles to " + flat + ", as " + it->second + " does");
       continue;
     }
     std::string text;

@@ -29,7 +29,8 @@
 //     raw/a.b.txt), or up to .9.png. Its path is that name and what follows the first '.' of the
 //     file name: aapt2 keeps raw/a.b.txt as res/raw/a.b.b.txt. Only a file kept as it is may
 //     have a '.' in its name: a values file, and one compiled as XML or PNG (layout/a.b.xml,
-//     drawable/a.b.png), fails the load, as aapt2 fails it.
+//     drawable/a.b.png), fails the load, as aapt2 fails it. So do two files aapt2 compiles to
+//     one name, as values-/a.xml and values/a.xml.
 //   - Type ids go to the types there are, in the order of ResType from 1, styleable included,
 //     although it holds nothing at runtime. Entry ids go to the entries of a type in the order of
 //     their names, as bytes, from 0.

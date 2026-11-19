@@ -763,6 +763,24 @@ TEST(ResourceTable, DotInTheNameOfACompiledFileFails) {
   EXPECT_EQ(errors[2].file.filename(), "a.b.xml");
 }
 
+// Two files that aapt2 compiles to one name, as a folder that ends in '-' and the folder without
+// it give, fail the load, on the second of them by folder/name (#122).
+TEST(ResourceTable, FilesOfOneCompiledNameFail) {
+  TempDir dir;
+  ResourceTable table;
+  std::vector<Diagnostic> errors;
+  EXPECT_FALSE(load(table, dir,
+                    {{"values-/a.xml", "<resources><string name='s'>s</string></resources>"},
+                     {"values/a.xml", "<resources><string name='t'>t</string></resources>"},
+                     {"raw-/x.txt", "x"},
+                     {"raw/x.txt", "y"},
+                     {"raw/y.txt", "y"}},
+                    "com.example", 0x7f, &errors));
+  ASSERT_EQ(errors.size(), 2u) << errorsOf(errors);
+  EXPECT_EQ(errors[0].message, "compiles to raw_x.txt.flat, as raw-/x.txt does");
+  EXPECT_EQ(errors[1].message, "compiles to values_a.arsc.flat, as values-/a.xml does");
+}
+
 // The dump writes numbers as printf does in the C locale, whatever the host app set.
 TEST(TableDump, NumbersIgnoreTheLocale) {
   TempDir dir;
