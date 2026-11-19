@@ -77,13 +77,7 @@ class IdCollector {
       : doc_(doc), file_(file), out_(out), diag_(diag) {}
 
   void visit(pugi::xml_node element) {
-    const std::optional<std::string> ns = elementNamespace(element);
-    if (!ns) {
-      diag_.error({file_, doc_.line(element)},
-                  "unbound prefix of <" + std::string(element.name()) + ">");
-      return;
-    }
-    if (*ns == kAaptNamespace && localName(element.name()) == "attr") {
+    if (elementNamespace(element) == kAaptNamespace && localName(element.name()) == "attr") {
       diag_.error({file_, doc_.line(element)}, "inline <aapt:attr> is not supported yet");
       return;
     }

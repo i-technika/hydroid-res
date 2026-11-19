@@ -216,10 +216,9 @@ class Linker {
   // enum or flags its attribute takes, else a string if it takes one.
   std::optional<Value> coerce(const ParsedItem& raw, const AttrInfo& attr) {
     const std::string& text = raw.text;
-    if (text == "@null") return Value::null();
-    if (text == "@empty") return Value::empty();
-    // Compile has read every reference but @+id/ of a name no id can have. aapt2 reads that one
-    // here, after it has resolved references, so it stays unresolved and flattens to 0: @null.
+    // Compile has read @null, @empty and every reference but @+id/ of a name no id can have (#91).
+    // aapt2 reads that one here, after it has resolved references, so it stays unresolved and
+    // flattens to 0: @null.
     if (parseReference(text)) return Value::null();
     if (std::optional<Value> v = parseLiteral(text, attr.formats)) return v;
     if (attr.formats & kFormatEnum) {

@@ -293,12 +293,7 @@ class Parser {
         continue;
       }
       if (node.type() != pugi::node_element) continue;
-      const std::optional<std::string> ns = elementNamespace(node);
-      if (!ns) {
-        error(node, "unbound prefix of <" + std::string(node.name()) + ">");
-        continue;
-      }
-      if (!ns->empty()) continue;  // another namespace: skipped
+      if (!elementNamespace(node).empty()) continue;  // another namespace: skipped
       const std::string_view name = node.name();
       if (name == "skip" || name == "eat-comment") continue;
 
@@ -578,15 +573,10 @@ class Parser {
         }
         if (child.type() != pugi::node_element) continue;
         flush(parent);
-        const std::optional<std::string> ns = elementNamespace(child);
-        if (!ns) {
-          error(child, "unbound prefix of <" + std::string(child.name()) + ">");
-          failed = true;
-          return;
-        }
+        const std::string ns = elementNamespace(child);
         auto inner = std::make_unique<FlatNode>();
-        const bool xliffG = *ns == kXliffNamespace && localName(child.name()) == "g";
-        if (ns->empty()) {
+        const bool xliffG = ns == kXliffNamespace && localName(child.name()) == "g";
+        if (ns.empty()) {
           // An HTML tag, which is a span named for it and its attributes.
           inner->kind = FlatNode::Kind::Span;
           inner->data = child.name();
@@ -658,11 +648,11 @@ class Parser {
     bool ok = true;
     for (pugi::xml_node child : el.children()) {
       if (child.type() != pugi::node_element) continue;
-      const std::optional<std::string> ns = elementNamespace(child);
+      const bool plain = elementNamespace(child).empty();
       const std::string_view name = child.name();
-      if (ns && ns->empty() && name == itemName) {
+      if (plain && name == itemName) {
         ok &= fn(child);
-      } else if (!(ns && ns->empty() && (name == "skip" || name == "eat-comment"))) {
+      } else if (!(plain && (name == "skip" || name == "eat-comment"))) {
         error(child, "unknown tag <" + std::string(name) + "> in <" + el.name() + ">");
         ok = false;
       }
@@ -842,9 +832,8 @@ class Parser {
     bool ok = true;
     for (pugi::xml_node child : el.children()) {
       if (child.type() != pugi::node_element) continue;
-      const std::optional<std::string> ns = elementNamespace(child);
       const std::string_view name = child.name();
-      const bool plain = ns && ns->empty();
+      const bool plain = elementNamespace(child).empty();
       if (plain && (name == "enum" || name == "flag")) {
         const bool isEnum = name == "enum";
         if (formats & (isEnum ? kFormatFlags : kFormatEnum)) {
@@ -980,8 +969,7 @@ void parseValues(std::string_view xml, const std::filesystem::path& file, const 
     return;
   }
   const pugi::xml_node root = doc.root();
-  const std::optional<std::string> ns = elementNamespace(root);
-  if (!ns || !ns->empty() || std::string_view(root.name()) != "resources") {
+  if (!elementNamespace(root).empty() || std::string_view(root.name()) != "resources") {
     diag.error({file, doc.line(root)}, "root element must be <resources>");
     return;
   }
