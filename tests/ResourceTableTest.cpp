@@ -781,6 +781,37 @@ TEST(ResourceTable, FilesOfOneCompiledNameFail) {
   EXPECT_EQ(errors[1].message, "compiles to values_a.arsc.flat, as values-/a.xml does");
 }
 
+// An id @+pkg:id/ makes in an XML file is the package's own when pkg is its name, fails the load
+// in another package, and is left out in android, which aapt2 only warns of (#83).
+TEST(ResourceTable, IdOfAnotherPackageInAnXmlFile) {
+  TempDir dir;
+  ResourceTable table;
+  ASSERT_TRUE(load(table, dir,
+                   {{"layout/l.xml",
+                     "<a xmlns:android='http://schemas.android.com/apk/res/android' "
+                     "android:id='@+com.example:id/own' x='@+android:id/text1'/>"}}));
+  EXPECT_TRUE(table.find("com.example:id/own"));
+  EXPECT_FALSE(table.find("com.example:id/text1"));
+
+  // @+id/b before @+app:id/b, which is another id; an error for each id of another package, not
+  // for each file that makes it, from the first that does, in the order of their packages, as
+  // bytes ('A' before 'a'), then of their names.
+  TempDir other;
+  ResourceTable failed;
+  std::vector<Diagnostic> errors;
+  EXPECT_FALSE(
+      load(failed, other,
+           {{"layout/l.xml", "<a\n x='@+id/b' y='@+app:id/b' z='@+app:id/a' w='@+Ab:id/b'/>"},
+            {"layout/m.xml", "<a y='@+app:id/b'/>"}},
+           "com.example", 0x7f, &errors));
+  ASSERT_EQ(errors.size(), 3u) << errorsOf(errors);
+  EXPECT_EQ(errors[0].message, "defined resource 'Ab:id/b' for external package 'Ab'");
+  EXPECT_EQ(errors[1].message, "defined resource 'app:id/a' for external package 'app'");
+  EXPECT_EQ(errors[2].message, "defined resource 'app:id/b' for external package 'app'");
+  EXPECT_EQ(errors[2].file.filename(), "l.xml");
+  EXPECT_EQ(errors[2].line, 1);
+}
+
 // The dump writes numbers as printf does in the C locale, whatever the host app set.
 TEST(TableDump, NumbersIgnoreTheLocale) {
   TempDir dir;

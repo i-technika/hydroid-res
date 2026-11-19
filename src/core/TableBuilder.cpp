@@ -410,11 +410,19 @@ std::optional<Package> buildPackage(ParsedFolder folder, const std::string& name
                                     const ResourceTable& deps, Diagnostics& diag) {
   // Every value of every entry, one for each configuration and product.
   std::map<Key, PendingEntry> entries;
+  // The ids XML files make in other packages, by package and name, each where first made.
+  std::map<std::pair<std::string, std::string>, Source> externalIds;
   for (ParsedResource& r : folder.resources) {
     // aapt2 link merges only what is defined in the package being linked: an <attr> a
     // <declare-styleable> defines in another package is left out, and the styleable then finds
-    // that package's attr, or fails to (#109).
-    if (!r.package.empty() && r.package != name) continue;
+    // that package's attr, or fails to (#109). An id @+pkg:id/ makes in an XML file fails it,
+    // but in android, which it only warns of (#83).
+    if (!r.package.empty() && r.package != name) {
+      if (r.type == ResType::Id && r.package != "android") {
+        externalIds.emplace(std::pair(r.package, r.name), r.source);
+      }
+      continue;
+    }
     PendingEntry& entry = entries[{r.type, r.name}];
     auto same = std::find_if(entry.values.begin(), entry.values.end(), [&](const PendingValue& v) {
       return v.config == r.config && v.product == r.product;
@@ -431,6 +439,13 @@ std::optional<Package> buildPackage(ParsedFolder folder, const std::string& name
                                  "' with config '" + toString(r.config) + "'");
         break;
     }
+  }
+  // One error for each such id, after merging and in the order of package and name, as aapt2's
+  // VerifyNoExternalPackages gives them from the merged table.
+  for (const auto& [external, source] : externalIds) {
+    const auto& [package, entry] = external;
+    diag.error(source, "defined resource '" + package + ":" + nameOf(ResType::Id, entry) +
+                           "' for external package '" + package + "'");
   }
   for (const SymbolDecl& s : folder.symbols) {
     const auto it = entries.find({s.type, s.name});
