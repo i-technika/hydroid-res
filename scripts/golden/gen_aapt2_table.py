@@ -7,12 +7,13 @@
   golden/aapt2/table_cases.json small res/ folders, each with what aapt2 dumps of it, or null
                                 where aapt2 rejects it (and the error it gives, to read)
 
-Each folder is compiled with `aapt2 compile --dir` into a folder of .flat files, linked against
-PLATFORM with LINK_FLAGS and dumped with `aapt2 dump resources`. Link takes the .flat files in the
-order of the folder/name each came from, and merges them in that order, the order hydroid reads
-them in too (#80). Linked as the one zip compile can write instead, they merge in an order that
-changes with the names in it, so that the first of two values that agree is not the one of the
-first path. The flags turn off what aapt2 link does beyond what the folder says, which hydroid's
+Each folder is compiled with `aapt2 compile --dir`, which decides what compiles and what fails,
+then each of its files again on its own into a .flat file; these are linked against PLATFORM with
+LINK_FLAGS and dumped with `aapt2 dump resources`. Link takes the .flat files in the order of the
+folder/name each came from and merges them in that order, the order hydroid reads them in too
+(#80). Linked as the one zip compile --dir writes instead, they merge in an order that changes
+with the names in it, so that the first of two values that agree is not the one of the first
+path. The flags turn off what aapt2 link does beyond what the folder says, which hydroid's
 ResourceTable does not do either: versioning styles and XML files, removing values of a locale
 with no default, and removing values another configuration repeats.
 The C++ test Aapt2TableTest loads each folder and checks that it dumps the same, so CI needs no
@@ -29,6 +30,7 @@ import re
 import subprocess
 import sys
 import tempfile
+import zipfile
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -286,6 +288,15 @@ CASES = {
         "values/styles.xml": "<resources><attr name='n' format='integer' min='0'/>"
                              "<style name='S'><item name='n'>3</item></style></resources>",
         "values-land/styles.xml": "<resources><attr name='n' format='integer' min='5'/></resources>"},
+    # values-/ is values/, and orders as "values-/" ('/' before 'l').
+    "order-trailing-dash": {"values-/a.xml": "<resources><attr name='n' format='integer' min='5'/>"
+                                             "<style name='S'><item name='n'>3</item></style></resources>",
+                            "values-land/a.xml": "<resources><attr name='n' format='integer' min='0'/>"
+                                                 "</resources>"},
+    "order-trailing-dash-swapped": {
+        "values-/a.xml": "<resources><attr name='n' format='integer' min='0'/>"
+                         "<style name='S'><item name='n'>3</item></style></resources>",
+        "values-land/a.xml": "<resources><attr name='n' format='integer' min='5'/></resources>"},
     "attr-unknown-child": values("<attr name='a'><foo/></attr>"),
     "attr-text-child": values("<attr name='a' format='color'>text<skip/></attr>"),
     "enum-values": values("<attr name='a'><enum name='x' value=' 5 '/><enum name='y' value='0x7fffffff'/>"
@@ -458,29 +469,53 @@ CASES = {
 }
 
 
-def flat_source(flat: str) -> str:
-    """The folder/name of res/ that compile made the .flat file `flat` of: values/a.xml makes
-    values_a.arsc.flat, and any other file raw/a.txt makes raw_a.txt.flat. A folder name has no '_'."""
-    folder, rest = flat.split("_", 1)
-    if rest.endswith(".arsc.flat"):
-        return f"{folder}/{rest[:-len('.arsc.flat')]}.xml"
-    return f"{folder}/{rest[:-len('.flat')]}"
+def ordered_flats(aapt2: Path, res: Path, out: Path, compiled: set) -> list:
+    """The .flat file of each file of `res` that compile --dir made one of (`compiled`, the names
+    in its zip), each compiled again on its own into a folder of its own, in the order of the
+    folder/name it came from, which link merges them in. aapt2 names each, so that a folder that
+    ends in '-' (values-/) or a raw/x.arsc needs no guessing. Paths are relative to `out`."""
+    # By folder/name, compared as Python compares strings: by code point, as UTF-8 bytes order.
+    sources = sorted(f"{d.name}/{f.name}" for d in res.iterdir()
+                     if d.is_dir() and not d.name.startswith(".")
+                     for f in d.iterdir() if f.is_file() and not f.name.startswith("."))
+    out.mkdir(parents=True, exist_ok=True)  # link runs in it, though res/ has no file to compile
+    order = []
+    source_of = {}
+    for i, rel in enumerate(sources):
+        dest = out / str(i)
+        dest.mkdir(parents=True)
+        if subprocess.run([str(aapt2), "compile", str(res / rel), "-o", str(dest)],
+                          capture_output=True).returncode != 0:
+            continue
+        for flat in dest.iterdir():
+            if flat.name not in compiled:
+                continue
+            if flat.name in source_of:
+                sys.exit(f"{rel} and {source_of[flat.name]} of {res} both compile to {flat.name}")
+            source_of[flat.name] = rel
+            order.append(f"{i}/{flat.name}")
+    if set(source_of) != compiled:
+        sys.exit(f"compile --dir made {sorted(compiled - set(source_of))} of {res}, "
+                 "which no file compiled on its own gives")
+    return order
 
 
 def link_dump(aapt2: Path, jar: Path, res: Path, package: str, work: Path):
     """Compiles and links `res`: (the dump, None), or (None, the first error)."""
     work.mkdir(parents=True, exist_ok=True)
-    flats = work / "flat"
-    flats.mkdir(exist_ok=True)
-    result = subprocess.run([str(aapt2), "compile", "--dir", str(res), "-o", str(flats)],
+    # A zip, which fails on two files that compile to the same .flat name, as a folder would not.
+    archive = work / "c.zip"
+    result = subprocess.run([str(aapt2), "compile", "--dir", str(res), "-o", str(archive)],
                             capture_output=True, text=True, encoding="utf-8")
     if result.returncode == 0:
         manifest = work / "AndroidManifest.xml"
         manifest.write_text('<manifest xmlns:android="http://schemas.android.com/apk/res/android" '
                             f'package="{package}"/>\n')
         apk = work / "out.apk"
-        # By folder/name, compared as Python compares strings: by code point, as UTF-8 bytes order.
-        order = sorted((p.name for p in flats.iterdir()), key=flat_source)
+        with zipfile.ZipFile(archive) as z:
+            compiled = {info.filename for info in z.infolist()}
+        flats = work / "flat"
+        order = ordered_flats(aapt2, res, flats, compiled)
         # Relative to the folder of .flat files, so that a large res/ stays within Windows's limit
         # on the length of a command line.
         result = subprocess.run([str(aapt2), "link", "-I", str(jar), "--manifest", str(manifest),
