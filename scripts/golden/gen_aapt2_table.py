@@ -262,6 +262,16 @@ CASES = {
     "attr-in-config": values("<attr name='a' format='color'/>", "values-land"),
     "attr-in-two-configs": {"values/v.xml": "<resources><attr name='a' format='color'/></resources>",
                             "values-land/v.xml": "<resources><attr name='a' format='integer'/></resources>"},
+    # aapt2 compiles files in the order of their whole path, so res/values-land/a.xml ('-' is
+    # 0x2D) before res/values/a.xml ('/' is 0x2F), and the first of two <attr> that agree stays.
+    "order-whole-path": {"values/a.xml": "<resources><attr name='n' format='integer' min='5'/>"
+                                         "<style name='S'><item name='n'>3</item></style></resources>",
+                         "values-land/a.xml": "<resources><attr name='n' format='integer' min='0'/>"
+                                              "</resources>"},
+    "order-whole-path-swapped": {"values/a.xml": "<resources><attr name='n' format='integer' min='0'/>"
+                                                 "<style name='S'><item name='n'>3</item></style></resources>",
+                                 "values-land/a.xml": "<resources><attr name='n' format='integer' min='5'/>"
+                                                      "</resources>"},
     "attr-unknown-child": values("<attr name='a'><foo/></attr>"),
     "attr-text-child": values("<attr name='a' format='color'>text<skip/></attr>"),
     "enum-values": values("<attr name='a'><enum name='x' value=' 5 '/><enum name='y' value='0x7fffffff'/>"
