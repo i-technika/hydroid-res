@@ -61,13 +61,8 @@ int run(const std::vector<fs::path>& args) {
         return 1;
       }
     }
-    try {
-      return dump(args[2], package);
-    } catch (const std::system_error& e) {
-      // A folder that fails to read as it is walked, which the library throws on still (#85).
-      std::cerr << "error: cannot read the res folder: " << e.what() << '\n';
-      return 1;
-    }
+    // addPackage throws nothing about the folder, which it reports among its errors (#85).
+    return dump(args[2], package);
   }
   return usage();
 }
