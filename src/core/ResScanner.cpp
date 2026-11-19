@@ -114,66 +114,85 @@ void scanResFolder(const fs::path& res, ParsedFolder& out, Diagnostics& diag) {
     diag.error({res, 0}, "not a folder");
     return;
   }
+  // The files in the order of their folder/name as bytes, the order in which the golden files have
+  // aapt2 link merge the .flat files (#80): res/values-land/a.xml ('-' is 0x2D) before
+  // res/values/a.xml ('/' is 0x2F), not each folder's files after the folder before it. Link keeps
+  // the first of two values that agree, so the order shows. aapt2 has no one order of its own:
+  // compile --dir keeps the files by their native path, where Windows's '\' (0x5C) puts
+  // values-v21/ before values-v2/, and link merges the zip compile writes in an order that
+  // changes with the names in it.
+  struct File {
+    std::string path;  // folder/name, by which the files are read
+    std::string dirName;
+    std::string fileName;
+    fs::path file;
+  };
+  std::vector<File> files;
   for (const auto& [dirName, dir] : list(res, /*directories=*/true, diag)) {
+    for (auto& [fileName, file] : list(dir, /*directories=*/false, diag)) {
+      files.push_back({dirName + "/" + fileName, dirName, std::move(fileName), std::move(file)});
+    }
+  }
+  std::sort(files.begin(), files.end(),
+            [](const File& a, const File& b) { return a.path < b.path; });
+  for (const auto& [path, dirName, fileName, file] : files) {
     const std::optional<ResDir> resDir = parseResDir(dirName);
     const bool values = resDir && resDir->type == "values";
     const std::optional<ResType> type = resDir ? parseResType(resDir->type) : std::nullopt;
-    for (const auto& [fileName, file] : list(dir, /*directories=*/false, diag)) {
-      if (!resDir) {
-        diag.error({file, 0}, "invalid configuration in folder name '" + dirName + "'");
-        continue;
-      }
-      std::string name;
-      std::string extension;
-      splitFileName(fileName, &name, &extension);
-      if (!values && !type) {
-        diag.error({file, 0}, "invalid file path: no resource type '" + resDir->type + "'");
-        continue;
-      }
-      if (values && extension != "xml") {
-        diag.error({file, 0}, "invalid file path: not an .xml file in " + dirName);
-        continue;
-      }
-      std::string text;
-      if (!read(file, &text)) {
-        diag.error({file, 0}, "cannot read the file");
-        continue;
-      }
-      if (values) {
-        parseValues(text, file, resDir->config, out, diag);
-        continue;
-      }
-
-      // The path aapt2 link gives it: the name, then what follows the file name's first '.'.
-      FileRef ref;
-      ref.path = "res/" + std::string(toString(*type));
-      if (resDir->config != Config{}) ref.path += "-" + toString(resDir->config);
-      ref.path += "/" + name;
-      if (const size_t dot = fileName.find('.'); dot != std::string::npos) {
-        ref.path += fileName.substr(dot);
-      }
-      // aapt2 compiles everything in xml/ as XML, and .xml files elsewhere but in raw/.
-      if (*type != ResType::Raw && (*type == ResType::Xml || extension == "xml")) {
-        ref.type = FileType::Xml;
-        XmlDocument doc;
-        std::string why;
-        int line = 0;
-        if (!doc.load(text, XmlExtent::Document, &why, &line)) {
-          diag.error({file, line}, "xml parser error: " + why);
-          continue;
-        }
-        IdCollector(doc, file, out, diag).visit(doc.root());
-      } else if (*type != ResType::Raw && (extension == "png" || extension == "9.png")) {
-        ref.type = FileType::Png;
-      }
-      ParsedResource resource;
-      resource.type = *type;
-      resource.name = name;
-      resource.config = resDir->config;
-      resource.value = std::move(ref);
-      resource.source = {file, 0};
-      out.resources.push_back(std::move(resource));
+    if (!resDir) {
+      diag.error({file, 0}, "invalid configuration in folder name '" + dirName + "'");
+      continue;
     }
+    std::string name;
+    std::string extension;
+    splitFileName(fileName, &name, &extension);
+    if (!values && !type) {
+      diag.error({file, 0}, "invalid file path: no resource type '" + resDir->type + "'");
+      continue;
+    }
+    if (values && extension != "xml") {
+      diag.error({file, 0}, "invalid file path: not an .xml file in " + dirName);
+      continue;
+    }
+    std::string text;
+    if (!read(file, &text)) {
+      diag.error({file, 0}, "cannot read the file");
+      continue;
+    }
+    if (values) {
+      parseValues(text, file, resDir->config, out, diag);
+      continue;
+    }
+
+    // The path aapt2 link gives it: the name, then what follows the file name's first '.'.
+    FileRef ref;
+    ref.path = "res/" + std::string(toString(*type));
+    if (resDir->config != Config{}) ref.path += "-" + toString(resDir->config);
+    ref.path += "/" + name;
+    if (const size_t dot = fileName.find('.'); dot != std::string::npos) {
+      ref.path += fileName.substr(dot);
+    }
+    // aapt2 compiles everything in xml/ as XML, and .xml files elsewhere but in raw/.
+    if (*type != ResType::Raw && (*type == ResType::Xml || extension == "xml")) {
+      ref.type = FileType::Xml;
+      XmlDocument doc;
+      std::string why;
+      int line = 0;
+      if (!doc.load(text, XmlExtent::Document, &why, &line)) {
+        diag.error({file, line}, "xml parser error: " + why);
+        continue;
+      }
+      IdCollector(doc, file, out, diag).visit(doc.root());
+    } else if (*type != ResType::Raw && (extension == "png" || extension == "9.png")) {
+      ref.type = FileType::Png;
+    }
+    ParsedResource resource;
+    resource.type = *type;
+    resource.name = name;
+    resource.config = resDir->config;
+    resource.value = std::move(ref);
+    resource.source = {file, 0};
+    out.resources.push_back(std::move(resource));
   }
 }
 
