@@ -4,6 +4,24 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
+    inputs:
+      scope:
+        description: "full: every job; quick: core (ubuntu-24.04) and core (ubuntu-24.04, shared) only"
+        type: choice
+        options: [full, quick]
+        default: full
+
+# Two scopes. A pull request into a milestone's step<k>/ branch, which /fix-issue makes for each
+# sub-issue, runs the quick one: Linux, static and shared. Pushes to main, pull requests into main
+# (a milestone's own, from /open-ms) and a dispatch with scope=full (/close-ms) run every job.
+# Each job, or its matrix, repeats the test below, as `if:` and `strategy:` cannot read `env`:
+#   github.event_name == 'push' || github.base_ref == 'main' || inputs.scope == 'full'
+
+# A new push to a pull request makes the run still going for the old head pointless.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   core:
@@ -12,7 +30,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, macos-15, windows-2022]
+        os: ${{ fromJSON((github.event_name == 'push' || github.base_ref == 'main' || inputs.scope == 'full') && '["ubuntu-24.04", "macos-15", "windows-2022"]' || '["ubuntu-24.04"]') }}
     steps:
       - uses: actions/checkout@v5
       - name: Name the dependency cache after the runner image and CMake
@@ -45,7 +63,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, macos-15, windows-2022]
+        os: ${{ fromJSON((github.event_name == 'push' || github.base_ref == 'main' || inputs.scope == 'full') && '["ubuntu-24.04", "macos-15", "windows-2022"]' || '["ubuntu-24.04"]') }}
     steps:
       - uses: actions/checkout@v5
       - name: Name the dependency cache after the runner image and CMake
@@ -95,6 +113,7 @@ jobs:
 
   oldest-cmake:
     name: core (CMake 3.24)
+    if: github.event_name == 'push' || github.base_ref == 'main' || inputs.scope == 'full'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
@@ -129,6 +148,7 @@ jobs:
 
   installed-deps:
     name: core (installed dependencies)
+    if: github.event_name == 'push' || github.base_ref == 'main' || inputs.scope == 'full'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
@@ -204,6 +224,7 @@ jobs:
 
   sanitize:
     name: core (Clang, ASan and UBSan)
+    if: github.event_name == 'push' || github.base_ref == 'main' || inputs.scope == 'full'
     runs-on: ubuntu-24.04
     env:
       CC: clang
@@ -242,6 +263,7 @@ jobs:
 
   format:
     name: clang-format
+    if: github.event_name == 'push' || github.base_ref == 'main' || inputs.scope == 'full'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
@@ -256,6 +278,7 @@ jobs:
 
   golden-app:
     name: golden app builds
+    if: github.event_name == 'push' || github.base_ref == 'main' || inputs.scope == 'full'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
@@ -267,3 +290,75 @@ jobs:
       - name: Assemble app and instrumentation test
         working-directory: golden
         run: ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest
+
+  # The two below come on top of the 11 runners above, to look where none of those does.
+
+  release:
+    name: core (${{ matrix.os }}, release)
+    if: github.event_name == 'push' || github.base_ref == 'main' || inputs.scope == 'full'
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # The optimizer brings warnings of its own (GCC's -Wmaybe-uninitialized, MSVC's C4702) that
+        # the Debug builds never see, and NDEBUG drops every assert the tests lean on.
+        os: [ubuntu-24.04, windows-2022]
+    steps:
+      - uses: actions/checkout@v5
+      - name: Name the dependency cache after the runner image and CMake
+        id: deps
+        shell: bash
+        run: echo "key=deps-${ImageOS:?}-${{ github.job }}-$(cmake --version | awk 'NR == 1 { print $3 }')" >> "$GITHUB_OUTPUT"
+      - name: Cache the fetched dependencies
+        uses: actions/cache@v6
+        with:
+          path: |
+            build/release/_deps/*-src
+            build/release/_deps/*-subbuild
+          key: ${{ steps.deps.outputs.key }}-${{ hashFiles('cmake/Dependencies.cmake') }}
+      - name: Install a decimal-comma locale
+        if: runner.os == 'Linux'
+        run: sudo locale-gen de_DE.UTF-8
+      - name: Configure
+        run: cmake --preset release -DHYDROID_RES_REQUIRE_LOCALE_TESTS=ON -DHYDROID_RES_REQUIRE_NDK_TESTS=ON
+      - name: Build
+        run: cmake --build --preset release --parallel
+      - name: Test
+        run: ctest --preset release
+
+  arm64:
+    name: core (ubuntu-24.04-arm)
+    if: github.event_name == 'push' || github.base_ref == 'main' || inputs.scope == 'full'
+    # Plain char is unsigned on Linux arm64 and signed on every other runner here, which a parser
+    # that reads bytes into char can get wrong unseen. macos-15 is arm64 too, but Apple keeps char
+    # signed there.
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v5
+      - name: Name the dependency cache after the OS release, the architecture and CMake
+        id: deps
+        shell: bash
+        # The partner image may not set ImageOS, so the key takes the release from os-release.
+        run: echo "key=deps-$(. /etc/os-release && echo "$ID$VERSION_ID")-${RUNNER_ARCH}-${{ github.job }}-$(cmake --version | awk 'NR == 1 { print $3 }')" >> "$GITHUB_OUTPUT"
+      - name: Cache the fetched dependencies
+        uses: actions/cache@v6
+        with:
+          path: |
+            build/debug/_deps/*-src
+            build/debug/_deps/*-subbuild
+          key: ${{ steps.deps.outputs.key }}-${{ hashFiles('cmake/Dependencies.cmake') }}
+      - name: Install a decimal-comma locale
+        run: |
+          command -v locale-gen > /dev/null || { sudo apt-get update && sudo apt-get install -y locales; }
+          sudo locale-gen de_DE.UTF-8
+      - name: Check that plain char is unsigned here
+        run: |
+          # Were it signed, this job would only repeat core (ubuntu-24.04).
+          echo 'static_assert(static_cast<char>(-1) > 0, "char is signed");' | c++ -x c++ -fsyntax-only -
+      - name: Configure
+        # The arm64 image has no Android NDK; the other jobs run AConfiguration.MatchesNdk.
+        run: cmake --preset debug -DHYDROID_RES_REQUIRE_LOCALE_TESTS=ON
+      - name: Build
+        run: cmake --build --preset debug --parallel
+      - name: Test
+        run: ctest --preset debug

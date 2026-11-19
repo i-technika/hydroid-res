@@ -1,13 +1,16 @@
 ---
 name: fix-issue
-description: 이슈 하나를 수정·테스트하고 PR을 만든 뒤, 새 컨텍스트에서 리뷰하고, 지적을 반영해 Resolve하고, 무결성을 검증한 다음 개발자 확인을 받아 머지하고 이슈를 닫는다.
-argument-hint: "[이슈 번호]"
+description: 마일스톤의 서브이슈 하나를 수정·테스트하고 PR을 만든 뒤, 새 컨텍스트에서 리뷰하고, 지적을 반영하거나 새 서브이슈로 등록하고, 무결성을 검증한 다음 개발자 확인을 받아 머지하고 이슈를 닫는다. 서브이슈 전용.
+argument-hint: "[서브이슈 번호]"
 disable-model-invocation: true
 ---
 
-# 이슈 처리: 수정 → PR → 리뷰 → 반영 → 검증 → 머지
+# 서브이슈 처리: 수정 → PR → 리뷰 → 반영 → 검증 → 머지
 
-인자: `$ARGUMENTS` (이슈 번호, 비어 있을 수 있음)
+인자: `$ARGUMENTS` (서브이슈 번호, 비어 있을 수 있음)
+
+먼저 `.claude/shared/workflow.md`를 읽는다. 저장소 구조, CI 범위, **서브이슈 등록**, **처리 순서**는 그
+문서의 절차를 따른다. 헬퍼 `python .claude/shared/hydroid_gh.py`를 아래에서 `hgh`라고 쓴다.
 
 아래 단계를 순서대로 끝까지 진행한다. 개발자에게 묻는 곳은 **질문 지점**으로 표시한 곳과, 진행할 수 없는
 상황(테스트가 계속 실패, CI가 원인 불명으로 실패, base가 앞서 나감 등)뿐이다. 질문은 항상
@@ -21,26 +24,38 @@ AskUserQuestion으로 선택지를 만들어 묻고, 질문만 보고도 판단�
 2. `git status --porcelain`이 비어 있지 않으면 멈추고 개발자에게 알린다(남의 작업을 덮지 않는다).
 3. `git fetch origin`.
 
-## 1. 이슈 번호
+## 1. 서브이슈 확인과 담당자
 
 - `$ARGUMENTS`에 번호가 있으면 그것을 쓴다.
-- 없으면 `gh issue list --state open --limit 4 --json number,title,milestone`로 최근 열린 이슈를 골라
-  **질문 지점**: "어느 이슈를 처리할까요?" 선택지로 보여 준다(다른 번호는 Other로 입력).
+- 없으면 열린 마일스톤 중 가장 앞선 것의 메인 이슈에 대해 `hgh subs <P>`를 보고, 공용 절차 **처리 순서**의
+  앞쪽 열린 서브이슈 최대 4개를 골라 **질문 지점**: "어느 서브이슈를 처리할까요?"(다른 번호는 Other).
+
+`hgh kind <N>`으로 확인한다. **이 스킬은 서브이슈만 처리한다.**
+- `kind`가 `main`이면 멈추고 "#<N>은 마일스톤 메인 이슈입니다. `/open-ms <N>` 또는 `/close-ms <N>`을 쓰세요."라고 알린다.
+- `other`(parent가 없거나, parent가 메인 이슈가 아님)면 멈추고 그 이유를 알린다. 메인 이슈의 서브이슈로
+  옮길지는 개발자가 정한다.
+- 이미 닫혀 있으면 계속할지 묻는다.
+
+담당자를 연결한다: `gh issue edit <N> --add-assignee i-technika`.
 
 `gh issue view <N> --json number,title,body,milestone,labels,state,comments`로 이슈를 읽는다
-(`--comments`와 `--json`은 함께 쓸 수 없다).
-이미 닫혀 있으면 계속할지 묻는다.
+(`--comments`와 `--json`은 함께 쓸 수 없다). parent(메인 이슈) 번호를 `<P>`로 기억한다.
 
 ## 2. base 브랜치와 작업 브랜치
 
-base는 **이슈의 마일스톤과 맞는 브랜치**다. 마일스톤 제목 `R<k>: ...`의 `<k>`에 대해
-`git ls-remote --heads origin "step<k>/*"`로 찾는다(예: `R3: Config·폴더 이름 파서` → `step3/config`).
+base는 **마일스톤의 단계 브랜치**다. `kind`가 준 `step` `<k>`에 대해
+`git ls-remote --heads origin "step<k>/*"`로 찾는다(예: R4 → `step4/resource-table`).
 
 - 정확히 하나면 그것을 base로 쓴다.
-- 없거나, 여러 개이거나, 이슈에 마일스톤이 없으면 **질문 지점**: 후보 브랜치(`main` 포함)를 선택지로 묻는다.
+- 없거나 여러 개면 **질문 지점**: 후보 브랜치를 선택지로 묻는다. 단계 브랜치가 없으면 `/open-ms <P>`가 아직
+  안 돈 것이므로 그것을 먼저 권한다. `main`을 base로 고르면 그 PR은 CI가 full로 돈다.
 
-작업 브랜치는 `fix/<N>-<짧은-영문-slug>`이고 `origin/<base>`에서 만든다. 같은 이름이 이미 있으면
-이어서 쓸지, 새로 만들지 묻는다.
+작업 브랜치 `fix/<N>-<짧은-영문-slug>`를 **이슈에 연결된 브랜치로** 만든다. 이슈의 Development에 브랜치가
+붙고, 이 브랜치에서 연 PR도 거기 연결된다:
+```
+gh issue develop <N> --base <base> --name fix/<N>-<slug> --checkout
+```
+같은 이름이 이미 있으면 이어서 쓸지, 새로 만들지 묻는다. 이어서 쓰면 `git switch`로 가져온다.
 
 ## 3. 수정과 테스트
 
@@ -55,13 +70,16 @@ base는 **이슈의 마일스톤과 맞는 브랜치**다. 마일스톤 제목 `
    decimal-comma 로케일이 이 PC에 없어서 configure가 실패하면 `-DHYDROID_RES_REQUIRE_LOCALE_TESTS=ON`만
    빼고 다시 하고, PR의 테스트 항목에 그렇게 적는다.
 3. 바꾼 `*.h`, `*.cpp`에 clang-format 23.1.5(`.clang-format`)로 `--dry-run --Werror`를 돌린다.
-   23.1.5가 없으면 건너뛰고 PR에 그렇게 적는다(CI의 `format` job이 확인한다).
+   서브이슈 PR의 CI(quick)에는 `clang-format` job이 없으므로 여기서 꼭 확인한다. 23.1.5가 없으면 건너뛰고
+   PR에 "clang-format은 마일스톤 PR의 full CI에서 확인됩니다"라고 적는다.
 4. golden(`golden/`, `scripts/golden/`)을 다시 만들어야 하면 해당 스크립트와 README의 조건(호스트 OS,
    build-tools 버전)을 지키고, 바뀐 행 수를 기록한다.
 5. 테스트가 실제로 잡는지 보려고 파일을 임시로 바꿀 때는, 먼저 scratchpad에 사본을 두고 그 사본으로 되돌린다.
    `git checkout -- <file>`이나 `git stash`로 되돌리면 아직 커밋하지 않은 수정까지 지워진다.
 6. 실패하면 원인을 고쳐 다시 돌린다. 같은 실패를 세 번 고쳐도 안 되면 **질문 지점**: 상황과 선택지
    (접근 바꾸기 / 여기서 중단 / 실패를 PR에 적고 계속)를 묻는다.
+7. 작업하다가 이 이슈의 범위 밖 문제(다른 버그, 낡은 주석, 빠진 테스트 등)를 발견하면 고치지 말고
+   **추가 이슈 목록**에 `파일:줄`, 문제, 제안을 적어 둔다. 8단계 뒤에 등록한다.
 
 ## 4. 커밋과 PR
 
@@ -70,15 +88,25 @@ base는 **이슈의 마일스톤과 맞는 브랜치**다. 마일스톤 제목 `
 - 본문은 72자로 줄 바꿈하고, 왜 바꿨는지와 무엇을 확인했는지 적는다. 바뀐 곳이 여럿이면 `- ` 목록.
 - 하네스가 알려 준 attribution 줄로 끝낸다.
 
-`git push -u origin <branch>` 후 PR을 만든다:
+`git push -u origin <branch>` 후 PR을 만든다. 담당자, label(이슈와 같은 것), 마일스톤(이슈와 같은 것),
+프로젝트를 만들 때 함께 넣는다:
 ```
-gh pr create --base <base> --head <branch> --title "<한국어 제목> (#<N>)" --body-file <scratchpad의 파일>
+gh pr create --base <base> --head <branch> --title "<한국어 제목> (#<N>)" --body-file <scratchpad의 파일> \
+  --assignee i-technika --label <이슈의 label마다 하나씩> --milestone "<이슈의 마일스톤 제목>" \
+  --project "Hydroid Project"
 ```
+이어서:
+1. 프로젝트 필드: `hgh copy-fields <N> <M>` (단계·영역·플랫폼·res 릴리스를 이슈와 같게. Status는 자동화에 맡긴다).
+2. **Development 연결 확인**: `hgh links <M>`의 `linkedIssues`에 `<N>`이 있어야 한다. 없으면 GitHub API로는
+   연결할 방법이 없으므로, 개발자에게 바로 알린다: "PR #<M> 오른쪽 Development에서 #<N>을 연결해 주세요:
+   <PR URL>". 기다리지 않고 진행하고, 9단계 검증에서 다시 본다.
+
 PR 본문(한국어, 기존 PR과 같은 구성):
 - `## 요약`: 이슈 번호와 무엇이 문제였는지. base가 기본 브랜치가 아니면
   `> base가 기본 브랜치가 아니라서 머지해도 #<N>은 자동으로 닫히지 않습니다.`를 넣는다.
 - `## 변경`: 파일별로 무엇을 바꿨는지.
-- `## 테스트`: 실제로 돌린 것만 `- [x]`로. 돌리지 못한 것은 `- [ ]`와 이유.
+- `## 테스트`: 실제로 돌린 것만 `- [x]`로. 돌리지 못한 것은 `- [ ]`와 이유. CI는 quick 범위(Linux static,
+  shared)만 돈다고 적는다.
 - 하네스가 알려 준 PR attribution 줄로 끝낸다.
 
 ### 질문 지점: 개발자 문의
@@ -127,17 +155,16 @@ Resolve는 `gh api graphql -f query='mutation($id:ID!){resolveReviewThread(input
 
 1. **중복 #X**: 고치지 않는다. 답글 "이번 PR에서는 다루지 않습니다. #X에서 다룹니다: <이유>"를 달고 Resolve.
    답글에 `#X`를 적으면 이슈 쪽 타임라인에도 링크가 남는다.
-2. **범위 밖** — **질문 지점**: 지적마다 하나의 질문으로 묻는다(한 번에 최대 4개):
-   - `새 이슈로 분리 (권장)`: 이슈를 만든다(한국어, 기존 이슈처럼 제목에 문제와 결과를 쓰고, 본문에 재현·근거·제안,
-     마일스톤은 맞는 것으로). 답글 "새 이슈 #Y로 분리했습니다"를 달고 Resolve.
-   - `이번 PR에서 수정`: 3번으로 넘긴다.
-   - `반영하지 않음`: 답글로 이유를 적고 Resolve.
-   권장 표시는 실제 판단에 맞게 옮긴다.
+2. **범위 밖**: 묻지 않고 공용 절차 **서브이슈 등록**으로 메인 이슈 `<P>`의 서브이슈를 만든다(출처
+   `PR #<M> 리뷰 <번호>번에서 나온 항목입니다.`). 답글 "새 서브이슈 #Y로 분리했습니다"를 달고 Resolve.
+   리뷰어가 범위 밖이라고 했어도 이 이슈의 완료 기준에 드는 것이면 **이번 PR**로 옮겨 3번으로 처리한다.
 3. **이번 PR**: 고치고, 3단계처럼 빌드·테스트·포맷을 돌린다. 지적을 잘못 짚었다고 판단하면 고치지 않고 근거를
    답글로 단다. 반영한 지적을 한 커밋에 묶는다. 본문은 `From the review of PR #<M>:` 다음에 `- ` 목록.
    push한 뒤 스레드마다 짧은 답글("고쳤습니다(<짧은 SHA>): <무엇을>")을 달고 Resolve.
-4. PR에 반영 요약 코멘트를 하나 단다(`gh pr comment`): `## 리뷰 반영 (<짧은 SHA>)`, 지적 번호별로
-   고쳤는지/다루지 않는지와 이유, `확인한 것:` 목록, PR attribution 줄.
+4. 3단계에서 적어 둔 **추가 이슈 목록**도 공용 절차 **서브이슈 등록**으로 등록한다(출처
+   `#<N> 작업 중 발견한 항목입니다.`).
+5. PR에 반영 요약 코멘트를 하나 단다(`gh pr comment`): `## 리뷰 반영 (<짧은 SHA>)`, 지적 번호별로
+   고쳤는지/다루지 않는지와 이유, 새로 등록한 서브이슈, `확인한 것:` 목록, PR attribution 줄.
 
 ### 다시 리뷰
 
@@ -156,8 +183,11 @@ Resolve는 `gh api graphql -f query='mutation($id:ID!){resolveReviewThread(input
 | base | PR base가 2단계의 base와 같음 |
 | base와 충돌 없음, 뒤처지지 않음 | `gh pr view <M> --json mergeable,mergeStateStatus`: `MERGEABLE`이고 `DIRTY`/`BEHIND` 아님 |
 | 미해결 스레드 0 | 위 GraphQL에서 `isResolved: false` 없음 |
+| PR 메타데이터 | `gh pr view <M> --json assignees,labels,milestone,projectItems`: `i-technika`, 이슈와 같은 label·마일스톤, `Hydroid Project` |
+| Development | `hgh links <M>`에 `<N>` 있음 (없으면 4단계의 안내를 다시 하고 표에 ❌로 둔다) |
+| 이슈 담당자 | `hgh kind <N>`의 `assignees`에 `i-technika` |
 | 로컬 빌드·테스트 | HEAD에서 3단계의 빌드와 `ctest` 통과 |
-| CI | `gh pr checks <M> --watch`(오래 걸리므로 백그라운드로 돌리고 끝날 때 알림을 받는다). 모든 체크 통과 |
+| CI (quick) | `gh pr checks <M> --watch`(백그라운드). `core (ubuntu-24.04)`, `core (ubuntu-24.04, shared)` 두 개 통과 |
 
 - CI가 실패하면 로그(`gh run view <id> --log-failed`)를 보고, 이 PR 때문이면 고쳐서 push하고 다시 확인한다.
   러너나 네트워크 같은 외부 원인으로 보이면 **질문 지점**: 다시 돌릴지(`gh run rerun --failed`), 중단할지 묻는다.
@@ -165,7 +195,7 @@ Resolve는 `gh api graphql -f query='mutation($id:ID!){resolveReviewThread(input
 
 ### 질문 지점: 머지 확인 (항상 묻는다)
 
-검증 표, 커밋 목록, 리뷰 처리 요약(고친 것 / 중복으로 넘긴 것 / 새 이슈)을 보여 주고 묻는다:
+검증 표, 커밋 목록, 리뷰 처리 요약(고친 것 / 중복으로 넘긴 것 / 새 서브이슈)을 보여 주고 묻는다:
 - `머지` — `gh pr merge <M> --merge` (기존과 같은 merge commit)
 - `중단` — 여기서 멈추고 PR은 열어 둔다
 
@@ -174,6 +204,11 @@ Resolve는 `gh api graphql -f query='mutation($id:ID!){resolveReviewThread(input
    `gh issue close <N> --comment "#<M>에서 고쳤고, \`<base>\`에 머지했습니다(기본 브랜치가 아니라서 직접 닫습니다)."`
    리뷰에서 다른 이슈로 넘긴 것이 있으면 한 문장 덧붙인다(예: "리뷰에서 나온 ...는 #X에서 다룹니다.").
 2. PR이 `MERGED`인지 확인한다.
-3. 마지막 보고: PR 링크, 머지 커밋, 닫은 이슈, 새로 만든 이슈, 다루지 않은 지적.
-4. PushNotification으로 한 줄 알린다. 예: `#64 머지 완료 (PR #65), 새 이슈 #66`.
+
+## 10. 마무리와 처리 순서
+
+1. 마지막 보고: PR 링크, 머지 커밋, 닫은 이슈, 새로 등록한 서브이슈(표), 다루지 않은 지적.
+2. 공용 절차 **처리 순서**로 메인 이슈 `<P>`의 남은 서브이슈 순서를 다시 매겨 표로 보여 준다. 열린 서브이슈가
+   없으면 "R<k>의 서브이슈를 모두 처리했습니다. 다음: `/close-ms <P>`"라고 적는다.
+3. PushNotification으로 한 줄 알린다. 예: `#64 머지 완료 (PR #65), 새 서브이슈 #66`.
    질문 지점은 따로 알리지 않는다(질문이 뜰 때 소리 훅과 모바일 알림이 이미 나간다).
