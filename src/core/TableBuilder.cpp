@@ -410,6 +410,8 @@ std::optional<Package> buildPackage(ParsedFolder folder, const std::string& name
                                     const ResourceTable& deps, Diagnostics& diag) {
   // Every value of every entry, one for each configuration and product.
   std::map<Key, PendingEntry> entries;
+  // The ids XML files make in other packages, by package and name, each where first made.
+  std::map<std::pair<std::string, std::string>, Source> externalIds;
   for (ParsedResource& r : folder.resources) {
     // aapt2 link merges only what is defined in the package being linked: an <attr> a
     // <declare-styleable> defines in another package is left out, and the styleable then finds
@@ -417,8 +419,7 @@ std::optional<Package> buildPackage(ParsedFolder folder, const std::string& name
     // but in android, which it only warns of (#83).
     if (!r.package.empty() && r.package != name) {
       if (r.type == ResType::Id && r.package != "android") {
-        diag.error(r.source, "defined resource '" + r.package + ":" + nameOf(r.type, r.name) +
-                                 "' for external package '" + r.package + "'");
+        externalIds.emplace(std::pair(r.package, r.name), r.source);
       }
       continue;
     }
@@ -438,6 +439,13 @@ std::optional<Package> buildPackage(ParsedFolder folder, const std::string& name
                                  "' with config '" + toString(r.config) + "'");
         break;
     }
+  }
+  // One error for each such id, after merging and in the order of package and name, as aapt2's
+  // VerifyNoExternalPackages gives them from the merged table.
+  for (const auto& [external, source] : externalIds) {
+    const auto& [package, entry] = external;
+    diag.error(source, "defined resource '" + package + ":" + nameOf(ResType::Id, entry) +
+                           "' for external package '" + package + "'");
   }
   for (const SymbolDecl& s : folder.symbols) {
     const auto it = entries.find({s.type, s.name});

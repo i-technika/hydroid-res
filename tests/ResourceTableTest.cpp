@@ -793,15 +793,20 @@ TEST(ResourceTable, IdOfAnotherPackageInAnXmlFile) {
   EXPECT_TRUE(table.find("com.example:id/own"));
   EXPECT_FALSE(table.find("com.example:id/text1"));
 
+  // @+id/b before @+app:id/b, which is another id; an error for each id of another package, not
+  // for each file that makes it, from the first that does, in the order of their names.
   TempDir other;
   ResourceTable failed;
   std::vector<Diagnostic> errors;
   EXPECT_FALSE(load(failed, other,
-                    {{"layout/l.xml", "<a\n x='@+app:id/viaauto' y='@+id/viaauto'/>"}},
+                    {{"layout/l.xml", "<a\n x='@+id/b' y='@+app:id/b' z='@+app:id/a'/>"},
+                     {"layout/m.xml", "<a y='@+app:id/b'/>"}},
                     "com.example", 0x7f, &errors));
-  ASSERT_EQ(errors.size(), 1u) << errorsOf(errors);
-  EXPECT_EQ(errors[0].message, "defined resource 'app:id/viaauto' for external package 'app'");
-  EXPECT_EQ(errors[0].line, 1);
+  ASSERT_EQ(errors.size(), 2u) << errorsOf(errors);
+  EXPECT_EQ(errors[0].message, "defined resource 'app:id/a' for external package 'app'");
+  EXPECT_EQ(errors[1].message, "defined resource 'app:id/b' for external package 'app'");
+  EXPECT_EQ(errors[1].file.filename(), "l.xml");
+  EXPECT_EQ(errors[1].line, 1);
 }
 
 // The dump writes numbers as printf does in the C locale, whatever the host app set.
