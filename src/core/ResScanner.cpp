@@ -129,14 +129,17 @@ class IdCollector {
     for (pugi::xml_attribute a : element.attributes()) {
       if (isNamespaceDeclaration(a)) continue;
       const std::optional<ParsedReference> ref = parseReference(a.value());
-      if (!ref || !ref->create || !ref->name.package.empty()) continue;
+      if (!ref || !ref->create) continue;
       const Source source{file_, doc_.line(element)};
       if (!isValidEntryName(ref->name.entry)) {
         diag_.error(source, "id '" + ref->name.entry + "' has an invalid entry name");
         continue;
       }
-      if (!seen_.insert(ref->name.entry).second) continue;
+      // The package as written, which the table builder checks (#83): aapt2 does not read it as
+      // an XML namespace prefix here.
+      if (!seen_.insert(ref->name.package + ":" + ref->name.entry).second) continue;
       out_.resources.push_back(makeIdResource(ref->name.entry, source));
+      out_.resources.back().package = ref->name.package;
     }
     for (pugi::xml_node child : element.children()) {
       if (child.type() == pugi::node_element) visit(child);

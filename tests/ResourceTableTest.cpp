@@ -781,6 +781,29 @@ TEST(ResourceTable, FilesOfOneCompiledNameFail) {
   EXPECT_EQ(errors[1].message, "compiles to values_a.arsc.flat, as values-/a.xml does");
 }
 
+// An id @+pkg:id/ makes in an XML file is the package's own when pkg is its name, fails the load
+// in another package, and is left out in android, which aapt2 only warns of (#83).
+TEST(ResourceTable, IdOfAnotherPackageInAnXmlFile) {
+  TempDir dir;
+  ResourceTable table;
+  ASSERT_TRUE(load(table, dir,
+                   {{"layout/l.xml",
+                     "<a xmlns:android='http://schemas.android.com/apk/res/android' "
+                     "android:id='@+com.example:id/own' x='@+android:id/text1'/>"}}));
+  EXPECT_TRUE(table.find("com.example:id/own"));
+  EXPECT_FALSE(table.find("com.example:id/text1"));
+
+  TempDir other;
+  ResourceTable failed;
+  std::vector<Diagnostic> errors;
+  EXPECT_FALSE(load(failed, other,
+                    {{"layout/l.xml", "<a\n x='@+app:id/viaauto' y='@+id/viaauto'/>"}},
+                    "com.example", 0x7f, &errors));
+  ASSERT_EQ(errors.size(), 1u) << errorsOf(errors);
+  EXPECT_EQ(errors[0].message, "defined resource 'app:id/viaauto' for external package 'app'");
+  EXPECT_EQ(errors[0].line, 1);
+}
+
 // The dump writes numbers as printf does in the C locale, whatever the host app set.
 TEST(TableDump, NumbersIgnoreTheLocale) {
   TempDir dir;
