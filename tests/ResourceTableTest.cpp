@@ -572,9 +572,21 @@ TEST(ResourceTable, FolderThatCannotBeOpenedFails) {
   EXPECT_EQ(errors[0].file.filename(), "values-fr");
 }
 
-// So does a link to a folder that cannot be opened: a junction on Windows, which needs no
-// privilege as a symbolic link does there, whose kind cannot be told, and a symbolic link
-// elsewhere, which then fails to open.
+// Makes `link` a link to the folder `target`: a junction on Windows, which needs no privilege as
+// a symbolic link does there, and a symbolic link elsewhere.
+bool linkFolder(const std::filesystem::path& link, const std::filesystem::path& target) {
+#ifdef _WIN32
+  const std::string mklink = "mklink /J \"" + link.string() + "\" \"" + target.string() + "\" >nul";
+  return std::system(mklink.c_str()) == 0;
+#else
+  std::error_code ec;
+  std::filesystem::create_directory_symlink(target, link, ec);
+  return !ec;
+#endif
+}
+
+// So does a link to a folder that cannot be opened, whose kind cannot be told on Windows, and
+// which fails to open elsewhere.
 TEST(ResourceTable, FolderLinkThatCannotBeOpenedFails) {
   TempDir dir;
   const std::filesystem::path res = dir.path() / "res";
@@ -583,13 +595,7 @@ TEST(ResourceTable, FolderLinkThatCannotBeOpenedFails) {
   std::filesystem::create_directories(target);
   std::ofstream(res / "values" / "v.xml") << "<resources><string name='s'>x</string></resources>";
   std::ofstream(target / "v.xml") << "<resources><string name='s'>y</string></resources>";
-#ifdef _WIN32
-  const std::string mklink =
-      "mklink /J \"" + (res / "values-fr").string() + "\" \"" + target.string() + "\" >nul";
-  ASSERT_EQ(std::system(mklink.c_str()), 0);
-#else
-  std::filesystem::create_directory_symlink(target, res / "values-fr");
-#endif
+  ASSERT_TRUE(linkFolder(res / "values-fr", target));
   const Unlistable fr(target);
   if (!fr.works()) GTEST_SKIP() << "this user may list a folder that denies it";
   ResourceTable table;
@@ -598,6 +604,22 @@ TEST(ResourceTable, FolderLinkThatCannotBeOpenedFails) {
   ASSERT_EQ(errors.size(), 1u) << errorsOf(errors);
   EXPECT_EQ(errors[0].message, "failed to open directory");
   EXPECT_EQ(errors[0].file.filename(), "values-fr");
+}
+
+// But a link to nothing is left out, as aapt2 leaves it: nothing is behind it to lack.
+TEST(ResourceTable, FolderLinkToNothingIsLeftOut) {
+  TempDir dir;
+  const std::filesystem::path res = dir.path() / "res";
+  const std::filesystem::path target = dir.path() / "fr";
+  std::filesystem::create_directories(res / "values");
+  std::filesystem::create_directories(target);
+  std::ofstream(res / "values" / "v.xml") << "<resources><string name='s'>x</string></resources>";
+  ASSERT_TRUE(linkFolder(res / "values-fr", target));
+  std::filesystem::remove(target);
+  ResourceTable table;
+  std::vector<Diagnostic> errors;
+  EXPECT_TRUE(table.addPackage(res, "com.example", 0x7f, &errors)) << errorsOf(errors);
+  EXPECT_TRUE(table.find("com.example:string/s"));
 }
 
 // The dump writes numbers as printf does in the C locale, whatever the host app set.

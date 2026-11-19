@@ -29,7 +29,8 @@ namespace fs = std::filesystem;
 // aapt2 does on other systems.)
 // A folder that cannot be opened or read to its end is an error (#85), and so is an entry of res/
 // whose kind cannot be told, as a junction or link to a folder that denies it, so that a load
-// never quietly lacks, say, values-fr/. aapt2 37.0.0 on Windows leaves such a folder out without
+// never quietly lacks, say, values-fr/. A link to nothing is left out, as aapt2 leaves it, since
+// nothing is behind it to lack. aapt2 37.0.0 on Windows leaves such a folder out without
 // a word; its own message for a folder it fails to open is "failed to open directory", which
 // hydroid's is, the same everywhere, as the system's may not be UTF-8 (Windows writes it in the
 // ANSI code page). A file whose kind cannot be told is #86's.
@@ -53,7 +54,9 @@ std::vector<std::pair<std::string, fs::path>> list(const fs::path& dir, bool dir
     }
     std::error_code kind;
     if (directories ? !e.is_directory(kind) : !e.is_regular_file(kind)) {
-      if (directories && kind) diag.error({e.path(), 0}, "failed to open directory");
+      if (directories && kind && kind != std::errc::no_such_file_or_directory) {
+        diag.error({e.path(), 0}, "failed to open directory");
+      }
       continue;
     }
     out.emplace_back(std::move(name), e.path());
