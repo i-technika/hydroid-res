@@ -199,15 +199,14 @@ class Linker {
   void linkXmlAttribute(const ParsedXmlAttribute& attribute) {
     const ParsedItem& value = attribute.value;
     const AttrInfo* info = nullptr;
-    std::string attrName;
     if (attribute.attr && linksInto(attribute.attr->package)) {
       const ResName& attr = *attribute.attr;
-      attrName = (own(attr.package) ? "" : attr.package + ":") + attr.entry;
       const std::optional<ResId> id = resolve(attr, value.source, Naming::XmlAttribute);
       if (!id) return;
       info = attrInfo(attr, *id);
       if (!info) {
-        diag_.error(value.source, "attribute " + attrName + " is not an <attr>");
+        diag_.error(value.source, "attribute " + (own(attr.package) ? "" : attr.package + ":") +
+                                      attr.entry + " is not an <attr>");
         return;
       }
     }
@@ -217,9 +216,11 @@ class Linker {
         if (linksInto(value.ref.package)) resolve(value.ref, value.source);
         return;
       case ParsedItem::Kind::Raw:
+        // aapt2 names the attribute here by its local name, with no package, as layout_width for
+        // android:layout_width, where its "not found" gives the package (#167).
         if (info && !(info->formats & kFormatString) && !parseForAttr(value.text, *info)) {
           diag_.error(value.source, "'" + value.text + "' is incompatible with attribute " +
-                                        attrName + " " + printed(*info));
+                                        attribute.attr->entry + " " + printed(*info));
         }
         return;
       case ParsedItem::Kind::Literal:
