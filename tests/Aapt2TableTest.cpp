@@ -181,6 +181,8 @@ TEST(Aapt2Table, CasesLikeAapt2) {
   const nlohmann::json golden = nlohmann::json::parse(readFile(HYDROID_AAPT2_TABLE_CASES));
   const std::string package = golden.at("package").get<std::string>();
   std::set<std::string, std::less<>> rejected;
+  // The cases whose error from aapt2 runs on to more lines.
+  std::set<std::string, std::less<>> longer;
   ASSERT_GT(golden.at("cases").size(), 150u);
   for (const nlohmann::json& c : golden.at("cases")) {
     const std::string name = c.at("name").get<std::string>();
@@ -195,6 +197,7 @@ TEST(Aapt2Table, CasesLikeAapt2) {
     const bool loaded = table.addPackage(dir.path() / "res", package, kAppPackageId, &errors);
     if (c.at("aapt2").is_null()) {
       rejected.insert(name);
+      if (c.at("error").get<std::string>().find('\n') != std::string::npos) longer.insert(name);
       std::string path;
       const std::string aapt2 = likeHydroid(c.at("error").get<std::string>(), package, &path);
       if (loaded) {
@@ -236,6 +239,12 @@ TEST(Aapt2Table, CasesLikeAapt2) {
     EXPECT_TRUE(difference.empty()) << difference;
   }
   EXPECT_GT(rejected.size(), 50u);
+  // aapt2 prints the string these errors are about on the line after, which gen_aapt2_table.py
+  // keeps, so that hydroid's words are compared to the string too (#152).
+  for (const char* name : {"string-apostrophe", "string-bad-unicode", "string-array-apostrophe",
+                           "style-string-attr", "plurals-apostrophe"}) {
+    EXPECT_TRUE(longer.count(name)) << name << ": aapt2's error has no line after its first";
+  }
   for (const auto& [name, words] : kOtherWords) {
     EXPECT_TRUE(rejected.count(name)) << "kOtherWords has " << name << ", not a case aapt2 rejects";
   }

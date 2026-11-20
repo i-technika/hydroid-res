@@ -745,6 +745,21 @@ def ordered_flats(aapt2: Path, res: Path, out: Path, compiled: set) -> list:
     return order
 
 
+# An error runs to the next line with error:, warn: or note: on it, as aapt2 prints the string an
+# error is about on the line after it, "unescaped apostrophe in string\n\"it's\"", and the
+# newlines of a name it does not find: "resource attr/a\nb (aka com.probe:attr/a\nb) not found".
+AAPT2_ERROR = re.compile(r"^([^\n]*?)\berror: (.*?)(?=\n[^\n]*\b(?:error|warn|note): |\n*\Z)",
+                         re.M | re.S)
+
+
+def aapt2_errors(stderr: str) -> list:
+    """(where, error) of each error aapt2 prints, in order: what the line has before "error: ",
+    and the error without the temporary folder a file name starts with or the period it ends
+    with."""
+    return [(m[1], re.sub(r"[^\s']*[\\/]res[\\/]", "res/", m[2]).rstrip("."))
+            for m in AAPT2_ERROR.finditer(stderr.replace("\r", ""))]
+
+
 def link_dump(aapt2: Path, jar: Path, res: Path, package: str, work: Path):
     """Compiles and links `res`: (the dump, None), or (None, the first error)."""
     work.mkdir(parents=True, exist_ok=True)
@@ -779,11 +794,10 @@ def link_dump(aapt2: Path, jar: Path, res: Path, package: str, work: Path):
             if not dump.startswith("Binary APK\n"):
                 sys.exit(f"unexpected dump of {res}:\n{dump}")
             return dump[len("Binary APK\n"):], None
-    errors = [m[1] for m in re.finditer(r"error: (.*)", result.stderr.replace("\r", ""))]
+    errors = aapt2_errors(result.stderr)
     if not errors:
         sys.exit(f"aapt2 failed on {res} with no error:\n{result.stderr}")
-    # Without the temporary folder the file names start with.
-    return None, re.sub(r"[^\s']*[\\/]res[\\/]", "res/", errors[0]).rstrip(".")
+    return None, errors[0][1]
 
 
 def run_case(aapt2: Path, jar: Path, tmp: Path, name: str):

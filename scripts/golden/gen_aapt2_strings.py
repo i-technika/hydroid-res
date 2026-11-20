@@ -30,7 +30,7 @@ import tempfile
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-from gen_aapt2_table import LINK_FLAGS
+from gen_aapt2_table import LINK_FLAGS, aapt2_errors
 from gen_aapt2_values import BUILD_TOOLS, EXE, HOST, MACHINE, PLATFORM, out_path, sdk_tools
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -184,18 +184,14 @@ def build(aapt2: Path, jar: Path, tmp: Path, pairs, keep):
                                   encoding="utf-8").stdout
             return {}, dump.replace("\r", "")
     failed = {}
-    # An error runs to the next line aapt2 starts with error:, warn: or note:, as it prints the
-    # newlines of a name it does not find: "resource attr/a\nb (aka com.probe:attr/a\nb) not found".
-    errors = r"strings\.xml:(\d+): error: (.*?)(?=\n[^\n]*\b(?:error|warn|note): |\n*\Z)"
-    for m in re.finditer(errors, result.stderr.replace("\r", ""), re.S):
+    for where, error in aapt2_errors(result.stderr):
+        line = re.search(r"strings\.xml:(\d+): $", where)
         # aapt2 reports @+id/ of a name no id can have, but leaves the text a string and builds.
-        if re.match(r"resource 'id/.*' has invalid entry name", m[2]):
+        if not line or re.match(r"resource 'id/.*' has invalid entry name", error):
             continue
-        if int(m[1]) not in lines:
+        if int(line[1]) not in lines:
             sys.exit(f"aapt2 {stage} error outside an input:\n{result.stderr}")
-        # Without the temporary folder a file name starts with, as gen_aapt2_table.py writes it.
-        error = re.sub(r"[^\s']*[\\/]res[\\/]", "res/", m[2]).rstrip(".")
-        failed.setdefault(lines[int(m[1])], []).append(error)
+        failed.setdefault(lines[int(line[1])], []).append(error)
     if not failed:
         sys.exit(f"aapt2 {stage} failed:\n{result.stderr}")
     return failed, None
