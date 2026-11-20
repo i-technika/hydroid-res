@@ -423,7 +423,15 @@ CASES = {
                                                    "<item type='string' name='t'>?attr/r</item>"),
                                           **values("<item type='attr' name='r'>@string/s</item>",
                                                    "values-land")},
-    "styleable-attr-item-not-an-attr": values("<string name='s'>x</string><item type='attr' name='r'>@string/s</item>"
+    # Of product='default', which ProductFilter keeps as it is, the value is not one of no product,
+    # which is all aapt2's symbol table looks at.
+    "attrref-attr-item-default-product": values("<string name='s'>x</string>"
+                                                "<item type='attr' name='r' product='default'>@string/s</item>"
+                                                "<item type='string' name='t'>?attr/r</item>"),
+    "style-key-attr-item-default-product": values("<string name='s'>x</string>"
+                                                  "<item type='attr' name='r' product='default'>@string/s</item>"
+                                                  "<style name='S'><item name='r'>1</item></style>"),
+    "styleable-attr-item-not-an-attr":values("<string name='s'>x</string><item type='attr' name='r'>@string/s</item>"
                                               "<declare-styleable name='S'><attr name='r'/></declare-styleable>"),
 
     # Literals.

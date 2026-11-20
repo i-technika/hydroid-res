@@ -264,20 +264,22 @@ class Linker {
   }
 
   // Whether aapt2's symbol table leaves out an attr of this package that it has an id for (#175).
-  // ResourceTableSymbolSource has one with a value of the default configuration only for an
-  // <attr>, which is always of it: <item type='attr' name='r'> in values/ it does not find, by
-  // any reference, where one in values-land/ only it finds, with no <attr>.
+  // ResourceTableSymbolSource has one with a value of the default configuration and no product
+  // only for an <attr>, which is always of it: <item type='attr' name='r'> in values/ it does not
+  // find, by any reference, where one in values-land/ only, or of product='default', which
+  // ProductFilter keeps as it is, it finds, with no <attr>.
   bool unfound(const ResName& name) const {
     if (name.type != ResType::Attr) return false;
     const std::vector<PendingValue>& values = entries_.at({ResType::Attr, name.entry});
     return std::any_of(values.begin(), values.end(), [](const PendingValue& v) {
-      return v.config == Config{} && !std::holds_alternative<ParsedAttr>(v.value);
+      return v.config == Config{} && v.product.empty() &&
+             !std::holds_alternative<ParsedAttr>(v.value);
     });
   }
 
   // An attr found where a style item or an XML attribute names an <attr>, which is not one (#166).
   // resolve() has not found any other: this one is of this package, with no value of the default
-  // configuration.
+  // configuration and no product.
   void notAnAttr(const ResName& name, const Source& source, Naming naming) {
     diag_.error(source, described(name, naming) + " is not an attribute");
   }

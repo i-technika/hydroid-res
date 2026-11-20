@@ -1296,8 +1296,8 @@ TEST(ResourceTable, AnotherPackagesPrivateResourceNeedsAPrivateReference) {
 // aapt2 37.0.0 does not find where a style item or an XML attribute names an <attr> (#166), nor by
 // any reference (#175), in its own package and in another alike, <public> or not, as it links
 // against com.other's apk. The golden cases have the own package's, with no other loaded, and its
-// one with no value of the default configuration, as in values-land/ only, which aapt2 finds and
-// says is not an attribute.
+// one with no value of the default configuration, as in values-land/ only, which a reference finds
+// and a style item or an XML attribute is told is not an attribute.
 TEST(ResourceTable, AttrItemIsNotFoundAsAnAttr) {
   TempDir dir;
   ResourceTable table;
