@@ -190,7 +190,8 @@ struct Package {
 
 // A problem that keeps a res/ folder from loading. There are no warnings: where aapt2 only warns
 // and goes on, as of an id @+android:id/ makes in an XML file or a <public> in a folder with
-// qualifiers, hydroid goes on too and says nothing (#130).
+// qualifiers, hydroid goes on too and says nothing (#130), where it reads what is warned of at
+// all: what it does not read yet, as <public-group> or <overlayable>, is an error in any folder.
 struct Diagnostic {
   std::filesystem::path file;  // empty for none
   int line = 0;                // 0 for none

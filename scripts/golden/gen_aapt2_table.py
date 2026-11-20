@@ -289,6 +289,12 @@ CASES = {
                               "<attr name='a'><enum name='x' value='1'/></attr>"),
     "attr-any-then-color": values("<attr name='a'/><attr name='a' format='color'/>"),
     "attr-in-config": values("<attr name='a' format='color'/>", "values-land"),
+    # What aapt2 only warns of in a folder with qualifiers, and hydroid takes without a word
+    # (#130). type="id" puts its id in that folder's configuration, which is #82's.
+    "public-in-config": values("<string name='s'>x</string><public type='string' name='s'/>",
+                               "values-land"),
+    "java-symbol-in-config": values("<string name='s'>x</string>"
+                                    "<java-symbol type='string' name='s'/>", "values-land"),
     "attr-in-two-configs": {"values/v.xml": "<resources><attr name='a' format='color'/></resources>",
                             "values-land/v.xml": "<resources><attr name='a' format='integer'/></resources>"},
     # Link merges the .flat files in the order of their folder/name (see link_dump), so
