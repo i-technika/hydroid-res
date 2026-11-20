@@ -812,6 +812,43 @@ TEST(ResourceTable, IdOfAnotherPackageInAnXmlFile) {
   EXPECT_EQ(errors[2].line, 1);
 }
 
+// An id @+pkg:id/ makes in a values file is the package's own when pkg, as written, is its name.
+// In another package it is left out with no error of its own, unlike one an XML file makes, and
+// the reference to it then fails (#131).
+TEST(ResourceTable, IdOfAPackageInAValuesFile) {
+  TempDir dir;
+  ResourceTable table;
+  ASSERT_TRUE(load(table, dir,
+                   {{"values/v.xml",
+                     "<resources><string name='s'>@+com.example:id/own</string>"
+                     "<string-array name='a'><item>@+com.example:id/in_array</item></string-array>"
+                     "</resources>"}}));
+  EXPECT_TRUE(table.find("com.example:id/own"));
+  EXPECT_TRUE(table.find("com.example:id/in_array"));
+
+  TempDir other;
+  ResourceTable failed;
+  std::vector<Diagnostic> errors;
+  EXPECT_FALSE(
+      load(failed, other,
+           {{"values/v.xml", "<resources><string name='s'>@+app:id/v</string></resources>"}},
+           "com.example", 0x7f, &errors));
+  ASSERT_EQ(errors.size(), 1u) << errorsOf(errors);
+  EXPECT_EQ(errors[0].message, "resource app:id/v not found: no package 'app' is loaded");
+
+  // x of xmlns:x names the package itself in the reference, but not in the id it makes.
+  TempDir prefix;
+  ResourceTable prefixed;
+  errors.clear();
+  EXPECT_FALSE(load(prefixed, prefix,
+                    {{"values/v.xml",
+                      "<resources xmlns:x='http://schemas.android.com/apk/res/com.example'>"
+                      "<string name='s'>@+x:id/v</string></resources>"}},
+                    "com.example", 0x7f, &errors));
+  ASSERT_EQ(errors.size(), 1u) << errorsOf(errors);
+  EXPECT_EQ(errors[0].message, "resource id/v not found");
+}
+
 // The dump writes numbers as printf does in the C locale, whatever the host app set.
 TEST(TableDump, NumbersIgnoreTheLocale) {
   TempDir dir;
