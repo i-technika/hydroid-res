@@ -151,6 +151,12 @@ struct ParsedResource {
   // package as well (#131), and one an XML file makes fails there, but in android (#83).
   std::string package;
   bool inXmlFile = false;  // an id an XML file makes, for the check of its package
+  // A resource of a values file, whose name the table builder checks as AddResourcesToTable does,
+  // when it adds it: the scanner checks those of the ids it makes, with words of its own.
+  bool checkName = false;
+  // How many of the resources that follow are its own: aapt2's child_resources, each followed by
+  // its own in turn, which go in only if it does (#159).
+  size_t children = 0;
   ParsedValue value;
   Source source;
 };

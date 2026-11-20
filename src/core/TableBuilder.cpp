@@ -600,6 +600,14 @@ std::optional<Package> buildPackage(ParsedFolder folder, const std::string& name
     ParsedResource& r = resources[i];
     if (!file || r.source.file != *file) files.emplace_back();
     file = &r.source.file;
+    // AddResourcesToTable: a resource whose name is not valid, or that is a duplicate, fails, and
+    // its children, which follow it, are left out with no errors of their own (#159).
+    if (r.checkName && !isValidEntryName(r.name)) {
+      diag.error(r.source, "resource '" + nameOf(r.type, r.name) + "' has invalid entry name '" +
+                               r.name + "'");
+      i += r.children;
+      continue;
+    }
     // An id an XML file makes in another package fails link, but in android, which it only warns
     // of (#83).
     if (r.inXmlFile && !r.package.empty() && r.package != name && r.package != "android") {
@@ -610,6 +618,7 @@ std::optional<Package> buildPackage(ParsedFolder folder, const std::string& name
       diag.error(r.source, "duplicate value for resource '" +
                                (r.package.empty() ? "" : r.package + ":") + nameOf(r.type, r.name) +
                                "' with config '" + toString(r.config) + "'");
+      i += r.children;
     }
   }
   if (!diag.empty()) return std::nullopt;

@@ -633,6 +633,47 @@ TEST(ResourceTable, ChildrenOfAFailedResourceAreLeftOut) {
   }
 }
 
+// Nor are they added when it is a duplicate, which compile finds, and the children of one that
+// fails give no errors, though those of the others do (#159). Every error aapt2 37.0.0 compile
+// gives of each, in order, but its "resource previously defined here".
+TEST(ResourceTable, ChildrenOfADuplicateAreLeftOut) {
+  const std::vector<std::pair<std::string, std::vector<std::string>>> cases = {
+      {"<attr name='e' format='string'/><attr name='e'><enum name='1x' value='1'/></attr>",
+       {"duplicate value for resource 'attr/e' with config ''"}},
+      // The attr/b of the styleable that fails is not there for the <attr> after it.
+      {"<declare-styleable name='s'><attr name='a' format='string'/></declare-styleable>"
+       "<declare-styleable name='s'><attr name='b' format='integer'/></declare-styleable>"
+       "<attr name='b' format='string'/>",
+       {"duplicate value for resource 'styleable/s' with config ''"}},
+      // An <attr> of a styleable that fails, and not the styleable: the next <attr> goes in.
+      {"<attr name='a' format='integer'/><declare-styleable name='s'><attr name='a'>"
+       "<enum name='1x' value='1'/></attr><attr name='2b' format='string'/></declare-styleable>",
+       {"duplicate value for resource 'attr/a' with config ''",
+        "resource 'attr/2b' has invalid entry name '2b'"}},
+      {"<declare-styleable name='s'><attr name='1a' format='string'/>"
+       "<attr name='2b' format='string'/></declare-styleable>",
+       {"resource 'attr/1a' has invalid entry name '1a'",
+        "resource 'attr/2b' has invalid entry name '2b'"}},
+      {"<attr name='e'><enum name='1x' value='1'/><enum name='2y' value='2'/></attr>",
+       {"resource 'id/1x' has invalid entry name '1x'",
+        "resource 'id/2y' has invalid entry name '2y'"}},
+      {"<integer name='i'>1</integer><integer name='i'>2</integer><integer name='1j'>3</integer>",
+       {"duplicate value for resource 'integer/i' with config ''",
+        "resource 'integer/1j' has invalid entry name '1j'"}},
+  };
+  for (const auto& [body, expected] : cases) {
+    TempDir dir;
+    ResourceTable table;
+    std::vector<Diagnostic> errors;
+    EXPECT_FALSE(load(table, dir, {{"values/v.xml", "<resources>" + body + "</resources>"}},
+                      "com.example", 0x7f, &errors))
+        << body;
+    std::vector<std::string> messages;
+    for (const Diagnostic& d : errors) messages.push_back(d.message);
+    EXPECT_EQ(messages, expected) << body << errorsOf(errors);
+  }
+}
+
 // A file aapt2 fails with "invalid file path 'res/...'" fails with what is wrong with its path,
 // on the file. Aapt2Table.CasesLikeAapt2 compares only aapt2's words, "invalid file path".
 TEST(ResourceTable, InvalidFilePathSaysWhy) {
