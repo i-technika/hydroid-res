@@ -129,7 +129,8 @@ CASES = {
     "xml-ids": {"layout/l.xml": f'<a {ANDROID} android:id="@+id/one" x="@+id/two" y=" @+id/three ">'
                                 '<b z="@+id/one">@+id/not_text</b></a>'},
     "xml-id-invalid-name": {"layout/l.xml": f'<a {ANDROID} android:id="@+id/1bad"/>'},
-    # The error names the package written before the id, which the case takes out of it (#172).
+    # aapt2's error names the package written before the id. Aapt2TableTest takes it out of the
+    # error where it is CASE_PACKAGE, as hydroid leaves it out, but not android (#172).
     "xml-id-invalid-name-own-package": {"layout/l.xml": f'<a {ANDROID} android:id="@+com.probe:id/1bad"/>'},
     "xml-id-invalid-name-android": {"layout/l.xml": f'<a {ANDROID} android:id="@+android:id/1bad"/>'},
     # An id @+pkg:id/ makes: in another package, which link fails on, but for android, which it
