@@ -1241,6 +1241,50 @@ TEST(ResourceTable, AnotherPackagesPrivateResourceNeedsAPrivateReference) {
   }
 }
 
+// A resource of type attr that is not an <attr>, as <item type='attr' name='r'> in values/, is one
+// aapt2 37.0.0 does not find where a style item or an XML attribute names an <attr>, in its own
+// package and in another alike, <public> or not, as it links against com.other's apk (#166). The
+// golden cases have the own package's, with no other loaded, and its one with no value of the
+// default configuration, as in values-land/ only, which aapt2 finds and says is not an attribute.
+TEST(ResourceTable, AttrItemIsNotFoundAsAnAttr) {
+  TempDir dir;
+  ResourceTable table;
+  std::vector<Diagnostic> errors;
+  const std::string item = "<string name='s'>x</string><item type='attr' name='r'>@string/s</item>";
+  const std::string other = "<resources>" + item +
+                            "<item type='attr' name='p'>@string/s</item>"
+                            "<public type='attr' name='r'/></resources>";
+  ASSERT_TRUE(load(table, dir, {{"values/v.xml", other}}, "com.other", 0x7e, &errors))
+      << errorsOf(errors);
+  const std::string ns =
+      " xmlns:app='http://schemas.android.com/apk/res-auto'"
+      " xmlns:o='http://schemas.android.com/apk/res/com.other'";
+  // A values file's resources, or an XML file's attributes, and the error. A values file that
+  // fails to link stops link before the XML files (#165), so each case has one or the other.
+  const std::vector<std::tuple<std::string, std::string, std::string>> cases = {
+      {"<style name='S'><item name='r'>1</item></style>", "", "style attribute 'attr/r' not found"},
+      {"<style name='S'><item name='com.other:r'>1</item></style>", "",
+       "style attribute 'com.other:attr/r' not found"},
+      {"", "app:r='1'", "attribute r not found"},
+      {"", "o:r='1'", "attribute com.other:r not found"},
+      {"<style name='S'><item name='com.other:p'>1</item></style>", "",
+       "style attribute 'com.other:attr/p' not found"},
+      {"", "o:p='1'", "attribute com.other:p not found"},
+  };
+  uint8_t id = 0x7d;
+  for (const auto& [values, attributes, message] : cases) {
+    SCOPED_TRACE(values + attributes);
+    errors.clear();
+    EXPECT_FALSE(load(table, dir,
+                      {{"values/v.xml", "<resources" + ns + ">" + item + values + "</resources>"},
+                       {"layout/l.xml", "<a" + ns + " " + attributes + "/>"}},
+                      "com.probe" + std::to_string(id), id, &errors));
+    id--;
+    ASSERT_EQ(errors.size(), 1u) << errorsOf(errors);
+    EXPECT_EQ(errors[0].message, message);
+  }
+}
+
 // What an XML file names in android is linked once a package android is loaded, as aapt2 links
 // it against android.jar, and left alone while none is, as hydroid cannot read android.jar yet
 // (#132). The golden cases load no android, so the cases that need one are here.

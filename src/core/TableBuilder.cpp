@@ -205,8 +205,7 @@ class Linker {
       if (!id) return;
       info = attrInfo(attr, *id);
       if (!info) {
-        diag_.error(value.source, "attribute " + (own(attr.package) ? "" : attr.package + ":") +
-                                      attr.entry + " is not an <attr>");
+        notAnAttr(attr, value.source, Naming::XmlAttribute);
         return;
       }
     }
@@ -248,22 +247,46 @@ class Linker {
     StyleAttribute,  // "style attribute 'attr/foo'", quoted
   };
 
+  // `name` as an error names it, with no package if it is this one's.
+  std::string written(const ResName& name) const {
+    return (own(name.package) ? "" : name.package + ":") + name.typeName() + "/" + name.entry;
+  }
+
+  // What `naming` makes of `name` in "... not found".
+  std::string described(const ResName& name, Naming naming) const {
+    switch (naming) {
+      case Naming::Resource: return "resource " + written(name);
+      case Naming::XmlAttribute:
+        return "attribute " + (own(name.package) ? "" : name.package + ":") + name.entry;
+      case Naming::StyleAttribute: return "style attribute '" + written(name) + "'";
+    }
+    return {};
+  }
+
+  // A resource of type attr that is not an <attr>, as <item type='attr' name='r'>, found where an
+  // <attr> is named (#166). aapt2's symbol table has an attr of this package with a value of the
+  // default configuration only for an <attr>, which is always of it, and of another package only
+  // for an <attr>: it does not find the others. One of this package with no value of the default
+  // configuration it finds, with no <attr>.
+  void notAnAttr(const ResName& name, const Source& source, Naming naming) {
+    bool found = false;
+    if (own(name.package)) {
+      const std::vector<PendingValue>& values = entries_.at({ResType::Attr, name.entry});
+      found = std::none_of(values.begin(), values.end(),
+                           [](const PendingValue& v) { return v.config == Config{}; });
+    }
+    diag_.error(source, described(name, naming) + (found ? " is not an attribute" : " not found"));
+  }
+
   std::optional<ResId> resolve(const ResName& name, const Source& source,
                                Naming naming = Naming::Resource) {
-    const std::string prefix = own(name.package) ? "" : name.package + ":";
-    const std::string written = prefix + name.typeName() + "/" + name.entry;
     // aapt2 looks for a macro to put its contents in place of the reference, in any package, and
     // says so when there is none.
     if (name.otherType == "macro") {
-      diag_.error(source, "failed to find definition for " + written);
+      diag_.error(source, "failed to find definition for " + written(name));
       return std::nullopt;
     }
-    std::string what;
-    switch (naming) {
-      case Naming::Resource: what = "resource " + written; break;
-      case Naming::XmlAttribute: what = "attribute " + prefix + name.entry; break;
-      case Naming::StyleAttribute: what = "style attribute '" + written + "'"; break;
-    }
+    const std::string what = described(name, naming);
     // No package hydroid loads has a resource of a type no ResType stands for (#142), so that a
     // reference of one is not looked for. android.jar has ^attr-private, which aapt2 finds: the
     // table must keep that type before a reference finds it there (#98).
@@ -276,6 +299,12 @@ class Linker {
       return std::nullopt;
     } else if (kept) {
       if (std::optional<ResId> id = deps_.find(name.package, name.type, name.entry)) {
+        // An attr of another package that is not an <attr> aapt2 does not find, before it asks
+        // whether the reference may name it.
+        if (naming != Naming::Resource && !attrInfo(name, *id)) {
+          notAnAttr(name, source, naming);
+          return std::nullopt;
+        }
         // ReferenceLinker::IsSymbolVisible: what another package does not make <public> only a
         // private reference may name (#141).
         if (name.privateReference || deps_.entry(*id)->isPublic) return id;
@@ -468,9 +497,7 @@ class Linker {
       }
       const AttrInfo* info = attrInfo(item.attr, *attrId);
       if (!info) {
-        diag_.error(
-            item.value.source,
-            "style attribute '" + nameOf(ResType::Attr, item.attr.entry) + "' is not an <attr>");
+        notAnAttr(item.attr, item.value.source, Naming::StyleAttribute);
         ok = false;
         continue;
       }
