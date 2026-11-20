@@ -121,9 +121,9 @@ void splitFileName(const std::string& file, std::string* name, std::string* exte
 // its ids are made. Text is not looked at.
 class XmlFileCollector {
  public:
-  XmlFileCollector(const XmlDocument& doc, const fs::path& file, ParsedFolder& out,
-                   Diagnostics& diag)
-      : doc_(doc), file_(file), out_(out), diag_(diag) {}
+  XmlFileCollector(const XmlDocument& doc, const fs::path& file, const std::string& package,
+                   ParsedFolder& out, Diagnostics& diag)
+      : doc_(doc), file_(file), package_(package), out_(out), diag_(diag) {}
 
   void visit(pugi::xml_node element) {
     if (elementNamespace(element) == kAaptNamespace && localName(element.name()) == "attr") {
@@ -168,8 +168,11 @@ class XmlFileCollector {
  private:
   void collectId(const ResName& name, const Source& source) {
     if (!isValidEntryName(name.entry)) {
-      diag_.error(source, "id '" + (name.package.empty() ? "" : name.package + ":") +
-                              name.typeName() + "/" + name.entry + "' has an invalid entry name");
+      // The id as written, with no package where it is this one, as the table builder's errors
+      // give it (#172).
+      const bool own = name.package.empty() || name.package == package_;
+      diag_.error(source, "id '" + (own ? "" : name.package + ":") + name.typeName() + "/" +
+                              name.entry + "' has an invalid entry name");
       return;
     }
     // The package as written, which the table builder checks (#83): aapt2 does not read it as an
@@ -182,6 +185,7 @@ class XmlFileCollector {
 
   const XmlDocument& doc_;
   const fs::path& file_;
+  const std::string& package_;
   ParsedFolder& out_;
   Diagnostics& diag_;
   std::set<std::string> seen_;
@@ -189,7 +193,8 @@ class XmlFileCollector {
 
 }  // namespace
 
-void scanResFolder(const fs::path& res, ParsedFolder& out, Diagnostics& diag) {
+void scanResFolder(const fs::path& res, const std::string& package, ParsedFolder& out,
+                   Diagnostics& diag) {
   std::error_code ec;
   if (!fs::is_directory(res, ec)) {
     diag.error({res, 0}, "not a folder");
@@ -290,7 +295,7 @@ void scanResFolder(const fs::path& res, ParsedFolder& out, Diagnostics& diag) {
         diag.error({file, line}, "xml parser error: " + why);
         continue;
       }
-      XmlFileCollector(doc, file, out, diag).visit(doc.root());
+      XmlFileCollector(doc, file, package, out, diag).visit(doc.root());
     } else if (png) {
       ref.type = FileType::Png;
     }

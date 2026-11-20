@@ -129,6 +129,9 @@ CASES = {
     "xml-ids": {"layout/l.xml": f'<a {ANDROID} android:id="@+id/one" x="@+id/two" y=" @+id/three ">'
                                 '<b z="@+id/one">@+id/not_text</b></a>'},
     "xml-id-invalid-name": {"layout/l.xml": f'<a {ANDROID} android:id="@+id/1bad"/>'},
+    # The error names the package written before the id, which the case takes out of it (#172).
+    "xml-id-invalid-name-own-package": {"layout/l.xml": f'<a {ANDROID} android:id="@+com.probe:id/1bad"/>'},
+    "xml-id-invalid-name-android": {"layout/l.xml": f'<a {ANDROID} android:id="@+android:id/1bad"/>'},
     # An id @+pkg:id/ makes: in another package, which link fails on, but for android, which it
     # only warns of, and in the package itself (#83). The prefix is not an XML namespace here.
     "xml-id-other-package": {"layout/l.xml": f'<a {ANDROID} xmlns:app="http://schemas.android.com/'

@@ -1012,8 +1012,9 @@ TEST(ResourceTable, FilesOfOneCompiledNameFailAtLink) {
 
 // A folder of no configuration and an @+id/ of no valid name fail with aapt2's words, then what
 // hydroid adds (#149). aapt2 names the qualifiers, all that follows the first '-', and the id as
-// written, its package too. CasesLikeAapt2 sees only that hydroid's words take in aapt2's, not
-// the folder name after them, and its golden id has no package.
+// written, its package too, which hydroid leaves out where it is the one being loaded, as the
+// golden cases take it out of aapt2's words (#172). CasesLikeAapt2 sees only that hydroid's words
+// take in aapt2's, not the folder name after them.
 TEST(ResourceTable, BadFolderAndIdNamesSayWhatAapt2Says) {
   using Files = std::vector<std::pair<std::string, std::string>>;
   const std::vector<std::pair<Files, std::string>> cases = {
@@ -1029,6 +1030,14 @@ TEST(ResourceTable, BadFolderAndIdNamesSayWhatAapt2Says) {
          "<a xmlns:android='http://schemas.android.com/apk/res/android' "
          "android:id='@+com.foo:id/1bad'/>"}},
        "id 'com.foo:id/1bad' has an invalid entry name"},
+      {{{"layout/l.xml",
+         "<a xmlns:android='http://schemas.android.com/apk/res/android' "
+         "android:id='@+com.example:id/1bad'/>"}},
+       "id 'id/1bad' has an invalid entry name"},
+      {{{"layout/l.xml",
+         "<a xmlns:android='http://schemas.android.com/apk/res/android' "
+         "android:id='@+android:id/1bad'/>"}},
+       "id 'android:id/1bad' has an invalid entry name"},
   };
   for (const auto& [files, message] : cases) {
     SCOPED_TRACE(message);
