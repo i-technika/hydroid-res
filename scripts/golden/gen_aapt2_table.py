@@ -5,7 +5,7 @@
                                 package com.itechnika.hydroid.table
   golden/aapt2/app_table.txt    the golden app's res/, as com.itechnika.hydroid.golden
   golden/aapt2/table_cases.json small res/ folders, each with what aapt2 dumps of it, or null
-                                where aapt2 rejects it (and the error it gives, to read)
+                                where aapt2 rejects it, with the first error it gives
 
 Each folder is compiled with `aapt2 compile --dir`, which decides what compiles and what fails,
 then each of its files again on its own into a .flat file; these are linked against PLATFORM with
@@ -17,8 +17,8 @@ path. Where the zip holds one name twice, as of values-/a.xml and values/a.xml, 
 zip as it is and fails on it (#122). The flags turn off what aapt2 link does beyond what the
 folder says, which hydroid's ResourceTable does not do either: versioning styles and XML files,
 removing values of a locale with no default, and removing values another configuration repeats.
-The C++ test Aapt2TableTest loads each folder and checks that it dumps the same, so CI needs no
-Android SDK.
+The C++ test Aapt2TableTest loads each folder and checks that it dumps the same, or fails with a
+first error that says what aapt2's does, so CI needs no Android SDK.
 
 Usage: python scripts/golden/gen_aapt2_table.py [--any-host]
 Needs an Android SDK with the build-tools (aapt2) and platform gen_aapt2_values.py pins, on its
