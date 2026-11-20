@@ -311,7 +311,9 @@ class Parser {
       }
       children_.clear();
       if (!parseResource(node, res) || !add(std::move(res))) continue;
-      for (ParsedResource& child : children_) add(std::move(child));
+      for (size_t c = 0; c < children_.size(); c++) {
+        if (!add(std::move(children_[c].resource))) c += children_[c].children;
+      }
     }
   }
 
@@ -877,7 +879,7 @@ class Parser {
           ok = false;
           continue;
         }
-        children_.push_back(makeIdResource(s.name, s.source));
+        children_.push_back({makeIdResource(s.name, s.source)});
         attr.symbols.insert(pos, std::move(s));
       } else if (!(plain && (name == "skip" || name == "eat-comment"))) {
         error(child, "unknown tag <" + std::string(name) + "> in <attr>");
@@ -911,7 +913,8 @@ class Parser {
       // defined in that package, as ParseDeclareStyleable names it, which the table builder sees
       // is the one being loaded (#109). It comes before the ids of its <enum>s and <flag>s.
       if (std::get<ParsedAttr>(attr.value).formats != kFormatAny) {
-        children_.insert(children_.begin() + static_cast<ptrdiff_t>(ids), std::move(attr));
+        children_.insert(children_.begin() + static_cast<ptrdiff_t>(ids),
+                         {std::move(attr), children_.size() - ids});
       }
       styleable.attrs.push_back(std::move(ref));
       return true;
@@ -974,10 +977,16 @@ class Parser {
   const Config& config_;
   ParsedFolder& out_;
   Diagnostics& diag_;
-  // aapt2's child_resources of the element being read: the <attr>s of a <declare-styleable> and the
-  // ids of <enum>s and <flag>s, each <attr> before its ids. AddResourcesToTable adds them after
-  // the element's resource, and none of them if it is not read or its name is not valid (#156).
-  std::vector<ParsedResource> children_;
+  // aapt2's child_resources of the element being read, in the order AddResourcesToTable adds them
+  // after the element's resource: the <attr>s of a <declare-styleable>, each followed by its own
+  // children, and the ids of <enum>s and <flag>s. A resource's children go in only if it is read
+  // and its name is valid (#156), though aapt2 leaves them out too when it is a duplicate, which
+  // only compile sees (#159).
+  struct Child {
+    ParsedResource resource;
+    size_t children = 0;  // how many of those that follow are its own
+  };
+  std::vector<Child> children_;
 };
 
 }  // namespace

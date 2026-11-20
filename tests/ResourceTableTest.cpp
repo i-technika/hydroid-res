@@ -607,6 +607,32 @@ TEST(ResourceTable, AttrNameIsParseXmlAttributeNames) {
   }
 }
 
+// The ids of the <enum>s and <flag>s of an <attr> go in after it, as AddResourcesToTable adds a
+// resource's children, and not at all if it is not read or its name is not valid, nor is any
+// error given of their names then (#156). The golden cases compare only the first error.
+TEST(ResourceTable, ChildrenOfAFailedResourceAreLeftOut) {
+  const std::vector<std::pair<std::string, std::string>> cases = {
+      {"<attr name='1a'><enum name='2x' value='1'/></attr>", "invalid entry name '1a'"},
+      {"<declare-styleable name='s'><attr name='1a'><enum name='2x' value='1'/></attr>"
+       "</declare-styleable>",
+       "invalid entry name '1a'"},
+      {"<declare-styleable name='1s'><attr name='2a' format='string'/></declare-styleable>",
+       "invalid entry name '1s'"},
+      {"<attr name='a'><enum name='2x' value='1'/><enum name='y' value='z'/></attr>",
+       "invalid value 'z' for <enum>"},
+  };
+  for (const auto& [body, expected] : cases) {
+    TempDir dir;
+    ResourceTable table;
+    std::vector<Diagnostic> errors;
+    EXPECT_FALSE(load(table, dir, {{"values/v.xml", "<resources>" + body + "</resources>"}},
+                      "com.example", 0x7f, &errors))
+        << body;
+    ASSERT_EQ(errors.size(), 1u) << body << errorsOf(errors);
+    EXPECT_NE(errors[0].message.find(expected), std::string::npos) << errors[0];
+  }
+}
+
 // A file aapt2 fails with "invalid file path 'res/...'" fails with what is wrong with its path,
 // on the file. Aapt2Table.CasesLikeAapt2 compares only aapt2's words, "invalid file path".
 TEST(ResourceTable, InvalidFilePathSaysWhy) {
