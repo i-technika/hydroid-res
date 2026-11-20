@@ -749,15 +749,17 @@ def ordered_flats(aapt2: Path, res: Path, out: Path, compiled: set) -> list:
     return order
 
 
-# What a line of aapt2's own starts with: "error: ", or the absolute path of a file, and its line,
-# before it, as "C:\...\v.xml:1: error: " or "/.../v.xml: warn: ".
-AAPT2_LINE = r"(?:(?:[A-Za-z]:\\|/)[^\n]*?: )?(?:error|warn|note): "
+# What a line of aapt2's own starts with: "error: ", or before it the file it is about, and its
+# line: an absolute path, as "C:\...\v.xml:1: error: " or "/.../v.xml: warn: ", or the .flat file
+# link takes from its folder, as "1/values_b.arsc.flat: error: " (ordered_flats()).
+AAPT2_WHERE = r"(?:(?:[A-Za-z]:\\|/|\d+/)[^\n]*?: )?"
+AAPT2_LINE = rf"{AAPT2_WHERE}(?:error|warn|note): "
 # An error runs to the next such line, as aapt2 prints the string an error is about on the line
 # after it, "unescaped apostrophe in string\n\"it's\"", and the newlines of a name it does not
-# find: "resource attr/a\nb (aka com.probe:attr/a\nb) not found". The string may have "error: "
-# or "warn: " in it, which no line of aapt2's starts with.
-AAPT2_ERROR = re.compile(r"^((?:(?:[A-Za-z]:\\|/)[^\n]*?: )?)error: (.*?)"
-                         rf"(?=\n{AAPT2_LINE}|\n*\Z)", re.M | re.S)
+# find: "resource attr/a\nb (aka com.probe:attr/a\nb) not found". So "error: " or "warn: " in the
+# string is kept, but a line of it that starts as one of aapt2's ends the error there: no input
+# of the scripts has one.
+AAPT2_ERROR = re.compile(rf"^({AAPT2_WHERE})error: (.*?)(?=\n{AAPT2_LINE}|\n*\Z)", re.M | re.S)
 
 
 def aapt2_errors(stderr: str) -> list:
