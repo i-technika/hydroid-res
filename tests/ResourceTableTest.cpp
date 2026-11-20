@@ -341,6 +341,44 @@ TEST(ResourceTable, StyleableDefinesAttrsOnlyInItsOwnPackage) {
   EXPECT_FALSE(table.package("com.other"));
 }
 
+// aapt2 compile resolves the collisions of a file before link leaves out what it defines in
+// another package (#88): two <attr> of another package that disagree fail in one file, as they do
+// in this package, and are both left out from two.
+TEST(ResourceTable, StyleableDefinesAttrsOfAFileBeforeLeavingOtherPackagesOut) {
+  TempDir dir;
+  ResourceTable table;
+  std::vector<Diagnostic> errors;
+  ASSERT_TRUE(load(table, dir,
+                   {{"values/v.xml",
+                     "<resources><attr name='a' format='color'/>"
+                     "<public type='attr' name='a'/></resources>"}},
+                   "com.lib", 0x7e, &errors))
+      << errorsOf(errors);
+  const std::string a = "<declare-styleable name='A'><attr name='com.lib:a' format='integer'/>"
+                        "</declare-styleable>";
+  const std::string b = "<declare-styleable name='B'><attr name='com.lib:a' format='color'/>"
+                        "</declare-styleable>";
+
+  EXPECT_FALSE(load(table, dir, {{"values/v.xml", "<resources>" + a + b + "</resources>"}},
+                    "com.one", 0x7f, &errors));
+  ASSERT_EQ(errors.size(), 1u);
+  EXPECT_EQ(errors[0].message, "duplicate value for resource 'com.lib:attr/a' with config ''");
+
+  errors.clear();
+  ASSERT_TRUE(load(table, dir,
+                   {{"values/a.xml", "<resources>" + a + "</resources>"},
+                    {"values/b.xml", "<resources>" + b + "</resources>"}},
+                   "com.two", 0x7f, &errors))
+      << errorsOf(errors);
+  EXPECT_FALSE(table.find("com.two:attr/a"));
+  for (const char* styleable : {"com.two:styleable/A", "com.two:styleable/B"}) {
+    const Package& app = *table.package("com.two");
+    EXPECT_EQ(app.styleables[valueOf(table, styleable).index()].attrs,
+              std::vector<ResId>{*table.find("com.lib:attr/a")})
+        << styleable;
+  }
+}
+
 TEST(ResourceTable, PackageMustBeLoaded) {
   TempDir dir;
   ResourceTable table;

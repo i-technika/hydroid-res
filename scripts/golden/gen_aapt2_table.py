@@ -493,6 +493,41 @@ CASES = {
         "values-/a.xml": "<resources><attr name='n' format='integer' min='0'/>"
                          "<style name='S'><item name='n'>3</item></style></resources>",
         "values-land/a.xml": "<resources><attr name='n' format='integer' min='5'/></resources>"},
+    # Compile makes a table of each file, where an <attr> of a <declare-styleable> yields to
+    # another of the file, then link merges the tables, where it does not: of two <attr> that
+    # agree, the first stays (#81, #88).
+    "attr-weak-then-strong": values("<declare-styleable name='A'><attr name='n' format='integer'"
+                                    " min='5'/></declare-styleable><attr name='n' format='integer'"
+                                    " min='0'/><style name='S'><item name='n'>3</item></style>"),
+    "attr-weak-then-strong-files": {
+        "values/a.xml": "<resources><declare-styleable name='A'><attr name='n' format='integer'"
+                        " min='5'/></declare-styleable>"
+                        "<style name='S'><item name='n'>3</item></style></resources>",
+        "values/b.xml": "<resources><attr name='n' format='integer' min='0'/></resources>"},
+    "attr-weak-then-weak-files": {
+        "values/a.xml": "<resources><declare-styleable name='A'><attr name='n' format='integer'"
+                        " min='5'/></declare-styleable></resources>",
+        "values/b.xml": "<resources><declare-styleable name='B'><attr name='n' format='integer'"
+                        " min='0'/></declare-styleable></resources>",
+        "values/c.xml": "<resources><style name='S'><item name='n'>3</item></style></resources>"},
+    "attr-weak-then-weak-files-swapped": {
+        "values/a.xml": "<resources><declare-styleable name='A'><attr name='n' format='integer'"
+                        " min='0'/></declare-styleable></resources>",
+        "values/b.xml": "<resources><declare-styleable name='B'><attr name='n' format='integer'"
+                        " min='5'/></declare-styleable></resources>",
+        "values/c.xml": "<resources><style name='S'><item name='n'>3</item></style></resources>"},
+    "attr-strong-then-weak-files": {
+        "values/a.xml": "<resources><attr name='n' format='integer' min='5'/></resources>",
+        "values/b.xml": "<resources><declare-styleable name='B'><attr name='n' format='integer'"
+                        " min='0'/></declare-styleable></resources>",
+        "values/c.xml": "<resources><style name='S'><item name='n'>3</item></style></resources>"},
+    "attr-weak-then-other-files": {
+        "values/a.xml": "<resources><declare-styleable name='A'><attr name='n' format='integer'/>"
+                        "</declare-styleable></resources>",
+        "values/b.xml": "<resources><attr name='n' format='color'/></resources>"},
+    "id-then-reference-files": {
+        "values/a.xml": "<resources><item type='id' name='x'/></resources>",
+        "values/b.xml": "<resources><item type='id' name='x'>@id/y</item><id name='y'/></resources>"},
     "attr-unknown-child": values("<attr name='a'><foo/></attr>"),
     "attr-text-child": values("<attr name='a' format='color'>text<skip/></attr>"),
     "enum-values": values("<attr name='a'><enum name='x' value=' 5 '/><enum name='y' value='0x7fffffff'/>"
@@ -550,6 +585,20 @@ CASES = {
                                             "<declare-styleable name='S'>"
                                             "<attr name='com.probe:a' format='color'/>"
                                             "</declare-styleable>"),
+    # Compile keeps what a file defines in the package by name apart from what it defines unwritten,
+    # which link merges first, whatever their order in the file (#88).
+    "styleable-define-own-after-plain": values("<declare-styleable name='B'>"
+                                               "<attr name='n' format='integer' min='0'/>"
+                                               "</declare-styleable><declare-styleable name='A'>"
+                                               "<attr name='com.probe:n' format='integer' min='5'/>"
+                                               "</declare-styleable>"
+                                               "<style name='S'><item name='n'>3</item></style>"),
+    "styleable-define-own-before-plain": values("<declare-styleable name='A'>"
+                                                "<attr name='com.probe:n' format='integer' min='0'/>"
+                                                "</declare-styleable><declare-styleable name='B'>"
+                                                "<attr name='n' format='integer' min='5'/>"
+                                                "</declare-styleable>"
+                                                "<style name='S'><item name='n'>3</item></style>"),
     "styleable-define-android": values("<declare-styleable name='S'>"
                                        "<attr name='android:a' format='color'/></declare-styleable>"),
     "styleable-define-not-loaded": values("<declare-styleable name='S'>"
