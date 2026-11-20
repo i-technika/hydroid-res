@@ -7,6 +7,7 @@
 
 #include <pugixml.hpp>
 
+#include <optional>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -15,6 +16,7 @@ namespace hydroid::res::detail {
 
 inline constexpr std::string_view kXliffNamespace = "urn:oasis:names:tc:xliff:document:1.2";
 inline constexpr std::string_view kAaptNamespace = "http://schemas.android.com/aapt";
+inline constexpr std::string_view kToolsNamespace = "http://schemas.android.com/tools";
 
 // How much of a file aapt2 reads: all of it (xml::Inflate, an XML file), or up to the end of its
 // root element (XmlPullParser, a values file), past which it looks for no error.
@@ -44,14 +46,22 @@ std::string_view localName(const char* name);
 // caller looks for no other case (#91).
 std::string elementNamespace(pugi::xml_node element);
 
+// The namespace of the attribute `attr` of `element`, from the xmlns of its prefix: "" for one
+// with no prefix, which a default xmlns="" does not give a namespace.
+std::string attributeNamespace(pugi::xml_node element, pugi::xml_attribute attr);
+
 // Whether `attr` declares a namespace (xmlns="", xmlns:p=""), which expat does not report as an
 // attribute.
 bool isNamespaceDeclaration(pugi::xml_attribute attr);
 
+// xml::ExtractPackageFromNamespace: the package of http://schemas.android.com/apk/res/<package>
+// or .../apk/prv/res/<package>, the package being loaded ("") of .../apk/res-auto, and nullopt of
+// any other namespace.
+std::optional<std::string> namespacePackage(std::string_view uri);
+
 // xml::ResolvePackage: the package that `alias` (the "app" of @app:color/x or app:attr) stands
-// for where `node` is. A prefix declared as http://schemas.android.com/apk/res/<package> is that
-// package, one declared as .../apk/res-auto the package being loaded (""), and anything else is
-// left as it is.
+// for where `node` is: that of the namespace its prefix is declared as (namespacePackage), and
+// anything else is left as it is.
 std::string resolvePackage(pugi::xml_node node, const std::string& alias);
 
 }  // namespace hydroid::res::detail

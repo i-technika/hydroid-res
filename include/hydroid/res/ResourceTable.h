@@ -41,6 +41,11 @@
 //   - A style without parent="" is the child of its name up to its last '.', which must exist.
 //     Its items are read against the format of their attribute, as Android does.
 //   - Every reference must name a resource of the table.
+//   - The attributes of XML files are linked as aapt2 links them, but those of tools:, which it
+//     leaves alone: one of a package's namespace (android:text, or app:x of res-auto) must name
+//     an <attr> of the table, and its value be one that <attr> takes; any reference in one must
+//     name a resource of the table. What one names in android is left alone while no package
+//     android is loaded, as hydroid cannot read android.jar yet.
 // It does not do what aapt2 link does by default beyond what the folder says, and what the golden
 // files are made without: add versions of styles and XML files for the attributes they use,
 // remove the values of a locale with no default, and remove values a more general configuration
@@ -49,8 +54,8 @@
 //
 // Not read yet, and so an error: <public> with an id, <public-group>, <staging-public-group>,
 // <overlayable>, <macro>, <add-resource>, <configVarying>, and inline XML resources
-// (<aapt:attr>). The contents of XML files are not checked against the attributes they use; the
-// XML trees are step 8.
+// (<aapt:attr>). The table keeps an XML file as a file, and nothing of its contents; the XML
+// trees are step 8.
 
 namespace hydroid::res {
 

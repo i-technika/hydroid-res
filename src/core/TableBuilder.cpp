@@ -130,8 +130,54 @@ class Linker {
     return std::visit(Visitor{*this, source}, value);
   }
 
+  // XmlReferenceLinker for one attribute of an XML file: the <attr> its namespace names must be
+  // found, a reference in its value must resolve, and any other value must be one the <attr>
+  // takes. An attribute of no package's namespace takes anything but an enum or flags name, and
+  // so takes any text, as a string. Unlike a style item's, the value is not checked against the
+  // <attr>'s min and max, nor its type against a reference's. Problems go to the diagnostics.
+  void linkXmlAttribute(const ParsedXmlAttribute& attribute) {
+    const ParsedItem& value = attribute.value;
+    std::optional<AttrInfo> info;
+    std::string attrName;
+    if (attribute.attr && linksInto(attribute.attr->package)) {
+      const ResName& attr = *attribute.attr;
+      attrName = (own(attr.package) ? "" : attr.package + ":") + attr.entry;
+      const std::optional<ResId> id = resolve(attr, value.source, "attribute");
+      if (!id) return;
+      info = attrInfo(attr, *id);
+      if (!info) {
+        diag_.error(value.source, "attribute " + attrName + " is not an <attr>");
+        return;
+      }
+    }
+    switch (value.kind) {
+      case ParsedItem::Kind::Reference:
+      case ParsedItem::Kind::AttrRef:
+        if (linksInto(value.ref.package)) resolve(value.ref, value.source);
+        return;
+      case ParsedItem::Kind::Raw:
+        if (info && !(info->formats & kFormatString) && !parseForAttr(value.text, *info)) {
+          diag_.error(value.source, "'" + value.text + "' is incompatible with attribute " +
+                                        attrName + " " + formatsToString(info->formats));
+        }
+        return;
+      case ParsedItem::Kind::Literal:
+      case ParsedItem::Kind::String:
+      case ParsedItem::Kind::StyledString:
+      case ParsedItem::Kind::Id: return;
+    }
+  }
+
  private:
   bool own(const std::string& package) const { return package.empty() || package == package_.name; }
+
+  // Whether what an XML file names in `package` is linked. aapt2 links every app against
+  // android.jar, which hydroid cannot read yet: what an XML file names in android, as the
+  // attribute android:text, is left alone while no package android is loaded. A reference of a
+  // values file is not, as it becomes a value of the table, which needs its id.
+  bool linksInto(const std::string& package) const {
+    return own(package) || package != "android" || deps_.package(package);
+  }
 
   std::optional<ResId> resolve(const ResName& name, const Source& source,
                                const char* what = "resource") {
@@ -212,6 +258,24 @@ class Linker {
     return std::nullopt;
   }
 
+  // TryParseItemForAttribute but for references: `text` as the literal, enum or flags `attr`
+  // takes, each read with whitespace around.
+  static std::optional<Value> parseForAttr(std::string_view text, const AttrInfo& attr) {
+    if (std::optional<Value> v = parseLiteral(text, attr.formats)) return v;
+    const std::string_view t = trim(text);
+    if (attr.formats & kFormatEnum) {
+      for (const AttrInfo::Symbol& s : attr.symbols) {
+        if (s.name == t) return Value::integer(static_cast<int32_t>(s.value), s.format);
+      }
+    }
+    if (attr.formats & kFormatFlags) {
+      if (std::optional<uint32_t> flags = flagsOf(t, attr)) {
+        return Value::integer(static_cast<int32_t>(*flags), IntFormat::Hex);
+      }
+    }
+    return std::nullopt;
+  }
+
   // ReferenceLinker's ParseValueWithAttribute: a style item's text as the literal, reference,
   // enum or flags its attribute takes, else a string if it takes one.
   std::optional<Value> coerce(const ParsedItem& raw, const AttrInfo& attr) {
@@ -220,17 +284,7 @@ class Linker {
     // aapt2 reads that one here, after it has resolved references, so it stays unresolved and
     // flattens to 0: @null.
     if (parseReference(text)) return Value::null();
-    if (std::optional<Value> v = parseLiteral(text, attr.formats)) return v;
-    if (attr.formats & kFormatEnum) {
-      for (const AttrInfo::Symbol& s : attr.symbols) {
-        if (s.name == text) return Value::integer(static_cast<int32_t>(s.value), s.format);
-      }
-    }
-    if (attr.formats & kFormatFlags) {
-      if (std::optional<uint32_t> flags = flagsOf(text, attr)) {
-        return Value::integer(static_cast<int32_t>(*flags), IntFormat::Hex);
-      }
-    }
+    if (std::optional<Value> v = parseForAttr(text, attr)) return v;
     if (attr.formats & kFormatString) {
       // aapt2 keeps the text as written when it is not a valid string, an apostrophe and all.
       std::string why;
@@ -521,6 +575,9 @@ std::optional<Package> buildPackage(ParsedFolder folder, const std::string& name
         entry.candidates.push_back({v.config, *value});
       }
     }
+  }
+  for (const ParsedXmlAttribute& attribute : folder.xmlAttributes) {
+    linker.linkXmlAttribute(attribute);
   }
   if (!diag.empty()) return std::nullopt;
   return package;
