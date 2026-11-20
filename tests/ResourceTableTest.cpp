@@ -576,6 +576,26 @@ TEST(ResourceTable, AttrNameIsParseXmlAttributeNames) {
   }
 }
 
+// A file aapt2 fails with "invalid file path 'res/...'" fails with what is wrong with its path,
+// on the file. Aapt2Table.CasesLikeAapt2 compares only aapt2's words, "invalid file path".
+TEST(ResourceTable, InvalidFilePathSaysWhy) {
+  const std::vector<std::pair<std::string, std::string>> cases = {
+      {"foo/x.png", "invalid file path: no resource type 'foo'"},
+      {"Raw/x.txt", "invalid file path: no resource type 'Raw'"},
+      {"values/a.txt", "invalid file path: not an .xml file in values"},
+  };
+  for (const auto& [path, expected] : cases) {
+    TempDir dir;
+    ResourceTable table;
+    std::vector<Diagnostic> errors;
+    EXPECT_FALSE(load(table, dir, {{path, "x"}}, "com.example", 0x7f, &errors)) << path;
+    ASSERT_EQ(errors.size(), 1u) << path << errorsOf(errors);
+    EXPECT_EQ(errors[0].message, expected);
+    EXPECT_EQ(errors[0].file, dir.path() / "com.example" / std::filesystem::u8path(path));
+    EXPECT_EQ(errors[0].line, 0);
+  }
+}
+
 // Keeps everyone from listing `dir` while it lives, and lets them again after: by an ACL on
 // Windows, where permissions() only sets the read-only flag, and by its mode elsewhere.
 class Unlistable {
