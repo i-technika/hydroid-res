@@ -917,8 +917,13 @@ class Parser {
     }
     out_.symbols.push_back({*t, res.name, /*isPublic=*/true, res.source});
     // A public id is also its definition, which aapt2 keeps in the configuration of the folder,
-    // as it does a value of any resource there, and only warns of the <public> (#82).
-    if (*t == ResType::Id) add(makeIdResource(res.name, res.source, config_));
+    // as it does a value of any resource there, and only warns of the <public> (#82). It has the
+    // product of the <public>, which ProductFilter then checks as any value's (#136).
+    if (*t == ResType::Id) {
+      ParsedResource id = makeIdResource(res.name, res.source, config_);
+      id.product = res.product;
+      add(std::move(id));
+    }
     return false;  // nothing more to add
   }
 
