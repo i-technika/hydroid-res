@@ -850,7 +850,8 @@ TEST(ResourceTable, FilesOfOneCompiledNameFail) {
 
 // A folder of no configuration and an @+id/ of no valid name fail with aapt2's words, then what
 // hydroid adds (#149). aapt2 names the qualifiers, all that follows the first '-', and the id as
-// written, its package too; the golden cases have one '-' and no package.
+// written, its package too. CasesLikeAapt2 sees only that hydroid's words take in aapt2's, not
+// the folder name after them, and its golden id has no package.
 TEST(ResourceTable, BadFolderAndIdNamesSayWhatAapt2Says) {
   using Files = std::vector<std::pair<std::string, std::string>>;
   const std::vector<std::pair<Files, std::string>> cases = {
