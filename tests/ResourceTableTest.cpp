@@ -556,10 +556,10 @@ TEST(ResourceTable, RejectsWhatIsNotUtf8) {
 TEST(ResourceTable, AttrNameIsParseXmlAttributeNames) {
   const std::vector<std::pair<std::string, std::string>> cases = {
       {"<attr name='n' format='integer'/><style name='S'><item name='*n'>3</item></style>",
-       "attr/*n not found"},
+       "'attr/*n' not found"},
       {"<attr name='n' format='integer'/><style name='S'><item "
        "name='com.example:'>3</item></style>",
-       "attr/com.example: not found"},
+       "'attr/com.example:' not found"},
       {"<style name='S'><item name='android:'>3</item></style>", "android:attr/android:"},
       {"<declare-styleable name='S'><attr name='*a' format='color'/></declare-styleable>",
        "invalid entry name '*a'"},
@@ -842,8 +842,10 @@ TEST(ResourceTable, FilesOfOneCompiledNameFail) {
                      {"raw/y.txt", "y"}},
                     "com.example", 0x7f, &errors));
   ASSERT_EQ(errors.size(), 2u) << errorsOf(errors);
-  EXPECT_EQ(errors[0].message, "compiles to raw_x.txt.flat, as raw-/x.txt does");
-  EXPECT_EQ(errors[1].message, "compiles to values_a.arsc.flat, as values-/a.xml does");
+  EXPECT_EQ(errors[0].message,
+            "Duplicate entries in archive: compiles to raw_x.txt.flat, as raw-/x.txt does");
+  EXPECT_EQ(errors[1].message,
+            "Duplicate entries in archive: compiles to values_a.arsc.flat, as values-/a.xml does");
 }
 
 // An id @+pkg:id/ makes in an XML file is the package's own when pkg is its name, fails the load
@@ -990,12 +992,12 @@ TEST(ResourceTable, AnotherPackagesPrivateResourceNeedsAPrivateReference) {
       {"<style name='S' parent='@com.other:style/QS'/>", "",
        "resource com.other:style/QS is private"},
       {"<style name='S'><item name='com.other:qa'>x</item></style>", "",
-       "style attribute com.other:attr/qa is private"},
+       "style attribute 'com.other:attr/qa' is private"},
       {"<declare-styleable name='D'><attr name='com.other:qa'/></declare-styleable>", "",
        "resource com.other:attr/qa is private"},
       {"", "x='@com.other:string/priv'", "resource com.other:string/priv is private"},
       {"", "x='?com.other:attr/qa'", "resource com.other:attr/qa is private"},
-      {"", "o:qa='1'", "attribute com.other:attr/qa is private"},
+      {"", "o:qa='1'", "attribute com.other:qa is private"},
       {"<string name='s'>@*com.other:string/priv</string>", "", ""},
       {"<string name='s'>@q:string/priv</string>", "", ""},
       {"<string name='s'>@o:string/pub</string>", "", ""},
@@ -1082,9 +1084,13 @@ TEST(ResourceTable, XmlFileLinksIntoAndroidOnceLoaded) {
       << errorsOf(errors);
   const std::vector<std::pair<std::string, std::string>> rejected = {
       {intoAndroid[0], "resource android:id/gen not found"},
-      {intoAndroid[1], "attribute android:attr/nosuch not found"},
-      {intoAndroid[2], "'foo' is incompatible with attribute android:layout_width dimension|enum"},
-      {intoAndroid[3], "'foo' is incompatible with attribute android:layout_width dimension|enum"},
+      {intoAndroid[1], "attribute android:nosuch not found"},
+      {intoAndroid[2],
+       "'foo' is incompatible with attribute android:layout_width (attr) dimension|enum "
+       "[match_parent=4294967295]"},
+      {intoAndroid[3],
+       "'foo' is incompatible with attribute android:layout_width (attr) dimension|enum "
+       "[match_parent=4294967295]"},
       {intoAndroid[4], "resource android:string/nosuch not found"},
       {intoAndroid[5], "resource android:attr/nosuch not found"},
       {intoAndroid[6], "resource android:string/nosuch not found"},
@@ -1100,6 +1106,35 @@ TEST(ResourceTable, XmlFileLinksIntoAndroidOnceLoaded) {
     EXPECT_EQ(errors[0].file.filename(), "l.xml");
     EXPECT_EQ(errors[0].line, 2);  // of the element, not of the attribute, as aapt2 gives it
     id--;
+  }
+}
+
+// An XML attribute's value the <attr> does not take names the <attr> as aapt2's Attribute::Print
+// does: its symbols in the order of their names, each value a uint32_t, then min and max, and no
+// [weak] for one of a <declare-styleable> (#149). The golden cases have one symbol at most, and
+// no min or max; these are what aapt2 37.0.0 says.
+TEST(ResourceTable, IncompatibleXmlAttributeNamesTheAttrAsAapt2Does) {
+  const std::vector<std::pair<std::string, std::string>> cases = {
+      {"<attr name='foo'><enum name='y' value='2'/><enum name='x' value='-1'/></attr>",
+       "(attr) enum [x=4294967295, y=2]"},
+      {"<attr name='foo'><flag name='y' value='0x2'/><flag name='x' value='0x1'/></attr>",
+       "(attr) flags [x=1, y=2]"},
+      {"<attr name='foo' format='integer' min='0' max='3'/>", "(attr) integer min=0 max=3"},
+      {"<declare-styleable name='S'><attr name='foo' format='integer'/></declare-styleable>",
+       "(attr) integer"},
+  };
+  for (const auto& [attr, printed] : cases) {
+    SCOPED_TRACE(attr);
+    TempDir dir;
+    ResourceTable table;
+    std::vector<Diagnostic> errors;
+    EXPECT_FALSE(load(
+        table, dir,
+        {{"values/v.xml", "<resources>" + attr + "</resources>"},
+         {"layout/l.xml", "<a xmlns:app='http://schemas.android.com/apk/res-auto' app:foo='z'/>"}},
+        "com.example", 0x7f, &errors));
+    ASSERT_EQ(errors.size(), 1u) << errorsOf(errors);
+    EXPECT_EQ(errors[0].message, "'z' is incompatible with attribute foo " + printed);
   }
 }
 

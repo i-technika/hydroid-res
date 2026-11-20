@@ -168,7 +168,8 @@ class XmlFileCollector {
  private:
   void collectId(const ResName& name, const Source& source) {
     if (!isValidEntryName(name.entry)) {
-      diag_.error(source, "id '" + name.entry + "' has an invalid entry name");
+      diag_.error(source, "id '" + (name.package.empty() ? "" : name.package + ":") +
+                              name.typeName() + "/" + name.entry + "' has an invalid entry name");
       return;
     }
     // The package as written, which the table builder checks (#83): aapt2 does not read it as an
@@ -221,7 +222,9 @@ void scanResFolder(const fs::path& res, ParsedFolder& out, Diagnostics& diag) {
     const bool values = resDir && resDir->type == "values";
     const std::optional<ResType> type = resDir ? parseResType(resDir->type) : std::nullopt;
     if (!resDir) {
-      diag.error({file, 0}, "invalid configuration in folder name '" + dirName + "'");
+      // aapt2 names the qualifiers, what follows the first '-'.
+      diag.error({file, 0}, "invalid configuration '" + dirName.substr(dirName.find('-') + 1) +
+                                "' in folder name '" + dirName + "'");
       continue;
     }
     std::string name;
@@ -255,7 +258,8 @@ void scanResFolder(const fs::path& res, ParsedFolder& out, Diagnostics& diag) {
         dash != std::string::npos && dash + 1 == dirName.size() ? dirName.substr(0, dash) : dirName;
     flat += "_" + (values ? name + ".arsc" : fileName) + ".flat";
     if (const auto [it, added] = flats.emplace(flat, path); !added) {
-      diag.error({file, 0}, "compiles to " + flat + ", as " + it->second + " does");
+      diag.error({file, 0}, "Duplicate entries in archive: compiles to " + flat + ", as " +
+                                it->second + " does");
       continue;
     }
     std::string text;
