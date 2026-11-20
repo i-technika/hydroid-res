@@ -212,6 +212,19 @@ CASES = {
     "id-plus-in-values": values("<string name='s'>@+id/made</string>"
                                 "<string-array name='a'><item>@+id/in_array</item></string-array>"),
     "id-plus-invalid-name": values("<string name='s'>@+id/1bad</string>"),
+    # An id @+pkg:id/ makes in a values file: in the package itself, and in another, which link
+    # leaves out, unlike one an XML file makes, so that the reference to it fails (#131). The
+    # package is as written, so that x of xmlns:x for the package itself is another package.
+    "id-plus-own-package": values("<string name='s'>@+com.probe:id/own</string>"
+                                  "<string name='t'>@+id/own</string>"
+                                  "<string-array name='a'><item>@+com.probe:id/in_array</item>"
+                                  "</string-array><attr name='r' format='reference'/>"
+                                  "<style name='S'><item name='r'>@+com.probe:id/in_style</item>"
+                                  "</style>"),
+    "id-plus-other-package": values("<string name='s'>@+app:id/v</string>"),
+    "id-plus-namespace-package": {
+        "values/v.xml": "<resources xmlns:x='http://schemas.android.com/apk/res/com.probe'>"
+                        "<string name='s'>@+x:id/v</string></resources>"},
     "id-plus-wrong-type": values("<color name='c'>@+color/c</color>"),
 
     # References.

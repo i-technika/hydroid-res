@@ -323,8 +323,12 @@ class Parser {
     out_.resources.push_back(std::move(res));
   }
 
-  // An id that @+id/ or an <enum> or <flag> makes, its name checked as any resource's.
-  void addId(const std::string& name, const Source& source) { add(makeIdResource(name, source)); }
+  // An id that @+[package:]id/ or an <enum> or <flag> makes, its name checked as any resource's.
+  void addId(const std::string& name, const Source& source, const std::string& package = "") {
+    ParsedResource id = makeIdResource(name, source);
+    id.package = package;
+    add(std::move(id));
+  }
 
   bool parseResource(pugi::xml_node el, ParsedResource& res) {
     const std::string_view element = el.name();
@@ -520,7 +524,10 @@ class Parser {
     // @+id/ of a name no id can have is not a reference: <string>@+id/1x</string> is that text.
     if (ref && ref->create && !isValidEntryName(ref->name.entry)) ref.reset();
     if (ref) {
-      if (ref->create && ref->name.package.empty()) addId(ref->name.entry, item.source);
+      // The id is in the package as written, not resolved as the reference is, as
+      // ResourceParser::ParseXml makes it, which the table builder keeps only in that package
+      // (#131).
+      if (ref->create) addId(ref->name.entry, item.source, ref->name.package);
       item.kind = ref->attr ? ParsedItem::Kind::AttrRef : ParsedItem::Kind::Reference;
       item.ref = std::move(ref->name);
       item.ref.package = resolvePackage(el, item.ref.package);

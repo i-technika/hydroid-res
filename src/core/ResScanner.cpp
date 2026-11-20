@@ -140,6 +140,7 @@ class IdCollector {
       if (!seen_.insert(ref->name.package + ":" + ref->name.entry).second) continue;
       out_.resources.push_back(makeIdResource(ref->name.entry, source));
       out_.resources.back().package = ref->name.package;
+      out_.resources.back().inXmlFile = true;
     }
     for (pugi::xml_node child : element.children()) {
       if (child.type() == pugi::node_element) visit(child);

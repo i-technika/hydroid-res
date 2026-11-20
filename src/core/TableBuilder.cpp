@@ -415,10 +415,11 @@ std::optional<Package> buildPackage(ParsedFolder folder, const std::string& name
   for (ParsedResource& r : folder.resources) {
     // aapt2 link merges only what is defined in the package being linked: an <attr> a
     // <declare-styleable> defines in another package is left out, and the styleable then finds
-    // that package's attr, or fails to (#109). An id @+pkg:id/ makes in an XML file fails it,
-    // but in android, which it only warns of (#83).
+    // that package's attr, or fails to (#109). So is an id @+pkg:id/ makes in a values file, and
+    // a reference to it then fails (#131). One an XML file makes fails link, but in android,
+    // which it only warns of (#83).
     if (!r.package.empty() && r.package != name) {
-      if (r.type == ResType::Id && r.package != "android") {
+      if (r.inXmlFile && r.package != "android") {
         externalIds.emplace(std::pair(r.package, r.name), r.source);
       }
       continue;

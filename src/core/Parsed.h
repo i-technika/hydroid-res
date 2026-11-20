@@ -111,9 +111,10 @@ struct ParsedResource {
   std::string product;  // product="", which only the table builder looks at
   // The package written before the name, resolved, of an <attr> a <declare-styleable> defines:
   // "" or the package being loaded defines it there, and another package's is left out. And the
-  // package of an id @+pkg:id/ makes in an XML file, as written, which fails in another package
-  // but android (#83).
+  // package of an id @+pkg:id/ makes, as written: one a values file makes is left out in another
+  // package as well (#131), and one an XML file makes fails there, but in android (#83).
   std::string package;
+  bool inXmlFile = false;  // an id an XML file makes, for the check of its package
   ParsedValue value;
   Source source;
 };
