@@ -57,6 +57,10 @@ struct ResName {
   // `type`: no package hydroid loads has a resource of it, so that the reference is not found
   // (#142). android.jar has ^attr-private, which hydroid cannot read yet (#98).
   std::string_view otherType;
+  // In a reference, aapt2's private_reference: @* or * before the name, or a package of an
+  // http://schemas.android.com/apk/prv/res/ namespace. Such a reference may name a resource
+  // another package does not make <public>, which any other fails to (#141).
+  bool privateReference = false;
 
   std::string typeName() const {
     return otherType.empty() ? toString(type) : std::string(otherType);

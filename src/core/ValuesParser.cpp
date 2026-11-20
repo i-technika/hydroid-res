@@ -534,7 +534,7 @@ class Parser {
       if (ref->create) addId(ref->name.entry, item.source, ref->name.package);
       item.kind = ref->attr ? ParsedItem::Kind::AttrRef : ParsedItem::Kind::Reference;
       item.ref = std::move(ref->name);
-      item.ref.package = resolvePackage(el, item.ref.package);
+      resolvePackage(el, item.ref);
       return true;
     }
     if (std::optional<Value> v = parseLiteral(raw, formats)) {
@@ -733,7 +733,7 @@ class Parser {
           error(el, why);
           return false;
         }
-        style.parent->package = resolvePackage(el, style.parent->package);
+        resolvePackage(el, *style.parent);
       }
     } else if (const size_t dot = res.name.rfind('.'); dot != std::string::npos) {
       style.parent = ResName{"", ResType::Style, res.name.substr(0, dot)};
@@ -766,7 +766,8 @@ class Parser {
       leading = true;
       name.remove_prefix(1);
     }
-    if (!name.empty() && name[0] == '*') name.remove_prefix(1);
+    const bool priv = !name.empty() && name[0] == '*';
+    if (priv) name.remove_prefix(1);
     std::string_view package;
     std::string_view type;
     std::string_view entry;
@@ -779,7 +780,9 @@ class Parser {
       *why = "invalid parent reference '" + std::string(s) + "'";
       return std::nullopt;
     }
-    return ResName{std::string(package), ResType::Style, std::string(entry)};
+    ResName parent{std::string(package), ResType::Style, std::string(entry)};
+    parent.privateReference = priv;
+    return parent;
   }
 
   // ResourceUtils::ParseXmlAttributeName: [*][package:]entry, an attr, where * only marks a
@@ -788,10 +791,13 @@ class Parser {
   static ResName attributeName(pugi::xml_node el, std::string_view s) {
     const std::string_view trimmed = trim(s);
     s = trimmed;
-    if (!s.empty() && s[0] == '*') s.remove_prefix(1);
+    const bool priv = !s.empty() && s[0] == '*';
+    if (priv) s.remove_prefix(1);
     ResName name{"", ResType::Attr, std::string(trimmed)};
+    name.privateReference = priv;
     if (const size_t colon = s.find(':'); colon != std::string_view::npos) {
-      name.package = resolvePackage(el, std::string(s.substr(0, colon)));
+      name.package = std::string(s.substr(0, colon));
+      resolvePackage(el, name);
       if (colon + 1 < s.size()) name.entry = std::string(s.substr(colon + 1));
     }
     return name;
@@ -1022,6 +1028,7 @@ std::optional<ParsedReference> parseReference(std::string_view text) {
     if (ref.create && (priv || parsed != ResType::Id)) return std::nullopt;
     ref.name = {std::string(package), parsed.value_or(ResType::Anim), std::string(entry),
                 otherType};
+    ref.name.privateReference = priv;
     return ref;
   }
   if (t[0] == '?') {

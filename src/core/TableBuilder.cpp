@@ -201,7 +201,13 @@ class Linker {
                               name.package + "' is loaded");
       return std::nullopt;
     } else if (kept) {
-      if (std::optional<ResId> id = deps_.find(name.package, name.type, name.entry)) return id;
+      if (std::optional<ResId> id = deps_.find(name.package, name.type, name.entry)) {
+        // ReferenceLinker::IsSymbolVisible: what another package does not make <public> only a
+        // private reference may name (#141).
+        if (name.privateReference || deps_.entry(*id)->isPublic) return id;
+        diag_.error(source, std::string(what) + " " + written + " is private");
+        return std::nullopt;
+      }
     }
     diag_.error(source, std::string(what) + " " + written + " not found");
     return std::nullopt;
