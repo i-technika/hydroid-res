@@ -1293,10 +1293,11 @@ TEST(ResourceTable, AnotherPackagesPrivateResourceNeedsAPrivateReference) {
 }
 
 // A resource of type attr that is not an <attr>, as <item type='attr' name='r'> in values/, is one
-// aapt2 37.0.0 does not find where a style item or an XML attribute names an <attr>, in its own
-// package and in another alike, <public> or not, as it links against com.other's apk (#166). The
-// golden cases have the own package's, with no other loaded, and its one with no value of the
-// default configuration, as in values-land/ only, which aapt2 finds and says is not an attribute.
+// aapt2 37.0.0 does not find where a style item or an XML attribute names an <attr> (#166), nor by
+// any reference (#175), in its own package and in another alike, <public> or not, as it links
+// against com.other's apk. The golden cases have the own package's, with no other loaded, and its
+// one with no value of the default configuration, as in values-land/ only, which aapt2 finds and
+// says is not an attribute.
 TEST(ResourceTable, AttrItemIsNotFoundAsAnAttr) {
   TempDir dir;
   ResourceTable table;
@@ -1321,6 +1322,13 @@ TEST(ResourceTable, AttrItemIsNotFoundAsAnAttr) {
       {"<style name='S'><item name='com.other:p'>1</item></style>", "",
        "style attribute 'com.other:attr/p' not found"},
       {"", "o:p='1'", "attribute com.other:p not found"},
+      {"<item type='string' name='t'>?com.other:attr/r</item>", "",
+       "resource com.other:attr/r not found"},
+      {"<item type='string' name='t'>@com.other:attr/r</item>", "",
+       "resource com.other:attr/r not found"},
+      {"<item type='string' name='t'>?com.other:attr/p</item>", "",
+       "resource com.other:attr/p not found"},
+      {"", "x='?o:attr/r'", "resource com.other:attr/r not found"},
   };
   uint8_t id = 0x7d;
   for (const auto& [values, attributes, message] : cases) {
