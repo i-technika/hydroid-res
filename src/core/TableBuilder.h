@@ -13,7 +13,9 @@ namespace hydroid::res::detail {
 
 // Merges `folder` into the package `name` with the id `id`: one value per configuration and
 // product, the default product kept, ids given and every reference resolved, into this package
-// or one of `deps`. nullopt if any of it fails, with the problems in `diag`.
+// or one of `deps`. nullopt if any of it fails, with the problems in `diag`, which may already
+// hold those of reading `folder`, with their positions in it: they fail it too, after compile
+// has given them among its own.
 std::optional<Package> buildPackage(ParsedFolder folder, const std::string& name, uint8_t id,
                                     const ResourceTable& deps, Diagnostics& diag);
 

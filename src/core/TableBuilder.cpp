@@ -560,13 +560,25 @@ std::optional<Package> buildPackage(ParsedFolder folder, const std::string& name
   // file, then link merges the tables in the order of the files, where an <attr> is not weak
   // (#88). The resources of a file are together, in the order the files are read (#80), and its
   // symbols among them, as written. Compile fails before link starts, on the errors of every file
-  // (#154). It runs only once every file has been read without an error, where aapt2 gives the
-  // errors of reading and of the file's table in the order written (#156).
+  // (#154). aapt2 adds each resource to the file's table as soon as it has read it, so the errors
+  // of reading come among those of the table, where they were read (#156).
+  const Diagnostics read = std::exchange(diag, Diagnostics());
+  size_t e = 0;
+  // Gives the errors of reading that came before the `i`th resource and the `s`th symbol.
+  auto readBefore = [&](size_t i, size_t s) {
+    for (; e < read.errors().size(); e++) {
+      const Diagnostics::Position& at = read.positions()[e];
+      if (at.resources > i || at.symbols > s) break;
+      const Diagnostic& d = read.errors()[e];
+      diag.error({d.file, d.line}, d.message);
+    }
+  };
   std::vector<FileTable> files;
   const std::filesystem::path* file = nullptr;
   std::vector<ParsedResource>& resources = folder.resources;
   for (size_t i = 0, s = 0; i <= resources.size(); i++) {
     for (; s < folder.symbols.size() && folder.symbols[s].position <= i; s++) {
+      readBefore(i, s);
       const SymbolDecl& symbol = folder.symbols[s];
       if (!file || symbol.source.file != *file) files.emplace_back();
       file = &symbol.source.file;
@@ -583,6 +595,7 @@ std::optional<Package> buildPackage(ParsedFolder folder, const std::string& name
       entry.id = symbol.id;
       entry.idSource = symbol.source;
     }
+    readBefore(i, s);
     if (i == resources.size()) break;
     ParsedResource& r = resources[i];
     if (!file || r.source.file != *file) files.emplace_back();
