@@ -848,6 +848,36 @@ TEST(ResourceTable, FilesOfOneCompiledNameFail) {
             "Duplicate entries in archive: compiles to values_a.arsc.flat, as values-/a.xml does");
 }
 
+// A folder of no configuration and an @+id/ of no valid name fail with aapt2's words, then what
+// hydroid adds (#149). aapt2 names the qualifiers, all that follows the first '-', and the id as
+// written, its package too; the golden cases have one '-' and no package.
+TEST(ResourceTable, BadFolderAndIdNamesSayWhatAapt2Says) {
+  using Files = std::vector<std::pair<std::string, std::string>>;
+  const std::vector<std::pair<Files, std::string>> cases = {
+      {{{"raw-land-hdpi-port/x.txt", "x"}},
+       "invalid configuration 'land-hdpi-port' in folder name 'raw-land-hdpi-port'"},
+      {{{"values-foo-bar/v.xml", "<resources/>"}},
+       "invalid configuration 'foo-bar' in folder name 'values-foo-bar'"},
+      {{{"layout/l.xml",
+         "<a xmlns:android='http://schemas.android.com/apk/res/android' "
+         "android:id='@+id/1bad'/>"}},
+       "id 'id/1bad' has an invalid entry name"},
+      {{{"layout/l.xml",
+         "<a xmlns:android='http://schemas.android.com/apk/res/android' "
+         "android:id='@+com.foo:id/1bad'/>"}},
+       "id 'com.foo:id/1bad' has an invalid entry name"},
+  };
+  for (const auto& [files, message] : cases) {
+    SCOPED_TRACE(message);
+    TempDir dir;
+    ResourceTable table;
+    std::vector<Diagnostic> errors;
+    EXPECT_FALSE(load(table, dir, files, "com.example", 0x7f, &errors));
+    ASSERT_EQ(errors.size(), 1u) << errorsOf(errors);
+    EXPECT_EQ(errors[0].message, message);
+  }
+}
+
 // An id @+pkg:id/ makes in an XML file is the package's own when pkg is its name, fails the load
 // in another package, and is left out in android, which aapt2 only warns of (#83).
 TEST(ResourceTable, IdOfAnotherPackageInAnXmlFile) {
