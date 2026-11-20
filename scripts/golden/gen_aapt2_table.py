@@ -284,6 +284,12 @@ CASES = {
     "product-configs": {"values/v.xml": "<resources><string name='p' product='tablet'>t</string>"
                                         "<string name='p'>d</string></resources>",
                         "values-land/v.xml": "<resources><string name='p'>l</string></resources>"},
+    # The id a <public type="id"> defines has the product of the <public> (#136).
+    "public-id-product-only": values("<public type='id' name='x' product='tablet'/>"),
+    "public-id-two-defaults": values("<public type='id' name='x'/>"
+                                     "<public type='id' name='x' product='default'/>"),
+    "public-id-product-beside-id": values("<id name='x'/>"
+                                          "<public type='id' name='x' product='tablet'/>"),
 
     # Attributes.
     "attr-formats": values("<attr name='a' format=' color | reference '/><attr name='b'/>"
