@@ -641,7 +641,8 @@ TEST(ResourceTable, ChildrenOfAFailedResourceAreLeftOut) {
 
 // Nor are they added when it is a duplicate, which compile finds, and the children of one that
 // fails give no errors, though those of the others do (#159). Every error aapt2 37.0.0 compile
-// gives of each, in order, but its "resource previously defined here". Some that fail have more
+// gives of each, in order, but its "resource previously defined here", and with no package where
+// it names the one being loaded, which compile does not know (#161). Some that fail have more
 // than one child, all of which are left out.
 TEST(ResourceTable, ChildrenOfADuplicateAreLeftOut) {
   const std::vector<std::pair<std::string, std::vector<std::string>>> cases = {
@@ -675,7 +676,7 @@ TEST(ResourceTable, ChildrenOfADuplicateAreLeftOut) {
        {"duplicate value for resource 'integer/i' with config ''",
         "resource 'integer/1j' has invalid entry name '1j'"}},
       // A name that is not valid is given with the package written before it, as a duplicate is,
-      // but the one being loaded, which no error gives (#161).
+      // unless that is the one being loaded (#161).
       {"<declare-styleable name='s'><attr name='android:1x' format='string'/>"
        "<attr name='com.example:2y' format='string'/><attr name='com.other:3z' format='string'/>"
        "</declare-styleable>",

@@ -611,7 +611,8 @@ std::optional<Package> buildPackage(ParsedFolder folder, const std::string& name
     file = &r.source.file;
     // AddResourcesToTable: a resource whose name is not valid, or that is a duplicate, fails, and
     // its children, which follow it, are left out with no errors of their own (#159). Its errors
-    // give the package written before its name unless that is this package, as others do (#161).
+    // give the package written before its name unless that is this package, which the golden
+    // cases take out of aapt2's words too, as compile does not know it (#161).
     const std::string resourceName =
         (r.package.empty() || r.package == name ? "" : r.package + ":") + nameOf(r.type, r.name);
     if (r.checkName && !isValidEntryName(r.name)) {
