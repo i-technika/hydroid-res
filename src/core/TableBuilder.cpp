@@ -611,10 +611,14 @@ std::optional<Package> buildPackage(ParsedFolder folder, const std::string& name
     if (!file || r.source.file != *file) files.emplace_back();
     file = &r.source.file;
     // AddResourcesToTable: a resource whose name is not valid, or that is a duplicate, fails, and
-    // its children, which follow it, are left out with no errors of their own (#159).
+    // its children, which follow it, are left out with no errors of their own (#159). Its errors
+    // give the package written before its name unless that is this package, which the golden
+    // cases take out of aapt2's words too, as compile does not know it (#161).
+    const std::string resourceName =
+        (r.package.empty() || r.package == name ? "" : r.package + ":") + nameOf(r.type, r.name);
     if (r.checkName && !isValidEntryName(r.name)) {
-      diag.error(r.source, "resource '" + nameOf(r.type, r.name) + "' has invalid entry name '" +
-                               r.name + "'");
+      diag.error(r.source,
+                 "resource '" + resourceName + "' has invalid entry name '" + r.name + "'");
       i += r.children;
       continue;
     }
@@ -625,9 +629,8 @@ std::optional<Package> buildPackage(ParsedFolder folder, const std::string& name
     }
     PendingValue value{r.config, r.product, std::move(r.value), r.source};
     if (!merge(files.back()[{r.package, {r.type, r.name}}].values, value, Stage::Compile)) {
-      diag.error(r.source, "duplicate value for resource '" +
-                               (r.package.empty() ? "" : r.package + ":") + nameOf(r.type, r.name) +
-                               "' with config '" + toString(r.config) + "'");
+      diag.error(r.source, "duplicate value for resource '" + resourceName + "' with config '" +
+                               toString(r.config) + "'");
       i += r.children;
     }
   }
