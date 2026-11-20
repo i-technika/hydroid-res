@@ -560,7 +560,8 @@ std::optional<Package> buildPackage(ParsedFolder folder, const std::string& name
   // file, then link merges the tables in the order of the files, where an <attr> is not weak
   // (#88). The resources of a file are together, in the order the files are read (#80), and its
   // symbols among them, as written. Compile fails before link starts, on the errors of every file
-  // (#154).
+  // (#154). It runs only once every file has been read without an error, where aapt2 gives the
+  // errors of reading and of the file's table in the order written (#156).
   std::vector<FileTable> files;
   const std::filesystem::path* file = nullptr;
   std::vector<ParsedResource>& resources = folder.resources;
