@@ -946,8 +946,11 @@ class Parser {
         {*t, res.name, /*isPublic=*/true, id, res.source, out_.resources.size()});
     // A public id is also its definition, which aapt2 keeps in the configuration of the folder,
     // as it does a value of any resource there, and only warns of the <public> (#82). It has the
-    // product of the <public> (#136).
-    if (*t == ResType::Id) add(makeIdResource(res.name, res.source, config_, res.product));
+    // product of the <public> (#136). aapt2 adds both as one resource, whose name the table
+    // builder checks once, with the symbol (#162).
+    if (*t == ResType::Id) {
+      out_.resources.push_back(makeIdResource(res.name, res.source, config_, res.product));
+    }
     return false;  // nothing more to add
   }
 

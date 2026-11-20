@@ -722,6 +722,19 @@ TEST(ResourceTable, SymbolNamesAreChecked) {
        "<public type='string' name='1x' id='0x7f010001'/>",
        {{1, "resource 'string/1x' has invalid entry name '1x'"},
         {1, "resource 'string/1x' has invalid entry name '1x'"}}},
+      // A <public type="id"> is its id too, which aapt2 adds with it: one error of each, which
+      // aapt2 gives on its line.
+      {"<public type='id' name='1x'/>", {{1, "resource 'id/1x' has invalid entry name '1x'"}}},
+      {"<public type='id' name='1x'/>\n<java-symbol type='id' name='1x'/>",
+       {{1, "resource 'id/1x' has invalid entry name '1x'"},
+        {2, "resource 'id/1x' has invalid entry name '1x'"}}},
+      {"<public type='id' name='1x' id='0x7f010000'/>\n"
+       "<public type='id' name='1x' id='0x7f010001'/>",
+       {{1, "resource 'id/1x' has invalid entry name '1x'"},
+        {2, "resource 'id/1x' has invalid entry name '1x'"}}},
+      {"<public type='id' name='1x'/>\n<id name='1x'/>",
+       {{1, "resource 'id/1x' has invalid entry name '1x'"},
+        {2, "resource 'id/1x' has invalid entry name '1x'"}}},
   };
   for (const auto& [body, expected] : cases) {
     TempDir dir;

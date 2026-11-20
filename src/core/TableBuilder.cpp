@@ -620,8 +620,9 @@ std::optional<Package> buildPackage(ParsedFolder folder, const std::string& name
       if (!file || symbol.source.file != *file) files.emplace_back();
       file = &symbol.source.file;
       // AddResourcesToTable adds it as it does a resource with a value, and fails on its name in
-      // the same words (#162). aapt2 gives this error no file or line, as it takes them from the
-      // value; it is given where the symbol is written, as is that of a second id below.
+      // the same words (#162), once for a <public type="id">, the id of which goes in with it.
+      // aapt2 gives the error of a symbol with no value no file or line, as it takes them from
+      // the value; it is given where the symbol is written, as is that of a second id below.
       if (!isValidEntryName(symbol.name)) {
         diag.error(symbol.source, "resource '" + nameOf(symbol.type, symbol.name) +
                                       "' has invalid entry name '" + symbol.name + "'");
