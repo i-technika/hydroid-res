@@ -402,6 +402,10 @@ CASES = {
 
     # Strings.
     "string-apostrophe": values("<string name='q'>it's</string>"),
+    # aapt2 prints the string on the line after its error as it is, which a script must keep to
+    # its end though it has words a line of aapt2's starts with, or a folder named res (#152).
+    "string-apostrophe-error-words": values("<string name='q'>it's warn: x error: y</string>"),
+    "string-apostrophe-res-folder": values("<string name='q'>a/res/b's</string>"),
     "string-apostrophe-quoted": values("<string name='q'>\"it's\"</string>"),
     "string-bad-unicode": values("<string name='q'>\\uZZZZ</string>"),
     "string-format": values("<string name='q'>%s %s</string>"),
@@ -745,6 +749,32 @@ def ordered_flats(aapt2: Path, res: Path, out: Path, compiled: set) -> list:
     return order
 
 
+# What a line of aapt2's own starts with: "error: ", or before it the file it is about, and its
+# line: an absolute path, as "C:\...\v.xml:1: error: " or "/.../v.xml: warn: ", or the .flat file
+# link takes from its folder, as "1/values_b.arsc.flat: error: " (ordered_flats()).
+AAPT2_WHERE = r"(?:(?:[A-Za-z]:\\|/|\d+/)[^\n]*?: )?"
+AAPT2_LINE = rf"{AAPT2_WHERE}(?:error|warn|note): "
+# An error runs to the next such line, as aapt2 prints the string an error is about on the line
+# after it, "unescaped apostrophe in string\n\"it's\"", and the newlines of a name it does not
+# find: "resource attr/a\nb (aka com.probe:attr/a\nb) not found". So "error: " or "warn: " in the
+# string is kept, but a line of it that starts as one of aapt2's ends the error there: no input
+# of the scripts has one.
+AAPT2_ERROR = re.compile(rf"^({AAPT2_WHERE})error: (.*?)(?=\n{AAPT2_LINE}|\n*\Z)", re.M | re.S)
+
+
+def aapt2_errors(stderr: str) -> list:
+    """(where, error) of each error aapt2 prints, in order: the path and line before "error: ",
+    and the error without the period it ends with, and without the temporary folder a file name
+    of its first line starts with. The lines after the first are a string or name of the input,
+    as it is."""
+    errors = []
+    for m in AAPT2_ERROR.finditer(stderr.replace("\r", "")):
+        first, *rest = m[2].split("\n")
+        first = re.sub(r"[^\s']*[\\/]res[\\/]", "res/", first)
+        errors.append((m[1], "\n".join([first, *rest]).rstrip(".")))
+    return errors
+
+
 def link_dump(aapt2: Path, jar: Path, res: Path, package: str, work: Path):
     """Compiles and links `res`: (the dump, None), or (None, the first error)."""
     work.mkdir(parents=True, exist_ok=True)
@@ -779,11 +809,10 @@ def link_dump(aapt2: Path, jar: Path, res: Path, package: str, work: Path):
             if not dump.startswith("Binary APK\n"):
                 sys.exit(f"unexpected dump of {res}:\n{dump}")
             return dump[len("Binary APK\n"):], None
-    errors = [m[1] for m in re.finditer(r"error: (.*)", result.stderr.replace("\r", ""))]
+    errors = aapt2_errors(result.stderr)
     if not errors:
         sys.exit(f"aapt2 failed on {res} with no error:\n{result.stderr}")
-    # Without the temporary folder the file names start with.
-    return None, re.sub(r"[^\s']*[\\/]res[\\/]", "res/", errors[0]).rstrip(".")
+    return None, errors[0][1]
 
 
 def run_case(aapt2: Path, jar: Path, tmp: Path, name: str):
