@@ -402,6 +402,10 @@ CASES = {
 
     # Strings.
     "string-apostrophe": values("<string name='q'>it's</string>"),
+    # aapt2 prints the string on the line after its error as it is, which a script must keep to
+    # its end though it has words a line of aapt2's starts with, or a folder named res (#152).
+    "string-apostrophe-error-words": values("<string name='q'>it's warn: x error: y</string>"),
+    "string-apostrophe-res-folder": values("<string name='q'>a/res/b's</string>"),
     "string-apostrophe-quoted": values("<string name='q'>\"it's\"</string>"),
     "string-bad-unicode": values("<string name='q'>\\uZZZZ</string>"),
     "string-format": values("<string name='q'>%s %s</string>"),
@@ -745,19 +749,28 @@ def ordered_flats(aapt2: Path, res: Path, out: Path, compiled: set) -> list:
     return order
 
 
-# An error runs to the next line with error:, warn: or note: on it, as aapt2 prints the string an
-# error is about on the line after it, "unescaped apostrophe in string\n\"it's\"", and the
-# newlines of a name it does not find: "resource attr/a\nb (aka com.probe:attr/a\nb) not found".
-AAPT2_ERROR = re.compile(r"^([^\n]*?)\berror: (.*?)(?=\n[^\n]*\b(?:error|warn|note): |\n*\Z)",
-                         re.M | re.S)
+# What a line of aapt2's own starts with: "error: ", or the absolute path of a file, and its line,
+# before it, as "C:\...\v.xml:1: error: " or "/.../v.xml: warn: ".
+AAPT2_LINE = r"(?:(?:[A-Za-z]:\\|/)[^\n]*?: )?(?:error|warn|note): "
+# An error runs to the next such line, as aapt2 prints the string an error is about on the line
+# after it, "unescaped apostrophe in string\n\"it's\"", and the newlines of a name it does not
+# find: "resource attr/a\nb (aka com.probe:attr/a\nb) not found". The string may have "error: "
+# or "warn: " in it, which no line of aapt2's starts with.
+AAPT2_ERROR = re.compile(r"^((?:(?:[A-Za-z]:\\|/)[^\n]*?: )?)error: (.*?)"
+                         rf"(?=\n{AAPT2_LINE}|\n*\Z)", re.M | re.S)
 
 
 def aapt2_errors(stderr: str) -> list:
-    """(where, error) of each error aapt2 prints, in order: what the line has before "error: ",
-    and the error without the temporary folder a file name starts with or the period it ends
-    with."""
-    return [(m[1], re.sub(r"[^\s']*[\\/]res[\\/]", "res/", m[2]).rstrip("."))
-            for m in AAPT2_ERROR.finditer(stderr.replace("\r", ""))]
+    """(where, error) of each error aapt2 prints, in order: the path and line before "error: ",
+    and the error without the period it ends with, and without the temporary folder a file name
+    of its first line starts with. The lines after the first are a string or name of the input,
+    as it is."""
+    errors = []
+    for m in AAPT2_ERROR.finditer(stderr.replace("\r", "")):
+        first, *rest = m[2].split("\n")
+        first = re.sub(r"[^\s']*[\\/]res[\\/]", "res/", first)
+        errors.append((m[1], "\n".join([first, *rest]).rstrip(".")))
+    return errors
 
 
 def link_dump(aapt2: Path, jar: Path, res: Path, package: str, work: Path):

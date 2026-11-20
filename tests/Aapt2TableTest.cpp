@@ -241,8 +241,9 @@ TEST(Aapt2Table, CasesLikeAapt2) {
   EXPECT_GT(rejected.size(), 50u);
   // aapt2 prints the string these errors are about on the line after, which gen_aapt2_table.py
   // keeps, so that hydroid's words are compared to the string too (#152).
-  for (const char* name : {"string-apostrophe", "string-bad-unicode", "string-array-apostrophe",
-                           "style-string-attr", "plurals-apostrophe"}) {
+  for (const char* name : {"string-apostrophe", "string-apostrophe-error-words",
+                           "string-apostrophe-res-folder", "string-bad-unicode",
+                           "string-array-apostrophe", "style-string-attr", "plurals-apostrophe"}) {
     EXPECT_TRUE(longer.count(name)) << name << ": aapt2's error has no line after its first";
   }
   for (const auto& [name, words] : kOtherWords) {
