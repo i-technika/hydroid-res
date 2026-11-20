@@ -703,8 +703,8 @@ TEST(ResourceTable, ChildrenOfADuplicateAreLeftOut) {
 
 // The name of a <public>, <java-symbol> or <symbol> is checked as that of a resource with a value,
 // where it is written among them, and one that is not valid is not declared (#162). Every error
-// aapt2 37.0.0 compile gives of each, in order. aapt2 gives no file or line of those of a symbol,
-// which are given where it is written.
+// aapt2 37.0.0 compile gives of each, in order. aapt2 gives no file or line of those of a symbol
+// with no value, which are given where it is written.
 TEST(ResourceTable, SymbolNamesAreChecked) {
   const std::vector<std::pair<std::string, std::vector<std::pair<int, std::string>>>> cases = {
       {"<java-symbol type='string' name='1x'/><string name='s'>a</string>",

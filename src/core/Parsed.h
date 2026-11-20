@@ -152,7 +152,8 @@ struct ParsedResource {
   std::string package;
   bool inXmlFile = false;  // an id an XML file makes, for the check of its package
   // A resource of a values file, whose name the table builder checks as AddResourcesToTable does,
-  // when it adds it: the scanner checks those of the ids it makes, with words of its own.
+  // when it adds it: the scanner checks those of the ids it makes, with words of its own, and the
+  // table builder that of the id of a <public type="id"> with the symbol (#162).
   bool checkName = false;
   // How many of the resources that follow are its own: aapt2's child_resources, each followed by
   // its own in turn, which go in only if it does (#159).
