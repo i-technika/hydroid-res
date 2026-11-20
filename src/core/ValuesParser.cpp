@@ -70,7 +70,7 @@ class StringBuilder {
             for (int i = 0; i < 4 && in.hasNext(); i++) {
               const int d = hexDigit(in.next());
               if (d < 0) {
-                error_ = "invalid unicode escape sequence in string \"" + std::string(text) + '"';
+                error_ = "invalid unicode escape sequence in string\n\"" + std::string(text) + '"';
                 return;
               }
               code = code * 16 + static_cast<uint32_t>(d);
@@ -86,7 +86,8 @@ class StringBuilder {
       } else if (c == '"') {
         quote_ = !quote_;
       } else if (!quote_ && c == '\'') {
-        error_ = "unescaped apostrophe in string \"" + std::string(text) + '"';
+        // As aapt2 puts it, and a bad \u above, the text on a line of its own.
+        error_ = "unescaped apostrophe in string\n\"" + std::string(text) + '"';
         return;
       } else {
         appendCodepoint(c, text_);

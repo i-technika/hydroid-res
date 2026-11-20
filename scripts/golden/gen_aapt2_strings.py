@@ -9,10 +9,11 @@ Each input is the XML inside one element, which decides how aapt2 reads it:
   style   <item name="str"> of a <style>   as text for an attribute of format="string"
 
 and the file records how `aapt2 dump resources` prints the value (with the indent of the lines
-after the first taken off), or null where aapt2 rejects it. The C++ test Aapt2TableTest loads
-the same strings and checks that hydroid's ResourceTable dumps each the same, so CI needs no
-Android SDK. Inputs are hand-picked edge cases of whitespace, quotes, escapes, tags and
-references, and seeded random mixes of them.
+after the first taken off), or null where aapt2 rejects it, with the first error aapt2 gives of
+that input on its own. The C++ test Aapt2TableTest loads the same strings and checks that
+hydroid's ResourceTable dumps each the same, or fails with a first error that says what aapt2's
+does, so CI needs no Android SDK. Inputs are hand-picked edge cases of whitespace, quotes,
+escapes, tags and references, and seeded random mixes of them.
 
 Usage: python scripts/golden/gen_aapt2_strings.py [--any-host]
 Needs an Android SDK with the build-tools (aapt2) and platform gen_aapt2_values.py pins, on its
@@ -20,11 +21,13 @@ GOLDEN_HOST. With --any-host it runs on any OS and writes build/aapt2-<os>-<cpu>
 """
 
 import json
+import os
 import random
 import re
 import subprocess
 import sys
 import tempfile
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from gen_aapt2_table import LINK_FLAGS
@@ -158,7 +161,8 @@ def write_values(path: Path, pairs, keep) -> dict:
 
 
 def build(aapt2: Path, jar: Path, tmp: Path, pairs, keep):
-    """(rejected inputs, None), or (set(), dump) when the kept inputs all build."""
+    """({rejected input: its errors, in order}, None), or ({}, dump) when the kept inputs all
+    build."""
     res = tmp / "res" / "values"
     res.mkdir(parents=True, exist_ok=True)
     lines = write_values(res / "strings.xml", pairs, keep)
@@ -178,18 +182,31 @@ def build(aapt2: Path, jar: Path, tmp: Path, pairs, keep):
             dump = subprocess.run([str(aapt2), "dump", "resources", str(tmp / "out.apk")],
                                   check=True, capture_output=True, text=True,
                                   encoding="utf-8").stdout
-            return set(), dump.replace("\r", "")
-    failed = set()
-    for m in re.finditer(r"strings\.xml:(\d+): error: (.*)", result.stderr):
+            return {}, dump.replace("\r", "")
+    failed = {}
+    # An error runs to the next line aapt2 starts with error:, warn: or note:, as it prints the
+    # newlines of a name it does not find: "resource attr/a\nb (aka com.probe:attr/a\nb) not found".
+    errors = r"strings\.xml:(\d+): error: (.*?)(?=\n[^\n]*\b(?:error|warn|note): |\n*\Z)"
+    for m in re.finditer(errors, result.stderr.replace("\r", ""), re.S):
         # aapt2 reports @+id/ of a name no id can have, but leaves the text a string and builds.
         if re.match(r"resource 'id/.*' has invalid entry name", m[2]):
             continue
         if int(m[1]) not in lines:
             sys.exit(f"aapt2 {stage} error outside an input:\n{result.stderr}")
-        failed.add(lines[int(m[1])])
+        # Without the temporary folder a file name starts with, as gen_aapt2_table.py writes it.
+        error = re.sub(r"[^\s']*[\\/]res[\\/]", "res/", m[2]).rstrip(".")
+        failed.setdefault(lines[int(m[1])], []).append(error)
     if not failed:
         sys.exit(f"aapt2 {stage} failed:\n{result.stderr}")
     return failed, None
+
+
+def first_error(aapt2: Path, jar: Path, tmp: Path, pairs, i: int) -> str:
+    """The first error aapt2 gives of input i on its own, as the test loads each it rejects."""
+    failed, dump = build(aapt2, jar, tmp / f"alone{i}", pairs, {i})
+    if dump is not None:
+        sys.exit(f"aapt2 rejects {pairs[i]!r} among the others, takes it on its own")
+    return failed[i][0]
 
 
 def values_of(dump: str, pairs) -> dict:
@@ -222,7 +239,11 @@ def main() -> None:
             failed, dump = build(aapt2, jar, Path(tmp), pairs, keep)
             if dump is not None:
                 break
-            keep -= failed
+            keep -= set(failed)
+        rejected = sorted(set(range(len(pairs))) - keep)
+        with ThreadPoolExecutor(os.cpu_count()) as pool:
+            errors = dict(zip(rejected, pool.map(
+                lambda i: first_error(aapt2, jar, Path(tmp), pairs, i), rejected)))
     values = values_of(dump, pairs)
     if set(values) != keep:
         sys.exit(f"the dump has {len(values)} of {len(keep)} inputs")
@@ -233,7 +254,9 @@ def main() -> None:
     with open(out_file, "w", encoding="utf-8", newline="\n") as out:
         out.write(f'{{"generated": {json.dumps(header)},\n "package": "{PACKAGE}",\n'
                   f' "prelude": {json.dumps(PRELUDE)},\n "rows": [\n')
-        rows = [json.dumps([tag, text, values.get(i)], ensure_ascii=False)
+        # [tag, text, value], or [tag, text, null, first error] where aapt2 rejects it.
+        rows = [json.dumps([tag, text, values[i]] if i in values else [tag, text, None, errors[i]],
+                           ensure_ascii=False)
                 for i, (tag, text) in enumerate(pairs)]
         out.write(",\n".join("  " + r for r in rows) + "\n]}\n")
     print(f"wrote {len(pairs)} strings ({len(pairs) - len(keep)} rejected) to "
