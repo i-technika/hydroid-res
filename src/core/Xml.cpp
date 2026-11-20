@@ -179,9 +179,15 @@ std::optional<std::string> namespacePackage(std::string_view uri) {
 
 std::string resolvePackage(pugi::xml_node node, const std::string& alias) {
   if (alias.empty()) return alias;
-  const std::optional<std::string> uri = namespaceOf(node, alias);
-  if (!uri) return alias;
-  return namespacePackage(*uri).value_or(alias);
+  // aapt2 keeps only the xmlns that name a package (PackageAwareVisitor, XmlPullParser), so one
+  // of another namespace, as xmlns:p="urn:x", does not hide a package p further out (#140).
+  const std::string attr = "xmlns:" + alias;
+  for (; node; node = node.parent()) {
+    if (pugi::xml_attribute a = node.attribute(attr.c_str())) {
+      if (std::optional<std::string> package = namespacePackage(a.value())) return *package;
+    }
+  }
+  return alias;
 }
 
 }  // namespace hydroid::res::detail

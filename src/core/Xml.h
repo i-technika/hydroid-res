@@ -60,8 +60,9 @@ bool isNamespaceDeclaration(pugi::xml_attribute attr);
 std::optional<std::string> namespacePackage(std::string_view uri);
 
 // xml::ResolvePackage: the package that `alias` (the "app" of @app:color/x or app:attr) stands
-// for where `node` is: that of the namespace its prefix is declared as (namespacePackage), and
-// anything else is left as it is.
+// for where `node` is: that of the nearest xmlns of its prefix, on `node` or an ancestor, that
+// names a package (namespacePackage), past any that names another namespace, and anything else is
+// left as it is.
 std::string resolvePackage(pugi::xml_node node, const std::string& alias);
 
 }  // namespace hydroid::res::detail
