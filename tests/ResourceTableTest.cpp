@@ -1232,10 +1232,11 @@ TEST(ResourceTable, AnotherPackagesPrivateResourceNeedsAPrivateReference) {
   }
 }
 
-// A resource of type attr that is not an <attr>, as <item type='attr' name='r'>, is one aapt2
-// 37.0.0 does not find where a style item or an XML attribute names an <attr>, in its own package
-// and in another alike, <public> or not, as it links against com.other's apk (#166). The golden
-// cases have the own package's, with no other loaded.
+// A resource of type attr that is not an <attr>, as <item type='attr' name='r'> in values/, is one
+// aapt2 37.0.0 does not find where a style item or an XML attribute names an <attr>, in its own
+// package and in another alike, <public> or not, as it links against com.other's apk (#166). The
+// golden cases have the own package's, with no other loaded, and its one with no value of the
+// default configuration, as in values-land/ only, which aapt2 finds and says is not an attribute.
 TEST(ResourceTable, AttrItemIsNotFoundAsAnAttr) {
   TempDir dir;
   ResourceTable table;
