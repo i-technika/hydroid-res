@@ -619,6 +619,14 @@ std::optional<Package> buildPackage(ParsedFolder folder, const std::string& name
       const SymbolDecl& symbol = folder.symbols[s];
       if (!file || symbol.source.file != *file) files.emplace_back();
       file = &symbol.source.file;
+      // AddResourcesToTable adds it as it does a resource with a value, and fails on its name in
+      // the same words (#162). aapt2 gives this error no file or line, as it takes them from the
+      // value; it is given where the symbol is written, as is that of a second id below.
+      if (!isValidEntryName(symbol.name)) {
+        diag.error(symbol.source, "resource '" + nameOf(symbol.type, symbol.name) +
+                                      "' has invalid entry name '" + symbol.name + "'");
+        continue;
+      }
       PendingEntry& entry = files.back()[{"", {symbol.type, symbol.name}}];
       entry.visibility =
           std::max(entry.visibility, symbol.isPublic ? Visibility::Public : Visibility::Private);

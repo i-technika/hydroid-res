@@ -701,6 +701,44 @@ TEST(ResourceTable, ChildrenOfADuplicateAreLeftOut) {
   }
 }
 
+// The name of a <public>, <java-symbol> or <symbol> is checked as that of a resource with a value,
+// where it is written among them, and one that is not valid is not declared (#162). Every error
+// aapt2 37.0.0 compile gives of each, in order. aapt2 gives no file or line of those of a symbol,
+// which are given where it is written.
+TEST(ResourceTable, SymbolNamesAreChecked) {
+  const std::vector<std::pair<std::string, std::vector<std::pair<int, std::string>>>> cases = {
+      {"<java-symbol type='string' name='1x'/><string name='s'>a</string>",
+       {{1, "resource 'string/1x' has invalid entry name '1x'"}}},
+      {"<public type='string' name='1x'/>\n<string name='1x'>a</string>",
+       {{1, "resource 'string/1x' has invalid entry name '1x'"},
+        {2, "resource 'string/1x' has invalid entry name '1x'"}}},
+      {"<string name='1s'>a</string>\n<symbol type='string' name='1x'/>\n"
+       "<symbol type='string' name='2y'/>",
+       {{1, "resource 'string/1s' has invalid entry name '1s'"},
+        {2, "resource 'string/1x' has invalid entry name '1x'"},
+        {3, "resource 'string/2y' has invalid entry name '2y'"}}},
+      // Before its id is looked at.
+      {"<public type='string' name='1x' id='0x7f010000'/>"
+       "<public type='string' name='1x' id='0x7f010001'/>",
+       {{1, "resource 'string/1x' has invalid entry name '1x'"},
+        {1, "resource 'string/1x' has invalid entry name '1x'"}}},
+  };
+  for (const auto& [body, expected] : cases) {
+    TempDir dir;
+    ResourceTable table;
+    std::vector<Diagnostic> errors;
+    EXPECT_FALSE(load(table, dir, {{"values/v.xml", "<resources>" + body + "</resources>"}},
+                      "com.example", 0x7f, &errors))
+        << body;
+    std::vector<std::pair<int, std::string>> got;
+    for (const Diagnostic& d : errors) {
+      got.emplace_back(d.line, d.message);
+      EXPECT_EQ(d.file, dir.path() / "com.example" / "values" / "v.xml") << d;
+    }
+    EXPECT_EQ(got, expected) << body << errorsOf(errors);
+  }
+}
+
 // A file aapt2 fails with "invalid file path 'res/...'" fails with what is wrong with its path,
 // on the file. Aapt2Table.CasesLikeAapt2 compares only aapt2's words, "invalid file path".
 TEST(ResourceTable, InvalidFilePathSaysWhy) {
