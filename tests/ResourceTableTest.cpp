@@ -871,6 +871,7 @@ TEST(ResourceTable, XmlFileLinksIntoAndroidOnceLoaded) {
         << errorsOf(errors);
   }
 
+  // Public, as what another package names in android must be for aapt2.
   TempDir dir;
   ResourceTable table;
   std::vector<Diagnostic> errors;
@@ -879,7 +880,10 @@ TEST(ResourceTable, XmlFileLinksIntoAndroidOnceLoaded) {
                      "<resources><attr name='layout_width' format='dimension'>"
                      "<enum name='match_parent' value='-1'/></attr><attr name='text'/>"
                      "<attr name='id' format='reference'/>"
-                     "<item type='id' name='text1'/><string name='ok'>ok</string></resources>"}},
+                     "<item type='id' name='text1'/><string name='ok'>ok</string>"
+                     "<public type='attr' name='layout_width'/><public type='attr' name='text'/>"
+                     "<public type='attr' name='id'/><public type='id' name='text1'/>"
+                     "<public type='string' name='ok'/></resources>"}},
                    "android", 0x01, &errors))
       << errorsOf(errors);
   ASSERT_TRUE(load(table, dir,
