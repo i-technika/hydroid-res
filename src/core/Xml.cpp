@@ -153,24 +153,35 @@ std::string elementNamespace(pugi::xml_node element) {
       .value_or("");
 }
 
+std::string attributeNamespace(pugi::xml_node element, pugi::xml_attribute attr) {
+  const std::string_view name = attr.name();
+  const size_t colon = name.find(':');
+  if (colon == std::string_view::npos) return {};
+  return namespaceOf(element, name.substr(0, colon)).value_or("");
+}
+
 bool isNamespaceDeclaration(pugi::xml_attribute attr) {
   const std::string_view name = attr.name();
   return name == "xmlns" || name.rfind("xmlns:", 0) == 0;
+}
+
+std::optional<std::string> namespacePackage(std::string_view uri) {
+  constexpr std::string_view kPublic = "http://schemas.android.com/apk/res/";
+  constexpr std::string_view kPrivate = "http://schemas.android.com/apk/prv/res/";
+  if (uri == "http://schemas.android.com/apk/res-auto") return std::string();
+  for (std::string_view prefix : {kPublic, kPrivate}) {
+    if (uri.size() > prefix.size() && uri.compare(0, prefix.size(), prefix) == 0) {
+      return std::string(uri.substr(prefix.size()));
+    }
+  }
+  return std::nullopt;
 }
 
 std::string resolvePackage(pugi::xml_node node, const std::string& alias) {
   if (alias.empty()) return alias;
   const std::optional<std::string> uri = namespaceOf(node, alias);
   if (!uri) return alias;
-  constexpr std::string_view kPublic = "http://schemas.android.com/apk/res/";
-  constexpr std::string_view kPrivate = "http://schemas.android.com/apk/prv/res/";
-  if (*uri == "http://schemas.android.com/apk/res-auto") return "";
-  for (std::string_view prefix : {kPublic, kPrivate}) {
-    if (uri->size() > prefix.size() && uri->compare(0, prefix.size(), prefix) == 0) {
-      return uri->substr(prefix.size());
-    }
-  }
-  return alias;
+  return namespacePackage(*uri).value_or(alias);
 }
 
 }  // namespace hydroid::res::detail

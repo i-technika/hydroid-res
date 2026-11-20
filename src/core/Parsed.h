@@ -128,10 +128,24 @@ struct SymbolDecl {
   Source source;
 };
 
+// An attribute of an XML file as aapt2's XmlReferenceLinker links it (#132): the <attr> its
+// namespace names, and its value, read against that <attr>, or as anything without one. The XML
+// file itself is not compiled yet (#100), so the table keeps nothing of it: a link that fails
+// only fails the load, as it fails aapt2 link.
+struct ParsedXmlAttribute {
+  // pkg:attr/name of an attribute in a namespace of a package (namespacePackage), the package ""
+  // for http://schemas.android.com/apk/res-auto.
+  std::optional<ResName> attr;
+  // A Literal for @null and @empty, a Reference or AttrRef with its package resolved as an XML
+  // namespace prefix, or the text of anything else as written, Raw.
+  ParsedItem value;
+};
+
 // What a res/ folder holds, in the order read.
 struct ParsedFolder {
   std::vector<ParsedResource> resources;
   std::vector<SymbolDecl> symbols;
+  std::vector<ParsedXmlAttribute> xmlAttributes;
 };
 
 // aapt2's ResourceUtils::IsValidResourceEntryName for ASCII: letters, digits, '_', '.' and '-',

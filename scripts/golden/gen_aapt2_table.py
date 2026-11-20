@@ -59,6 +59,18 @@ def values(body, folder="values"):
     return {f"{folder}/v.xml": f"<resources {XLIFF}>{body}</resources>\n"}
 
 
+AUTO = 'xmlns:app="http://schemas.android.com/apk/res-auto"'
+TOOLS = 'xmlns:tools="http://schemas.android.com/tools"'
+
+
+def layout(attributes, body=None):
+    """A case of a layout of one element with `attributes`, and a values file of `body`."""
+    files = {"layout/l.xml": f"<a {ANDROID} {AUTO} {TOOLS} {attributes}/>"}
+    if body is not None:
+        files.update(values(body))
+    return files
+
+
 # name -> files of res/ (text). Folders of one or two files each, mostly what aapt2 rejects and
 # what it takes that looks like it would not.
 CASES = {
@@ -117,6 +129,102 @@ CASES = {
     "xml-raw-ids": {"raw/r.xml": '<a x="@+id/not_collected"/>'},
     "drawable-xml-ids": {"drawable/d.xml": f'<shape {ANDROID} android:id="@+id/in_shape"/>',
                          "drawable-v21/d.xml": f'<shape {ANDROID} android:id="@+id/in_shape"/>'},
+
+    # XML files: link reads each attribute against the <attr> its namespace names, and resolves
+    # the references in it (#132). hydroid loads no android, so these name nothing in android
+    # that matters: android:text takes a reference, which link checks whatever the attribute.
+    "xml-link-missing": layout('android:text="@string/missing"'),
+    "xml-link-missing-plain": layout('x="@string/missing"'),
+    "xml-link-missing-id": layout('x="@id/missing"'),
+    "xml-link-missing-attr": layout('x="?attr/missing"'),
+    "xml-link-missing-attr-bare": layout('x="?missing"'),
+    "xml-link-missing-private": layout('x="@*string/missing"'),
+    "xml-link-missing-whitespace": layout('x=" @string/missing "'),
+    "xml-link-missing-space-in-name": layout('x="@string/a b"'),
+    "xml-link-missing-nested": {"layout/l.xml": '<a><b><c x="@string/missing"/></b></a>'},
+    "xml-link-missing-dtd-entity": {"layout/l.xml": "<!DOCTYPE a [<!ENTITY i '@string/missing'>]>"
+                                                    "<a x='&i;'/>"},
+    "xml-link-missing-xml-folder": {"xml/x.xml": '<a x="@string/missing"/>'},
+    "xml-link-missing-xml-folder-txt": {"xml/x.txt": '<a x="@string/missing"/>'},
+    "xml-link-missing-drawable": {"drawable/d.xml": '<a x="@string/missing"/>'},
+    "xml-link-missing-menu-in-config": {"menu-land/m.xml": '<menu x="@string/missing"/>'},
+    "xml-link-raw-not-linked": {"raw/r.xml": '<a x="@string/missing"/>'},
+    "xml-link-text-not-linked": {"layout/l.xml": "<a>@string/missing</a>"},
+    "xml-link-found": layout('x="@string/s" y="?attr/a" z="?a" w="@id/later" v="@+id/later" '
+                             'u="@layout/l" t="@null" s=" @empty "',
+                             "<string name='s'>s</string><attr name='a'/>"),
+    "xml-link-found-public-id": layout('x="@id/p"', "<public type='id' name='p'/>"),
+    "xml-link-not-references": layout('x="@string/" y="@+string/s" z="@foo/bar" w="?attr/" v="?" '
+                                      'u="@" t="@+id/" s="string/missing"'),
+    # Link leaves tools: alone, though compile makes its ids; another namespace is linked.
+    "xml-link-tools": layout('tools:text="@string/missing" tools:id="@+id/from_tools"'),
+    "xml-link-tools-other-prefix": {"layout/l.xml": '<a xmlns:t="http://schemas.android.com/tools" '
+                                                    't:x="@string/missing"/>'},
+    "xml-link-tools-element": {"layout/l.xml": '<t:a xmlns:t="http://schemas.android.com/tools" '
+                                               'x="@string/missing"/>'},
+    "xml-link-other-namespace": {"layout/l.xml": '<a xmlns:u="urn:u" u:x="@string/missing"/>'},
+    "xml-link-aapt-namespace": {"layout/l.xml": '<a xmlns:aapt="http://schemas.android.com/aapt" '
+                                                'aapt:x="@string/missing"/>'},
+    # The package of a reference is an XML namespace prefix, as res-auto.
+    "xml-link-prefix-auto": layout('x="@app:string/s"', "<string name='s'>s</string>"),
+    "xml-link-prefix-not-a-package": {"layout/l.xml": '<a xmlns:u="urn:u" x="@u:string/s"/>',
+                                      **values("<string name='s'>s</string>")},
+    "xml-link-other-package": layout('x="@com.other:string/s"'),
+    "xml-link-own-package": layout('x="@com.probe:string/s"', "<string name='s'>s</string>"),
+    # The attribute of a namespace of a package.
+    "xml-link-attr-not-found": layout('app:foo="1"'),
+    "xml-link-attr-not-an-attr": layout('app:foo="1"', "<string name='foo'>s</string>"),
+    "xml-link-attr-android-name": layout('app:text="1"'),
+    "xml-link-attr-styleable": layout('app:foo="1"', "<declare-styleable name='S'>"
+                                                     "<attr name='foo' format='integer'/>"
+                                                     "</declare-styleable>"),
+    "xml-link-attr-in-other-config": {"layout/l.xml": f'<a {AUTO} app:foo="1"/>',
+                                      **values("<attr name='foo' format='integer'/>",
+                                               "values-land")},
+    "xml-link-attr-own-namespace": {"layout/l.xml": '<a xmlns:p="http://schemas.android.com/apk/'
+                                                    'res/com.probe" p:foo="x"/>',
+                                    **values("<attr name='foo' format='integer'/>")},
+    "xml-link-attr-own-private-namespace": {"layout/l.xml": '<a xmlns:p="http://schemas.android.'
+                                                            'com/apk/prv/res/com.probe" p:foo="x"/>',
+                                            **values("<attr name='foo' format='integer'/>")},
+    "xml-link-attr-other-package": {"layout/l.xml": '<a xmlns:p="http://schemas.android.com/apk/'
+                                                    'res/com.other" p:foo="1"/>'},
+    "xml-link-attr-namespace-on-child": {"layout/l.xml": f'<a><b {AUTO} app:foo="x"/></a>',
+                                         **values("<attr name='foo' format='integer'/>")},
+    # The value, read against the attribute: a reference of any type, or what its formats take,
+    # with no check of min and max.
+    "xml-link-integer": layout('app:foo=" 5 " app:bar="@string/s" app:baz="?attr/foo" '
+                               'app:qux="@+id/n" app:quux="@null" app:corge="@empty"',
+                               "<attr name='foo' format='integer' min='0' max='3'/>"
+                               "<attr name='bar' format='integer'/><attr name='baz' format='integer'/>"
+                               "<attr name='qux' format='integer'/><attr name='quux' format='integer'/>"
+                               "<attr name='corge' format='integer'/><string name='s'>s</string>"),
+    "xml-link-integer-text": layout('app:foo="x"', "<attr name='foo' format='integer'/>"),
+    "xml-link-integer-empty": layout('app:foo=""', "<attr name='foo' format='integer'/>"),
+    "xml-link-integer-float-far": layout('app:foo="9638178525"',
+                                         "<attr name='foo' format='float|integer'/>"),
+    "xml-link-dimension-float": layout('app:foo="1.5"', "<attr name='foo' format='dimension'/>"),
+    "xml-link-color-name": layout('app:foo="red"', "<attr name='foo' format='color|reference'/>"),
+    "xml-link-color-not-a-reference": layout('app:foo="@ string/s"',
+                                             "<attr name='foo' format='color'/>"
+                                             "<string name='s'>s</string>"),
+    "xml-link-reference-text": layout('app:foo="x"', "<attr name='foo' format='reference'/>"),
+    "xml-link-strings": layout("app:foo=\"it's\" app:bar='\\uZZZZ' app:baz=\"x\" app:qux=\"x\" "
+                               "app:quux=\"True\"",
+                               "<attr name='foo' format='string'/><attr name='bar' format='string'/>"
+                               "<attr name='baz' format='string|integer'/><attr name='qux'/>"
+                               "<attr name='quux' format='boolean'/>"),
+    "xml-link-enum": layout('app:foo=" x " app:bar="&#9;x"',
+                            "<attr name='foo'><enum name='x' value='1'/></attr>"
+                            "<attr name='bar'><enum name='x' value='1'/></attr>"),
+    "xml-link-enum-integer": layout('app:foo="2"', "<attr name='foo'><enum name='x' value='1'/></attr>"),
+    "xml-link-enum-empty": layout('app:foo=""', "<attr name='foo'><enum name='x' value='1'/></attr>"),
+    "xml-link-flags": layout('app:foo="x|y" app:bar="" app:baz=" y | x "',
+                             "<attr name='foo'><flag name='x' value='1'/><flag name='y' value='2'/>"
+                             "</attr><attr name='bar'><flag name='x' value='1'/></attr>"
+                             "<attr name='baz'><flag name='x' value='1'/><flag name='y' value='2'/>"
+                             "</attr>"),
+    "xml-link-flags-unknown": layout('app:foo="x|z"', "<attr name='foo'><flag name='x' value='1'/></attr>"),
 
     # Values files.
     "values-empty": {"values/v.xml": "<resources/>"},

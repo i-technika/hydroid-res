@@ -849,6 +849,68 @@ TEST(ResourceTable, IdOfAPackageInAValuesFile) {
   EXPECT_EQ(errors[0].message, "resource id/v not found");
 }
 
+// What an XML file names in android is linked once a package android is loaded, as aapt2 links
+// it against android.jar, and left alone while none is, as hydroid cannot read android.jar yet
+// (#132). The golden cases load no android, so the cases that need one are here.
+TEST(ResourceTable, XmlFileLinksIntoAndroidOnceLoaded) {
+  const std::string head =
+      "<?xml version='1.0'?>\n<a xmlns:android='http://schemas.android.com/apk/res/android' "
+      "xmlns:p='http://schemas.android.com/apk/prv/res/android'\n";
+  const std::vector<std::string> intoAndroid = {
+      "android:id='@+android:id/gen'", "android:nosuch='1'",         "android:layout_width='foo'",
+      "p:layout_width='foo'",          "x='@android:string/nosuch'", "x='?android:attr/nosuch'",
+      "x='@*android:string/nosuch'",
+  };
+  for (const std::string& attribute : intoAndroid) {
+    SCOPED_TRACE(attribute);
+    TempDir dir;
+    ResourceTable table;
+    std::vector<Diagnostic> errors;
+    EXPECT_TRUE(
+        load(table, dir, {{"layout/l.xml", head + attribute + "/>"}}, "com.example", 0x7f, &errors))
+        << errorsOf(errors);
+  }
+
+  TempDir dir;
+  ResourceTable table;
+  std::vector<Diagnostic> errors;
+  ASSERT_TRUE(load(table, dir,
+                   {{"values/v.xml",
+                     "<resources><attr name='layout_width' format='dimension'>"
+                     "<enum name='match_parent' value='-1'/></attr><attr name='text'/>"
+                     "<attr name='id' format='reference'/>"
+                     "<item type='id' name='text1'/><string name='ok'>ok</string></resources>"}},
+                   "android", 0x01, &errors))
+      << errorsOf(errors);
+  ASSERT_TRUE(load(table, dir,
+                   {{"layout/l.xml",
+                     head + "android:id='@+android:id/text1' android:layout_width='match_parent' "
+                            "android:text='@android:string/ok' p:layout_width=' 10dp '/>"}},
+                   "com.example", 0x7f, &errors))
+      << errorsOf(errors);
+  const std::vector<std::pair<std::string, std::string>> rejected = {
+      {intoAndroid[0], "resource android:id/gen not found"},
+      {intoAndroid[1], "attribute android:attr/nosuch not found"},
+      {intoAndroid[2], "'foo' is incompatible with attribute android:layout_width dimension|enum"},
+      {intoAndroid[3], "'foo' is incompatible with attribute android:layout_width dimension|enum"},
+      {intoAndroid[4], "resource android:string/nosuch not found"},
+      {intoAndroid[5], "resource android:attr/nosuch not found"},
+      {intoAndroid[6], "resource android:string/nosuch not found"},
+  };
+  uint8_t id = 0x7e;
+  for (const auto& [attribute, message] : rejected) {
+    SCOPED_TRACE(attribute);
+    errors.clear();
+    EXPECT_FALSE(load(table, dir, {{"layout/l.xml", head + attribute + "/>"}},
+                      "com.example" + std::to_string(id), id, &errors));
+    ASSERT_EQ(errors.size(), 1u) << errorsOf(errors);
+    EXPECT_EQ(errors[0].message, message);
+    EXPECT_EQ(errors[0].file.filename(), "l.xml");
+    EXPECT_EQ(errors[0].line, 2);  // of the element, not of the attribute, as aapt2 gives it
+    id--;
+  }
+}
+
 // The dump writes numbers as printf does in the C locale, whatever the host app set.
 TEST(TableDump, NumbersIgnoreTheLocale) {
   TempDir dir;

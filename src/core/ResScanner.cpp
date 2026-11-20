@@ -14,6 +14,7 @@
 
 #include "core/PathUtf8.h"
 #include "core/ValuesParser.h"
+#include "core/Whitespace.h"
 #include "core/Xml.h"
 #include "hydroid/res/ConfigParser.h"
 
@@ -114,11 +115,14 @@ void splitFileName(const std::string& file, std::string* name, std::string* exte
   }
 }
 
-// aapt2's XmlIdCollector: the ids that @+id/ in an attribute of an XML file makes. Text is not
-// looked at.
-class IdCollector {
+// What the attributes of an XML file give the table builder: the ids that @+id/ in one makes, as
+// aapt2's XmlIdCollector collects them, and each attribute, for the table builder to link as
+// aapt2 link's XmlReferenceLinker does (#132), but one of tools:, which link leaves alone though
+// its ids are made. Text is not looked at.
+class XmlFileCollector {
  public:
-  IdCollector(const XmlDocument& doc, const fs::path& file, ParsedFolder& out, Diagnostics& diag)
+  XmlFileCollector(const XmlDocument& doc, const fs::path& file, ParsedFolder& out,
+                   Diagnostics& diag)
       : doc_(doc), file_(file), out_(out), diag_(diag) {}
 
   void visit(pugi::xml_node element) {
@@ -128,19 +132,32 @@ class IdCollector {
     }
     for (pugi::xml_attribute a : element.attributes()) {
       if (isNamespaceDeclaration(a)) continue;
-      const std::optional<ParsedReference> ref = parseReference(a.value());
-      if (!ref || !ref->create) continue;
       const Source source{file_, doc_.line(element)};
-      if (!isValidEntryName(ref->name.entry)) {
-        diag_.error(source, "id '" + ref->name.entry + "' has an invalid entry name");
-        continue;
+      const std::optional<ParsedReference> ref = parseReference(a.value());
+      if (ref && ref->create) collectId(ref->name, source);
+      const std::string ns = attributeNamespace(element, a);
+      if (ns == kToolsNamespace) continue;
+      ParsedXmlAttribute attribute;
+      if (std::optional<std::string> package = namespacePackage(ns)) {
+        attribute.attr =
+            ResName{std::move(*package), ResType::Attr, std::string(localName(a.name()))};
       }
-      // The package as written, which the table builder checks (#83): aapt2 does not read it as
-      // an XML namespace prefix here.
-      if (!seen_.insert(ref->name.package + ":" + ref->name.entry).second) continue;
-      out_.resources.push_back(makeIdResource(ref->name.entry, source));
-      out_.resources.back().package = ref->name.package;
-      out_.resources.back().inXmlFile = true;
+      // ResourceUtils::TryParseItemForAttribute reads @null, @empty and references first, as
+      // any attribute takes them.
+      ParsedItem& value = attribute.value;
+      value.source = source;
+      const std::string_view text = trim(a.value());
+      if (text == "@null" || text == "@empty") {
+        value.literal = text == "@null" ? Value::null() : Value::empty();
+      } else if (ref) {
+        value.kind = ref->attr ? ParsedItem::Kind::AttrRef : ParsedItem::Kind::Reference;
+        value.ref = ref->name;
+        value.ref.package = resolvePackage(element, value.ref.package);
+      } else {
+        value.kind = ParsedItem::Kind::Raw;
+        value.text = a.value();
+      }
+      out_.xmlAttributes.push_back(std::move(attribute));
     }
     for (pugi::xml_node child : element.children()) {
       if (child.type() == pugi::node_element) visit(child);
@@ -148,6 +165,19 @@ class IdCollector {
   }
 
  private:
+  void collectId(const ResName& name, const Source& source) {
+    if (!isValidEntryName(name.entry)) {
+      diag_.error(source, "id '" + name.entry + "' has an invalid entry name");
+      return;
+    }
+    // The package as written, which the table builder checks (#83): aapt2 does not read it as an
+    // XML namespace prefix here, though link reads the reference so.
+    if (!seen_.insert(name.package + ":" + name.entry).second) return;
+    out_.resources.push_back(makeIdResource(name.entry, source));
+    out_.resources.back().package = name.package;
+    out_.resources.back().inXmlFile = true;
+  }
+
   const XmlDocument& doc_;
   const fs::path& file_;
   ParsedFolder& out_;
@@ -254,7 +284,7 @@ void scanResFolder(const fs::path& res, ParsedFolder& out, Diagnostics& diag) {
         diag.error({file, line}, "xml parser error: " + why);
         continue;
       }
-      IdCollector(doc, file, out, diag).visit(doc.root());
+      XmlFileCollector(doc, file, out, diag).visit(doc.root());
     } else if (png) {
       ref.type = FileType::Png;
     }

@@ -103,7 +103,7 @@ python scripts/golden/gen_aapt2_table.py     # golden/aapt2/table.txt, app_table
 ```
 
 The table files are what `aapt2 dump resources` prints of `golden/table/res`, of the golden app's
-`res/` and of some 190 small folders, linked with `--no-auto-version`, `--no-version-vectors`,
+`res/` and of some 300 small folders, linked with `--no-auto-version`, `--no-version-vectors`,
 `--no-version-transitions`, `--no-resource-removal` and `--no-resource-deduping`, which keep
 aapt2 from adding or dropping values the folder does not say. `hydroid-rc dump <res> [<package>]`
 prints a folder the same way, from hydroid's `ResourceTable`, to compare by hand.
