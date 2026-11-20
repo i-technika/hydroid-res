@@ -169,6 +169,15 @@ CASES = {
     "xml-link-prefix-auto": layout('x="@app:string/s"', "<string name='s'>s</string>"),
     "xml-link-prefix-not-a-package": {"layout/l.xml": '<a xmlns:u="urn:u" x="@u:string/s"/>',
                                       **values("<string name='s'>s</string>")},
+    # An xmlns of the prefix that names no package does not hide one further out that does (#140).
+    "xml-link-prefix-hidden-by-namespace": {
+        "layout/l.xml": '<a xmlns:p="http://schemas.android.com/apk/res/com.probe">'
+                        '<b xmlns:p="urn:x" x="@p:layout/l"/></a>'},
+    # Of two that name a package, the nearer one.
+    "xml-link-prefix-nearest-package": {
+        "layout/l.xml": '<a xmlns:p="http://schemas.android.com/apk/res/com.other">'
+                        '<b xmlns:p="http://schemas.android.com/apk/res/com.probe">'
+                        '<c xmlns:p="urn:x" x="@p:layout/l"/></b></a>'},
     "xml-link-other-package": layout('x="@com.other:string/s"'),
     "xml-link-own-package": layout('x="@com.probe:string/s"', "<string name='s'>s</string>"),
     # The attribute of a namespace of a package.
@@ -348,6 +357,11 @@ CASES = {
     "ref-res-auto": {"values/v.xml": "<resources xmlns:app='http://schemas.android.com/apk/res-auto'>"
                                      "<string name='s'>s</string><string name='a'>@app:string/s</string>"
                                      "</resources>"},
+    # An xmlns of the prefix that names no package does not hide one further out that does (#140).
+    "ref-prefix-hidden-by-namespace": {
+        "values/v.xml": "<resources xmlns:p='http://schemas.android.com/apk/res/com.probe'>"
+                        "<string name='t'>t</string>"
+                        "<string name='s' xmlns:p='urn:x'>@p:string/t</string></resources>"},
     "ref-unknown-type": values("<color name='c'>@colour/c</color>"),
     "ref-no-entry": values("<string name='c'>@string/</string>"),
     "attrref-forms": values("<attr name='a' format='color'/>"
