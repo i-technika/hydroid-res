@@ -618,6 +618,12 @@ TEST(ResourceTable, ChildrenOfAFailedResourceAreLeftOut) {
        "invalid entry name '1a'"},
       {"<declare-styleable name='1s'><attr name='2a' format='string'/></declare-styleable>",
        "invalid entry name '1s'"},
+      // More than one child, and grandchildren, all left out (#159).
+      {"<attr name='1a'><enum name='2x' value='1'/><enum name='3y' value='2'/></attr>",
+       "invalid entry name '1a'"},
+      {"<declare-styleable name='1s'><attr name='a'><enum name='2x' value='1'/></attr>"
+       "<attr name='3b' format='string'/></declare-styleable>",
+       "invalid entry name '1s'"},
       {"<attr name='a'><enum name='2x' value='1'/><enum name='y' value='z'/></attr>",
        "invalid value 'z' for <enum>"},
   };
