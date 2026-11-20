@@ -69,9 +69,10 @@ bool ResourceTable::addPackage(const std::filesystem::path& res, std::string_vie
     // Compile goes on past an error of reading, which it gives among those of each file's table,
     // where it was read (#156).
     diag.track(&folder);
-    detail::scanResFolder(res, folder, diag);
+    const std::string packageName(name);
+    detail::scanResFolder(res, packageName, folder, diag);
     diag.track(nullptr);
-    loaded = detail::buildPackage(std::move(folder), std::string(name), id, *this, diag);
+    loaded = detail::buildPackage(std::move(folder), packageName, id, *this, diag);
   }
   if (!loaded) {
     if (errors) errors->insert(errors->end(), diag.errors().begin(), diag.errors().end());
