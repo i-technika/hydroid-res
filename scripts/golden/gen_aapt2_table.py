@@ -206,6 +206,9 @@ CASES = {
     "xml-link-attr-not-an-attr": layout('app:foo="1"', "<string name='foo'>s</string>"),
     "xml-link-attr-item-not-an-attr": layout('app:r="1"', "<string name='s'>x</string>"
                                                            "<item type='attr' name='r'>@string/s</item>"),
+    "xml-link-attr-item-in-other-config": {**layout('app:r="1"', "<string name='s'>x</string>"),
+                                           **values("<item type='attr' name='r'>@string/s</item>",
+                                                    "values-land")},
     "xml-link-attr-android-name": layout('app:text="1"'),
     "xml-link-attr-styleable": layout('app:foo="1"', "<declare-styleable name='S'>"
                                                      "<attr name='foo' format='integer'/>"
@@ -860,6 +863,10 @@ CASES = {
     "style-key-not-attr": values("<integer name='i'>1</integer><style name='S'><item name='i'>1</item></style>"),
     "style-key-attr-item-not-an-attr": values("<string name='s'>x</string><item type='attr' name='r'>@string/s</item>"
                                               "<style name='S'><item name='r'>1</item></style>"),
+    "style-key-attr-item-in-other-config": {**values("<string name='s'>x</string>"
+                                                     "<style name='S'><item name='r'>1</item></style>"),
+                                            **values("<item type='attr' name='r'>@string/s</item>",
+                                                     "values-land")},
     "style-key-twice": values("<attr name='a' format='integer'/>"
                               "<style name='S'><item name='a'>1</item><item name='a'>2</item></style>"),
     "style-key-forms": {"values/v.xml": "<resources xmlns:app='http://schemas.android.com/apk/res-auto'>"

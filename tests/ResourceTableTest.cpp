@@ -1234,13 +1234,16 @@ TEST(ResourceTable, AnotherPackagesPrivateResourceNeedsAPrivateReference) {
 
 // A resource of type attr that is not an <attr>, as <item type='attr' name='r'>, is one aapt2
 // 37.0.0 does not find where a style item or an XML attribute names an <attr>, in its own package
-// and in another alike (#166). The golden cases have the own package's, with no other loaded.
+// and in another alike, <public> or not, as it links against com.other's apk (#166). The golden
+// cases have the own package's, with no other loaded.
 TEST(ResourceTable, AttrItemIsNotFoundAsAnAttr) {
   TempDir dir;
   ResourceTable table;
   std::vector<Diagnostic> errors;
   const std::string item = "<string name='s'>x</string><item type='attr' name='r'>@string/s</item>";
-  const std::string other = "<resources>" + item + "<public type='attr' name='r'/></resources>";
+  const std::string other = "<resources>" + item +
+                            "<item type='attr' name='p'>@string/s</item>"
+                            "<public type='attr' name='r'/></resources>";
   ASSERT_TRUE(load(table, dir, {{"values/v.xml", other}}, "com.other", 0x7e, &errors))
       << errorsOf(errors);
   const std::string ns =
@@ -1254,6 +1257,9 @@ TEST(ResourceTable, AttrItemIsNotFoundAsAnAttr) {
        "style attribute 'com.other:attr/r' not found"},
       {"", "app:r='1'", "attribute r not found"},
       {"", "o:r='1'", "attribute com.other:r not found"},
+      {"<style name='S'><item name='com.other:p'>1</item></style>", "",
+       "style attribute 'com.other:attr/p' not found"},
+      {"", "o:p='1'", "attribute com.other:p not found"},
   };
   uint8_t id = 0x7d;
   for (const auto& [values, attributes, message] : cases) {

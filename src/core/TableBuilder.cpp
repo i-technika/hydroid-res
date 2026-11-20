@@ -263,10 +263,19 @@ class Linker {
     return {};
   }
 
-  // A resource of type attr found where an <attr> is named, as <item type='attr' name='r'>, is
-  // one aapt2 does not find: its symbol table has an attr only for an <attr> (#166).
+  // A resource of type attr that is not an <attr>, as <item type='attr' name='r'>, found where an
+  // <attr> is named (#166). aapt2's symbol table has an attr of this package with a value of the
+  // default configuration only for an <attr>, which is always of it, and of another package only
+  // for an <attr>: it does not find the others. One of this package with no value of the default
+  // configuration it finds, with no <attr>.
   void notAnAttr(const ResName& name, const Source& source, Naming naming) {
-    diag_.error(source, described(name, naming) + " not found");
+    bool found = false;
+    if (own(name.package)) {
+      const std::vector<PendingValue>& values = entries_.at({ResType::Attr, name.entry});
+      found = std::none_of(values.begin(), values.end(),
+                           [](const PendingValue& v) { return v.config == Config{}; });
+    }
+    diag_.error(source, described(name, naming) + (found ? " is not an attribute" : " not found"));
   }
 
   std::optional<ResId> resolve(const ResName& name, const Source& source,
@@ -290,6 +299,12 @@ class Linker {
       return std::nullopt;
     } else if (kept) {
       if (std::optional<ResId> id = deps_.find(name.package, name.type, name.entry)) {
+        // An attr of another package that is not an <attr> aapt2 does not find, before it asks
+        // whether the reference may name it.
+        if (naming != Naming::Resource && !attrInfo(name, *id)) {
+          notAnAttr(name, source, naming);
+          return std::nullopt;
+        }
         // ReferenceLinker::IsSymbolVisible: what another package does not make <public> only a
         // private reference may name (#141).
         if (name.privateReference || deps_.entry(*id)->isPublic) return id;
