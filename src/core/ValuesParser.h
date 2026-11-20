@@ -21,7 +21,8 @@ void parseValues(std::string_view xml, const std::filesystem::path& file, const 
                  ParsedFolder& out, Diagnostics& diag);
 
 // A reference as aapt2's ResourceUtils reads one: @[+][*][package:]type/entry, or
-// ?[package:][attr/]entry, with whitespace around. The package is as written, not resolved.
+// ?[package:][attr/]entry, with whitespace around. The package is as written, not resolved. The
+// type may be one no ResType stands for (ResName::otherType), which nothing loaded has.
 struct ParsedReference {
   ResName name;
   bool attr = false;    // ?

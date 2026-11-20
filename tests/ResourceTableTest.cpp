@@ -849,6 +849,42 @@ TEST(ResourceTable, IdOfAPackageInAValuesFile) {
   EXPECT_EQ(errors[0].message, "resource id/v not found");
 }
 
+// A reference of a type aapt2 has and no ResType stands for, as macro, names nothing, though an
+// anim, the ResType a ResName holds by default, has the name, in the package itself or in another
+// (#142). The golden cases load no other package, and have no anim of the name.
+TEST(ResourceTable, ReferenceOfATypeWithNoResTypeIsNotFound) {
+  TempDir dir;
+  ResourceTable table;
+  std::vector<Diagnostic> errors;
+  ASSERT_TRUE(load(table, dir, {{"anim/a.xml", "<set/>"}}, "com.lib", 0x7e, &errors))
+      << errorsOf(errors);
+  for (const std::string ref :
+       {"@macro/a", "@configVarying/a", "@^attr-private/a", "@com.lib:macro/a",
+        "@*com.lib:configVarying/a", "@com.lib:^attr-private/a"}) {
+    errors.clear();
+    EXPECT_FALSE(
+        load(table, dir,
+             {{"anim/a.xml", "<set/>"},
+              {"values/v.xml", "<resources><string name='s'>" + ref + "</string></resources>"},
+              {"layout/l.xml", "<a/>"}},  // the one of the last round
+             "com.example", 0x7f, &errors))
+        << ref;
+    ASSERT_EQ(errors.size(), 1u) << ref << errorsOf(errors);
+    EXPECT_EQ(errors[0].message, "resource " + ref.substr(ref[1] == '*' ? 2 : 1) + " not found");
+
+    // In an attribute of an XML file too.
+    errors.clear();
+    EXPECT_FALSE(load(table, dir,
+                      {{"values/v.xml", "<resources/>"}, {"layout/l.xml", "<a x='" + ref + "'/>"}},
+                      "com.example", 0x7f, &errors))
+        << ref;
+    ASSERT_EQ(errors.size(), 1u) << ref << errorsOf(errors);
+  }
+  EXPECT_FALSE(table.find("com.lib:macro/a"));
+  EXPECT_FALSE(table.find("@configVarying/a", "com.lib"));
+  EXPECT_TRUE(table.find("@anim/a", "com.lib"));
+}
+
 // What an XML file names in android is linked once a package android is loaded, as aapt2 links
 // it against android.jar, and left alone while none is, as hydroid cannot read android.jar yet
 // (#132). The golden cases load no android, so the cases that need one are here.

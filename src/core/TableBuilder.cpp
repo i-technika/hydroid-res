@@ -182,16 +182,18 @@ class Linker {
   std::optional<ResId> resolve(const ResName& name, const Source& source,
                                const char* what = "resource") {
     const std::string written =
-        (own(name.package) ? "" : name.package + ":") + nameOf(name.type, name.entry);
+        (own(name.package) ? "" : name.package + ":") + name.typeName() + "/" + name.entry;
+    // No package has a resource of a type no ResType stands for (#142).
+    const bool kept = name.otherType.empty();
     if (own(name.package)) {
       const auto it = ids_.find({name.type, name.entry});
-      if (it != ids_.end()) return it->second;
+      if (kept && it != ids_.end()) return it->second;
     } else if (!deps_.package(name.package)) {
       diag_.error(source, std::string(what) + " " + written + " not found: no package '" +
                               name.package + "' is loaded");
       return std::nullopt;
-    } else if (std::optional<ResId> id = deps_.find(name.package, name.type, name.entry)) {
-      return id;
+    } else if (kept) {
+      if (std::optional<ResId> id = deps_.find(name.package, name.type, name.entry)) return id;
     }
     diag_.error(source, std::string(what) + " " + written + " not found");
     return std::nullopt;

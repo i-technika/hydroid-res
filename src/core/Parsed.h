@@ -44,6 +44,13 @@ struct ResName {
   std::string package;
   ResType type = ResType::Anim;
   std::string entry;
+  // In a reference, a type aapt2 reads that no ResType stands for, as configVarying, in place of
+  // `type`: no resource of it is loaded, so that the reference is not found (#142).
+  std::string_view otherType;
+
+  std::string typeName() const {
+    return otherType.empty() ? toString(type) : std::string(otherType);
+  }
 };
 
 // A value that fits one Res_value, before linking.

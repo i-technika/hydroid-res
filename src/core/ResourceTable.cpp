@@ -111,7 +111,7 @@ std::optional<ResId> ResourceTable::find(std::string_view name,
   const std::string text =
       name.empty() || name[0] != '@' ? "@" + std::string(name) : std::string(name);
   const std::optional<detail::ParsedReference> ref = detail::parseReference(text);
-  if (!ref || ref->create) return std::nullopt;
+  if (!ref || ref->create || !ref->name.otherType.empty()) return std::nullopt;
   return find(ref->name.package.empty() ? defaultPackage : ref->name.package, ref->name.type,
               ref->name.entry);
 }
