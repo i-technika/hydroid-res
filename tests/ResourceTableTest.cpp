@@ -635,11 +635,19 @@ TEST(ResourceTable, ChildrenOfAFailedResourceAreLeftOut) {
 
 // Nor are they added when it is a duplicate, which compile finds, and the children of one that
 // fails give no errors, though those of the others do (#159). Every error aapt2 37.0.0 compile
-// gives of each, in order, but its "resource previously defined here".
+// gives of each, in order, but its "resource previously defined here". Some that fail have more
+// than one child, all of which are left out.
 TEST(ResourceTable, ChildrenOfADuplicateAreLeftOut) {
   const std::vector<std::pair<std::string, std::vector<std::string>>> cases = {
       {"<attr name='e' format='string'/><attr name='e'><enum name='1x' value='1'/></attr>",
        {"duplicate value for resource 'attr/e' with config ''"}},
+      // All the children of one that fails, and their own: none of their names is checked.
+      {"<attr name='e' format='string'/><attr name='e'><enum name='1x' value='1'/>"
+       "<enum name='2y' value='2'/></attr>",
+       {"duplicate value for resource 'attr/e' with config ''"}},
+      {"<declare-styleable name='s'/><declare-styleable name='s'><attr name='a'>"
+       "<enum name='1x' value='1'/></attr><attr name='1b' format='string'/></declare-styleable>",
+       {"duplicate value for resource 'styleable/s' with config ''"}},
       // The attr/b of the styleable that fails is not there for the <attr> after it.
       {"<declare-styleable name='s'><attr name='a' format='string'/></declare-styleable>"
        "<declare-styleable name='s'><attr name='b' format='integer'/></declare-styleable>"
