@@ -1384,6 +1384,14 @@ TEST(ResourceTable, EachItemReadsTheAttrItNames) {
                  "com.another", 0x7c),
       (std::vector<std::string>{incompatible, incompatible}))
       << errorsOf(errors);
+  // A value that fails to link stops link before the XML files (#165).
+  EXPECT_EQ(messagesOf({{"values/v.xml",
+                         "<resources><attr name='n' format='integer'/>"
+                         "<style name='A'><item name='n'>z</item></style></resources>"},
+                        {"layout/l.xml", layout + "app:n='z'/>"}},
+                       "com.yet", 0x7b),
+            (std::vector<std::string>{n}))
+      << errorsOf(errors);
 }
 
 // The dump writes numbers as printf does in the C locale, whatever the host app set.

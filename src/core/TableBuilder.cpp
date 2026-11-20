@@ -810,6 +810,10 @@ std::optional<Package> buildPackage(ParsedFolder folder, const std::string& name
       }
     }
   }
+  // aapt2 link stops on "failed linking references." once the table has linked with errors, before
+  // it links any XML file (#165). Every stage before has returned on its errors, so these are the
+  // table's.
+  if (!diag.empty()) return std::nullopt;
   for (const ParsedXmlAttribute& attribute : folder.xmlAttributes) {
     linker.linkXmlAttribute(attribute);
   }
