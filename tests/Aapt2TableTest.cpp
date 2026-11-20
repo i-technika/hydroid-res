@@ -251,7 +251,8 @@ std::string stringElement(size_t i, const std::string& tag, const std::string& t
 
 // Thousands of strings, as a <string>, an <item type="string"> and a style item of a string
 // attribute: whitespace, quotes, escapes, tags, references and format arguments. The ones aapt2
-// takes load together and must print the same; each it rejects must fail on its own.
+// takes load together and must print the same; each it rejects must fail on its own, with a first
+// error that says what aapt2's does of it on its own.
 TEST(Aapt2Table, StringsLikeAapt2) {
   const nlohmann::json golden = nlohmann::json::parse(readFile(HYDROID_AAPT2_STRINGS));
   const std::string package = golden.at("package").get<std::string>();
@@ -287,8 +288,22 @@ TEST(Aapt2Table, StringsLikeAapt2) {
       TempDir one;
       one.write("res/values/strings.xml", head + stringElement(i, tag, text) + "\n</resources>\n");
       ResourceTable alone;
-      EXPECT_FALSE(alone.addPackage(one.path() / "res", package, kAppPackageId))
-          << "aapt2 rejects it, hydroid takes it";
+      std::vector<Diagnostic> aloneErrors;
+      std::string path;
+      const std::string aapt2 = likeHydroid(rows[i].at(3).get<std::string>(), package, &path);
+      if (alone.addPackage(one.path() / "res", package, kAppPackageId, &aloneErrors)) {
+        ADD_FAILURE() << "aapt2 rejects it (" << aapt2 << "), hydroid takes it";
+        continue;
+      }
+      if (aloneErrors.empty()) {
+        ADD_FAILURE() << "aapt2 rejects it (" << aapt2 << "), hydroid with no error";
+        continue;
+      }
+      // As in CasesLikeAapt2, but with no list of other words: hydroid's first error takes in
+      // aapt2's for every string.
+      const std::string& first = aloneErrors.front().message;
+      EXPECT_NE(first.find(aapt2), std::string::npos)
+          << "aapt2 rejects it: " << aapt2 << "\nhydroid:" << errorsOf(aloneErrors);
       continue;
     }
     const ResType type = tag == "style" ? ResType::Style : ResType::String;
