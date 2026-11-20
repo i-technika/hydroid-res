@@ -27,17 +27,31 @@ struct Source {
   int line = 0;
 };
 
+struct ParsedFolder;
+
 // Collects the problems of a load.
 class Diagnostics {
  public:
-  void error(const Source& where, std::string message) {
-    errors_.push_back({where.file, where.line, std::move(message)});
-  }
+  // Where an error of reading a res/ folder falls among what was read of it: after so many of its
+  // resources and symbols.
+  struct Position {
+    size_t resources = 0;
+    size_t symbols = 0;
+  };
+
+  void error(const Source& where, std::string message);
   bool empty() const { return errors_.empty(); }
-  std::vector<Diagnostic>& errors() { return errors_; }
+  const std::vector<Diagnostic>& errors() const { return errors_; }
+  // The Position of each error in the folder being read when it was given, or {} with none.
+  const std::vector<Position>& positions() const { return positions_; }
+  // Gives each error from now on the Position of what `folder` holds then, or none with nullptr,
+  // for compile to give the errors of reading among those of each file's table (#156).
+  void track(const ParsedFolder* folder) { folder_ = folder; }
 
  private:
   std::vector<Diagnostic> errors_;
+  std::vector<Position> positions_;
+  const ParsedFolder* folder_ = nullptr;
 };
 
 // A resource by name, @[package:]type/entry. An empty package is the one being loaded.
@@ -174,6 +188,12 @@ struct ParsedFolder {
   std::vector<SymbolDecl> symbols;
   std::vector<ParsedXmlAttribute> xmlAttributes;
 };
+
+inline void Diagnostics::error(const Source& where, std::string message) {
+  errors_.push_back({where.file, where.line, std::move(message)});
+  positions_.push_back(folder_ ? Position{folder_->resources.size(), folder_->symbols.size()}
+                               : Position{});
+}
 
 // aapt2's ResourceUtils::IsValidResourceEntryName for ASCII: letters, digits, '_', '.' and '-',
 // not starting with a digit. aapt2 takes the other characters that the host's iswalnum calls

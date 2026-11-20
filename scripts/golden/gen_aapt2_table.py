@@ -584,6 +584,41 @@ CASES = {
         "values/b.xml": "<resources><string name='z'>2</string></resources>",
         "values/c.xml": "<resources><string name='q'>1</string><string name='q'>2</string>"
                         "</resources>"},
+    # Compile adds each resource to the file's table as soon as it has read it, so its errors come
+    # among those of reading, in the order of the files and as written (#156).
+    "duplicate-before-parser-error": values(
+        "<string name='q'>1</string><string name='q'>2</string><attr name='a' format='colour'/>"),
+    "duplicate-after-parser-error": values(
+        "<attr name='a' format='colour'/><string name='q'>1</string><string name='q'>2</string>"),
+    "duplicate-before-parser-error-file": {
+        "values/a.xml": "<resources><string name='q'>1</string><string name='q'>2</string>"
+                        "</resources>",
+        "values/b.xml": "<resources><attr name='a' format='colour'/></resources>"},
+    "duplicate-after-parser-error-file": {
+        "values/a.xml": "<resources><attr name='a' format='colour'/></resources>",
+        "values/b.xml": "<resources><string name='q'>1</string><string name='q'>2</string>"
+                        "</resources>"},
+    "public-given-two-before-parser-error": values(
+        "<string name='q'>x</string><public type='string' name='q' id='0x7f010000'/>"
+        "<public type='string' name='q' id='0x7f010001'/>"
+        "<public type='string' name='q' id='zz'/>"),
+    "public-given-two-after-parser-error": values(
+        "<string name='q'>x</string><public type='string' name='q' id='zz'/>"
+        "<public type='string' name='q' id='0x7f010000'/>"
+        "<public type='string' name='q' id='0x7f010001'/>"),
+    "public-given-two-before-xml-error": {
+        "values/a.xml": "<resources><string name='q'>x</string>"
+                        "<public type='string' name='q' id='0x7f010000'/>"
+                        "<public type='string' name='q' id='0x7f010001'/></resources>",
+        "xml/x.xml": "<a"},
+    "public-given-two-after-xml-error": {
+        "anim/x.xml": "<a",
+        "values/a.xml": "<resources><string name='q'>x</string>"
+                        "<public type='string' name='q' id='0x7f010000'/>"
+                        "<public type='string' name='q' id='0x7f010001'/></resources>"},
+    "public-id-given-two-before-parser-error": values(
+        "<public type='id' name='i' id='0x7f010000'/><public type='id' name='i' id='0x7f010001'/>"
+        "<item type='id' name='j'>x</item>"),
     # aapt2 fails a check of its own on an entry id of 0xffff, which no case has.
 
     # Attributes.
