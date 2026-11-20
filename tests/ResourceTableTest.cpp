@@ -674,6 +674,18 @@ TEST(ResourceTable, ChildrenOfADuplicateAreLeftOut) {
       {"<integer name='i'>1</integer><integer name='i'>2</integer><integer name='1j'>3</integer>",
        {"duplicate value for resource 'integer/i' with config ''",
         "resource 'integer/1j' has invalid entry name '1j'"}},
+      // A name that is not valid is given with the package written before it, as a duplicate is,
+      // but the one being loaded, which no error gives (#161).
+      {"<declare-styleable name='s'><attr name='android:1x' format='string'/>"
+       "<attr name='com.example:2y' format='string'/><attr name='com.other:3z' format='string'/>"
+       "</declare-styleable>",
+       {"resource 'android:attr/1x' has invalid entry name '1x'",
+        "resource 'attr/2y' has invalid entry name '2y'",
+        "resource 'com.other:attr/3z' has invalid entry name '3z'"}},
+      {"<declare-styleable name='s'><attr name='com.example:a' format='string'/>"
+       "</declare-styleable><declare-styleable name='t'>"
+       "<attr name='com.example:a' format='integer'/></declare-styleable>",
+       {"duplicate value for resource 'attr/a' with config ''"}},
   };
   for (const auto& [body, expected] : cases) {
     TempDir dir;

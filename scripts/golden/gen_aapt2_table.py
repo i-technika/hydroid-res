@@ -827,6 +827,18 @@ CASES = {
     "styleable-define-not-loaded": values("<declare-styleable name='S'>"
                                           "<attr name='com.other:a' format='color'/>"
                                           "</declare-styleable>"),
+    # The error of a name that is not valid names the package before it too (#161).
+    "styleable-define-android-invalid-name": values("<declare-styleable name='S'>"
+                                                    "<attr name='android:1x' format='string'/>"
+                                                    "</declare-styleable>"),
+    "styleable-define-own-package-invalid-name": values("<declare-styleable name='S'>"
+                                                        "<attr name='com.probe:1x' format='string'/>"
+                                                        "</declare-styleable>"),
+    "styleable-define-own-package-twice": values("<declare-styleable name='S'>"
+                                                 "<attr name='com.probe:a' format='string'/>"
+                                                 "</declare-styleable><declare-styleable name='T'>"
+                                                 "<attr name='com.probe:a' format='integer'/>"
+                                                 "</declare-styleable>"),
 
     # Styles.
     "style-parents": values("<style name='A'/><style name='B' parent='A'/><style name='C' parent='@style/A'/>"
