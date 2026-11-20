@@ -156,6 +156,13 @@ CASES = {
     "xml-link-found-public-id": layout('x="@id/p"', "<public type='id' name='p'/>"),
     "xml-link-not-references": layout('x="@string/" y="@+string/s" z="@foo/bar" w="?attr/" v="?" '
                                       'u="@" t="@+id/" s="string/missing"'),
+    # The types of a reference no resource of the case has (#142), which overlayable is not one
+    # of.
+    "xml-link-config-varying": layout('x="@configVarying/c"'),
+    "xml-link-attr-private": layout('x="@^attr-private/c"'),
+    "xml-link-macro": layout('x="@macro/m"'),
+    "xml-link-macro-create": layout('x="@+macro/m"'),
+    "xml-link-overlayable": layout('x="@overlayable/o"'),
     # Link leaves tools: alone, though compile makes its ids; another namespace is linked.
     "xml-link-tools": layout('tools:text="@string/missing" tools:id="@+id/from_tools"'),
     "xml-link-tools-other-prefix": {"layout/l.xml": '<a xmlns:t="http://schemas.android.com/tools" '
@@ -364,6 +371,17 @@ CASES = {
                         "<string name='s' xmlns:p='urn:x'>@p:string/t</string></resources>"},
     "ref-unknown-type": values("<color name='c'>@colour/c</color>"),
     "ref-no-entry": values("<string name='c'>@string/</string>"),
+    # Types aapt2 reads in a reference though no resource of the case is of them, so that nothing
+    # so named is found, as overlayable, which it does not read in one, is text (#142).
+    "ref-config-varying": values("<string name='s'>@configVarying/c</string>"),
+    "ref-attr-private": values("<string name='s'>@^attr-private/c</string>"),
+    "ref-macro": values("<string name='s'>@macro/m</string>"),
+    "ref-macro-private": values("<string name='s'>@*macro/m</string>"),
+    "ref-macro-in-style": values("<attr name='a' format='string'/>"
+                                 "<style name='S'><item name='a'>@macro/m</item></style>"),
+    "ref-macro-create": values("<string name='s'>@+macro/m</string>"),
+    "ref-macro-attr": values("<string name='s'>?macro/m</string>"),
+    "ref-overlayable": values("<string name='s'>@overlayable/o</string>"),
     "attrref-forms": values("<attr name='a' format='color'/>"
                             "<color name='c1'>?attr/a</color><color name='c2'>?a</color>"
                             "<color name='c3'>?com.probe:a</color><color name='c4'>?com.probe:attr/a</color>"),

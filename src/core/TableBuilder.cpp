@@ -182,16 +182,26 @@ class Linker {
   std::optional<ResId> resolve(const ResName& name, const Source& source,
                                const char* what = "resource") {
     const std::string written =
-        (own(name.package) ? "" : name.package + ":") + nameOf(name.type, name.entry);
+        (own(name.package) ? "" : name.package + ":") + name.typeName() + "/" + name.entry;
+    // aapt2 looks for a macro to put its contents in place of the reference, in any package, and
+    // says so when there is none.
+    if (name.otherType == "macro") {
+      diag_.error(source, "failed to find definition for " + written);
+      return std::nullopt;
+    }
+    // No package hydroid loads has a resource of a type no ResType stands for (#142), so that a
+    // reference of one is not looked for. android.jar has ^attr-private, which aapt2 finds: the
+    // table must keep that type before a reference finds it there (#98).
+    const bool kept = name.otherType.empty();
     if (own(name.package)) {
       const auto it = ids_.find({name.type, name.entry});
-      if (it != ids_.end()) return it->second;
+      if (kept && it != ids_.end()) return it->second;
     } else if (!deps_.package(name.package)) {
       diag_.error(source, std::string(what) + " " + written + " not found: no package '" +
                               name.package + "' is loaded");
       return std::nullopt;
-    } else if (std::optional<ResId> id = deps_.find(name.package, name.type, name.entry)) {
-      return id;
+    } else if (kept) {
+      if (std::optional<ResId> id = deps_.find(name.package, name.type, name.entry)) return id;
     }
     diag_.error(source, std::string(what) + " " + written + " not found");
     return std::nullopt;

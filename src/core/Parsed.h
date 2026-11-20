@@ -10,6 +10,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <variant>
 #include <vector>
 
@@ -41,9 +42,25 @@ class Diagnostics {
 
 // A resource by name, @[package:]type/entry. An empty package is the one being loaded.
 struct ResName {
+  ResName() = default;
+  ResName(std::string inPackage, ResType inType, std::string inEntry,
+          std::string_view inOtherType = {})
+      : package(std::move(inPackage)),
+        type(inType),
+        entry(std::move(inEntry)),
+        otherType(inOtherType) {}
+
   std::string package;
   ResType type = ResType::Anim;
   std::string entry;
+  // In a reference, a type aapt2 reads that no ResType stands for, as configVarying, in place of
+  // `type`: no package hydroid loads has a resource of it, so that the reference is not found
+  // (#142). android.jar has ^attr-private, which hydroid cannot read yet (#98).
+  std::string_view otherType;
+
+  std::string typeName() const {
+    return otherType.empty() ? toString(type) : std::string(otherType);
+  }
 };
 
 // A value that fits one Res_value, before linking.

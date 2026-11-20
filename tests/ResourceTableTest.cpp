@@ -849,6 +849,50 @@ TEST(ResourceTable, IdOfAPackageInAValuesFile) {
   EXPECT_EQ(errors[0].message, "resource id/v not found");
 }
 
+// A reference of a type aapt2 has and no ResType stands for, as macro, names nothing, though an
+// anim, the ResType a ResName holds by default, has the name, in the package itself or in another
+// (#142), in a value, a style item and an attribute of an XML file. aapt2 says so of a macro in
+// its own words, also in a package not loaded. The golden cases load no other package, have no
+// anim of the name and do not compare errors.
+TEST(ResourceTable, ReferenceOfATypeWithNoResTypeIsNotFound) {
+  TempDir dir;
+  ResourceTable table;
+  std::vector<Diagnostic> errors;
+  ASSERT_TRUE(load(table, dir, {{"anim/a.xml", "<set/>"}}, "com.lib", 0x7e, &errors))
+      << errorsOf(errors);
+  const std::pair<const char*, const char*> cases[] = {
+      {"@macro/a", "failed to find definition for macro/a"},
+      {"@configVarying/a", "resource configVarying/a not found"},
+      {"@^attr-private/a", "resource ^attr-private/a not found"},
+      {"@com.lib:macro/a", "failed to find definition for com.lib:macro/a"},
+      {"@*com.lib:configVarying/a", "resource com.lib:configVarying/a not found"},
+      {"@com.lib:^attr-private/a", "resource com.lib:^attr-private/a not found"},
+      {"@com.none:macro/a", "failed to find definition for com.none:macro/a"},
+      {"@com.none:configVarying/a",
+       "resource com.none:configVarying/a not found: no package 'com.none' is loaded"},
+  };
+  for (const auto& [written, expected] : cases) {
+    const std::string ref = written;
+    const std::string values = "<resources><attr name='t' format='string'/>";
+    for (const auto& [v, layout] : std::vector<std::pair<std::string, std::string>>{
+             {values + "<string name='s'>" + ref + "</string></resources>", "<a/>"},
+             {values + "<style name='S'><item name='t'>" + ref + "</item></style></resources>",
+              "<a/>"},
+             {values + "</resources>", "<a x='" + ref + "'/>"}}) {
+      errors.clear();
+      EXPECT_FALSE(load(table, dir,
+                        {{"anim/a.xml", "<set/>"}, {"values/v.xml", v}, {"layout/l.xml", layout}},
+                        "com.example", 0x7f, &errors))
+          << v << layout;
+      ASSERT_EQ(errors.size(), 1u) << v << layout << errorsOf(errors);
+      EXPECT_EQ(errors[0].message, expected) << v << layout;
+    }
+  }
+  EXPECT_FALSE(table.find("com.lib:macro/a"));
+  EXPECT_FALSE(table.find("@configVarying/a", "com.lib"));
+  EXPECT_TRUE(table.find("@anim/a", "com.lib"));
+}
+
 // What an XML file names in android is linked once a package android is loaded, as aapt2 links
 // it against android.jar, and left alone while none is, as hydroid cannot read android.jar yet
 // (#132). The golden cases load no android, so the cases that need one are here.

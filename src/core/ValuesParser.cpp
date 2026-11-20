@@ -269,6 +269,10 @@ const struct {
     {"string", ResType::String, kFormatString},
 };
 
+// The types of aapt2 that a reference may name and no ResType stands for (#142). aapt2 has
+// overlayable too, but does not read it in a reference: @overlayable/o is text.
+constexpr std::string_view kOtherRefTypes[] = {"^attr-private", "configVarying", "macro"};
+
 // Elements aapt2 reads that this does not yet.
 constexpr std::string_view kUnsupported[] = {
     "add-resource",
@@ -1008,9 +1012,16 @@ std::optional<ParsedReference> parseReference(std::string_view text) {
     if (priv) rest.remove_prefix(1);
     extractResourceName(rest, &package, &type, &entry);
     const std::optional<ResType> parsed = type.empty() ? std::nullopt : parseResType(type);
-    if (!parsed || entry.empty()) return std::nullopt;
-    if (ref.create && (priv || *parsed != ResType::Id)) return std::nullopt;
-    ref.name = {std::string(package), *parsed, std::string(entry)};
+    std::string_view otherType;
+    if (!parsed) {
+      for (std::string_view other : kOtherRefTypes) {
+        if (type == other) otherType = other;
+      }
+    }
+    if ((!parsed && otherType.empty()) || entry.empty()) return std::nullopt;
+    if (ref.create && (priv || parsed != ResType::Id)) return std::nullopt;
+    ref.name = {std::string(package), parsed.value_or(ResType::Anim), std::string(entry),
+                otherType};
     return ref;
   }
   if (t[0] == '?') {
