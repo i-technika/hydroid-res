@@ -165,29 +165,32 @@ bool isNamespaceDeclaration(pugi::xml_attribute attr) {
   return name == "xmlns" || name.rfind("xmlns:", 0) == 0;
 }
 
-std::optional<std::string> namespacePackage(std::string_view uri) {
+std::optional<NamespacePackage> namespacePackage(std::string_view uri) {
   constexpr std::string_view kPublic = "http://schemas.android.com/apk/res/";
   constexpr std::string_view kPrivate = "http://schemas.android.com/apk/prv/res/";
-  if (uri == "http://schemas.android.com/apk/res-auto") return std::string();
+  if (uri == "http://schemas.android.com/apk/res-auto") return NamespacePackage{};
   for (std::string_view prefix : {kPublic, kPrivate}) {
     if (uri.size() > prefix.size() && uri.compare(0, prefix.size(), prefix) == 0) {
-      return std::string(uri.substr(prefix.size()));
+      return NamespacePackage{std::string(uri.substr(prefix.size())), prefix == kPrivate};
     }
   }
   return std::nullopt;
 }
 
-std::string resolvePackage(pugi::xml_node node, const std::string& alias) {
-  if (alias.empty()) return alias;
+void resolvePackage(pugi::xml_node node, ResName& name) {
+  if (name.package.empty()) return;
   // aapt2 keeps only the xmlns that name a package (PackageAwareVisitor, XmlPullParser), so one
   // of another namespace, as xmlns:p="urn:x", does not hide a package p further out (#140).
-  const std::string attr = "xmlns:" + alias;
+  const std::string attr = "xmlns:" + name.package;
   for (; node; node = node.parent()) {
     if (pugi::xml_attribute a = node.attribute(attr.c_str())) {
-      if (std::optional<std::string> package = namespacePackage(a.value())) return *package;
+      if (std::optional<NamespacePackage> package = namespacePackage(a.value())) {
+        name.package = std::move(package->package);
+        name.privateReference |= package->isPrivate;
+        return;
+      }
     }
   }
-  return alias;
 }
 
 }  // namespace hydroid::res::detail

@@ -12,6 +12,8 @@
 #include <string_view>
 #include <unordered_map>
 
+#include "core/Parsed.h"
+
 namespace hydroid::res::detail {
 
 inline constexpr std::string_view kXliffNamespace = "urn:oasis:names:tc:xliff:document:1.2";
@@ -57,12 +59,17 @@ bool isNamespaceDeclaration(pugi::xml_attribute attr);
 // xml::ExtractPackageFromNamespace: the package of http://schemas.android.com/apk/res/<package>
 // or .../apk/prv/res/<package>, the package being loaded ("") of .../apk/res-auto, and nullopt of
 // any other namespace.
-std::optional<std::string> namespacePackage(std::string_view uri);
+struct NamespacePackage {
+  std::string package;
+  bool isPrivate = false;  // .../apk/prv/res/<package>, which makes a private reference (#141)
+};
+std::optional<NamespacePackage> namespacePackage(std::string_view uri);
 
-// xml::ResolvePackage: the package that `alias` (the "app" of @app:color/x or app:attr) stands
-// for where `node` is: that of the nearest xmlns of its prefix, on `node` or an ancestor, that
-// names a package (namespacePackage), past any that names another namespace, and anything else is
-// left as it is.
-std::string resolvePackage(pugi::xml_node node, const std::string& alias);
+// xml::ResolvePackage: the package of `name` as written (the "app" of @app:color/x or app:attr)
+// becomes the one it stands for where `node` is: that of the nearest xmlns of its prefix, on
+// `node` or an ancestor, that names a package (namespacePackage), past any that names another
+// namespace, and anything else is left as it is. A namespace .../apk/prv/res/ makes `name` a
+// private reference; a public one leaves @* private.
+void resolvePackage(pugi::xml_node node, ResName& name);
 
 }  // namespace hydroid::res::detail

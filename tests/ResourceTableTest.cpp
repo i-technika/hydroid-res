@@ -24,6 +24,7 @@
 #include <sstream>
 #include <string>
 #include <system_error>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -258,7 +259,8 @@ TEST(ResourceTable, FillsValuesAndPools) {
             "size(0x7f020001)=2.000000dp");
 }
 
-// A package may refer to one loaded before it, by its name, as an app does to android.
+// A package may refer to one loaded before it, by its name, as an app does to android: to what
+// that package makes <public> (#141).
 TEST(ResourceTable, RefersIntoAnotherPackage) {
   TempDir dir;
   ResourceTable table;
@@ -267,7 +269,10 @@ TEST(ResourceTable, RefersIntoAnotherPackage) {
                    {{"values/v.xml",
                      "<resources><color name='accent'>#123</color>"
                      "<attr name='mode'><enum name='on' value='5'/></attr>"
-                     "<attr name='text' format='string'/><style name='Theme'/></resources>"}},
+                     "<attr name='text' format='string'/><style name='Theme'/>"
+                     "<public type='color' name='accent'/><public type='attr' name='mode'/>"
+                     "<public type='attr' name='text'/><public type='style' name='Theme'/>"
+                     "</resources>"}},
                    "com.lib", 0x7e, &errors))
       << errorsOf(errors);
   ASSERT_TRUE(load(table, dir,
@@ -308,7 +313,9 @@ TEST(ResourceTable, StyleableDefinesAttrsOnlyInItsOwnPackage) {
   ResourceTable table;
   std::vector<Diagnostic> errors;
   ASSERT_TRUE(load(table, dir,
-                   {{"values/v.xml", "<resources><attr name='a' format='color'/></resources>"}},
+                   {{"values/v.xml",
+                     "<resources><attr name='a' format='color'/>"
+                     "<public type='attr' name='a'/></resources>"}},
                    "com.lib", 0x7e, &errors))
       << errorsOf(errors);
   ASSERT_TRUE(
@@ -891,6 +898,76 @@ TEST(ResourceTable, ReferenceOfATypeWithNoResTypeIsNotFound) {
   EXPECT_FALSE(table.find("com.lib:macro/a"));
   EXPECT_FALSE(table.find("@configVarying/a", "com.lib"));
   EXPECT_TRUE(table.find("@anim/a", "com.lib"));
+}
+
+// What another package does not make <public> only a private reference names: @*, * before a
+// style parent or an attribute's name, or a prefix of an .../apk/prv/res/ namespace. Any other
+// fails as private, in a values file and an XML file alike, as aapt2 37.0.0 links each case
+// against com.other's apk (#141). Its own resources a package names freely. The golden cases load
+// no other package.
+TEST(ResourceTable, AnotherPackagesPrivateResourceNeedsAPrivateReference) {
+  TempDir dir;
+  ResourceTable table;
+  std::vector<Diagnostic> errors;
+  ASSERT_TRUE(load(table, dir,
+                   {{"values/v.xml",
+                     "<resources><string name='pub'>p</string><string name='priv'>q</string>"
+                     "<attr name='pa' format='string'/><attr name='qa' format='string'/>"
+                     "<style name='PS'/><style name='QS'/>"
+                     "<string name='own'>@string/priv</string>"
+                     "<public type='string' name='pub'/><public type='attr' name='pa'/>"
+                     "<public type='style' name='PS'/></resources>"}},
+                   "com.other", 0x7e, &errors))
+      << errorsOf(errors);
+
+  const std::string ns =
+      " xmlns:o='http://schemas.android.com/apk/res/com.other'"
+      " xmlns:q='http://schemas.android.com/apk/prv/res/com.other'";
+  // A values file's resources, or an XML file's attributes, and the error, if any.
+  const std::vector<std::tuple<std::string, std::string, std::string>> cases = {
+      {"<string name='s'>@com.other:string/priv</string>", "",
+       "resource com.other:string/priv is private"},
+      {"<string name='s'>?com.other:attr/qa</string>", "",
+       "resource com.other:attr/qa is private"},
+      {"<style name='S' parent='@com.other:style/QS'/>", "",
+       "resource com.other:style/QS is private"},
+      {"<style name='S'><item name='com.other:qa'>x</item></style>", "",
+       "style attribute com.other:attr/qa is private"},
+      {"<declare-styleable name='D'><attr name='com.other:qa'/></declare-styleable>", "",
+       "resource com.other:attr/qa is private"},
+      {"", "x='@com.other:string/priv'", "resource com.other:string/priv is private"},
+      {"", "x='?com.other:attr/qa'", "resource com.other:attr/qa is private"},
+      {"", "o:qa='1'", "attribute com.other:attr/qa is private"},
+      {"<string name='s'>@*com.other:string/priv</string>", "", ""},
+      {"<string name='s'>@q:string/priv</string>", "", ""},
+      {"<string name='s'>@o:string/pub</string>", "", ""},
+      {"<style name='S' parent='@*com.other:style/QS'/>", "", ""},
+      {"<style name='S' parent='@q:style/QS'/>", "", ""},
+      {"<style name='S' parent='@com.other:style/PS'/>", "", ""},
+      {"<style name='S'><item name='*com.other:qa'>x</item></style>", "", ""},
+      {"<style name='S'><item name='q:qa'>x</item><item name='o:pa'>x</item></style>", "", ""},
+      {"<declare-styleable name='D'><attr name='*com.other:qa'/></declare-styleable>", "", ""},
+      {"", "x='@*com.other:string/priv' y='@q:string/priv' z='?q:attr/qa' w='@o:string/pub'", ""},
+      {"", "q:qa='1' o:pa='1'", ""},
+  };
+  uint8_t id = 0x7d;
+  for (const auto& [values, attributes, message] : cases) {
+    SCOPED_TRACE(values + attributes);
+    errors.clear();
+    const bool loaded =
+        load(table, dir,
+             {{"values/v.xml", "<resources" + ns + ">" + values + "</resources>"},
+              {"layout/l.xml", "<a" + ns + " " + attributes + "/>"}},
+             "com.probe" + std::to_string(id), id, &errors);
+    id--;
+    if (message.empty()) {
+      EXPECT_TRUE(loaded) << errorsOf(errors);
+      continue;
+    }
+    EXPECT_FALSE(loaded);
+    ASSERT_EQ(errors.size(), 1u) << errorsOf(errors);
+    EXPECT_EQ(errors[0].message, message);
+  }
 }
 
 // What an XML file names in android is linked once a package android is loaded, as aapt2 links

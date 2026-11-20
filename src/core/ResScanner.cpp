@@ -138,9 +138,10 @@ class XmlFileCollector {
       const std::string ns = attributeNamespace(element, a);
       if (ns == kToolsNamespace) continue;
       ParsedXmlAttribute attribute;
-      if (std::optional<std::string> package = namespacePackage(ns)) {
+      if (std::optional<NamespacePackage> package = namespacePackage(ns)) {
         attribute.attr =
-            ResName{std::move(*package), ResType::Attr, std::string(localName(a.name()))};
+            ResName{std::move(package->package), ResType::Attr, std::string(localName(a.name()))};
+        attribute.attr->privateReference = package->isPrivate;
       }
       // ResourceUtils::TryParseItemForAttribute reads @null, @empty and references first, as
       // any attribute takes them.
@@ -152,7 +153,7 @@ class XmlFileCollector {
       } else if (ref) {
         value.kind = ref->attr ? ParsedItem::Kind::AttrRef : ParsedItem::Kind::Reference;
         value.ref = ref->name;
-        value.ref.package = resolvePackage(element, value.ref.package);
+        resolvePackage(element, value.ref);
       } else {
         value.kind = ParsedItem::Kind::Raw;
         value.text = a.value();
