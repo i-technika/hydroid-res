@@ -26,12 +26,19 @@ struct PendingValue {
   Source source;
 };
 
+// aapt2's Visibility::Level: <java-symbol> or <symbol> make a resource private, <public> public.
+enum class Visibility : uint8_t { Undefined, Private, Public };
+
 struct PendingEntry {
   std::vector<PendingValue> values;
-  bool isPublic = false;
+  Visibility visibility = Visibility::Undefined;
   std::optional<ResId> id;  // the one a <public id=""> gives
   Source idSource;          // that <public>
 };
+
+// The table aapt2 compile makes of a file: of each package as written ("" before any other),
+// type and name, one value for each configuration and product.
+using FileTable = std::map<std::pair<std::string, Key>, PendingEntry>;
 
 std::string nameOf(ResType type, const std::string& entry) {
   return std::string(toString(type)) + "/" + entry;
@@ -547,37 +554,56 @@ class Linker {
 
 std::optional<Package> buildPackage(ParsedFolder folder, const std::string& name, uint8_t id,
                                     const ResourceTable& deps, Diagnostics& diag) {
-  // Every value of every entry, one for each configuration and product.
-  std::map<Key, PendingEntry> entries;
   // The ids XML files make in other packages, by package and name, each where first made.
   std::map<std::pair<std::string, std::string>, Source> externalIds;
   // aapt2 compiles each file into a table of its own, where a weak value yields to another of the
   // file, then link merges the tables in the order of the files, where an <attr> is not weak
-  // (#88). The resources of a file are together, in the order the files are read (#80).
+  // (#88). The resources of a file are together, in the order the files are read (#80), and its
+  // symbols among them, as written. Compile fails before link starts, on the errors of every file
+  // (#154).
+  std::vector<FileTable> files;
+  const std::filesystem::path* file = nullptr;
   std::vector<ParsedResource>& resources = folder.resources;
-  for (size_t begin = 0, end = 0; begin < resources.size(); begin = end) {
-    const std::filesystem::path& file = resources[begin].source.file;
-    for (end = begin + 1; end < resources.size() && resources[end].source.file == file;) end++;
-
-    // The file's table: of each package as written ("" before any other), type and name, one value
-    // for each configuration and product.
-    std::map<std::pair<std::string, Key>, std::vector<PendingValue>> compiled;
-    for (size_t i = begin; i < end; i++) {
-      ParsedResource& r = resources[i];
-      // An id an XML file makes in another package fails link, but in android, which it only
-      // warns of (#83).
-      if (r.inXmlFile && !r.package.empty() && r.package != name && r.package != "android") {
-        externalIds.emplace(std::pair(r.package, r.name), r.source);
+  for (size_t i = 0, s = 0; i <= resources.size(); i++) {
+    for (; s < folder.symbols.size() && folder.symbols[s].position <= i; s++) {
+      const SymbolDecl& symbol = folder.symbols[s];
+      if (!file || symbol.source.file != *file) files.emplace_back();
+      file = &symbol.source.file;
+      PendingEntry& entry = files.back()[{"", {symbol.type, symbol.name}}];
+      entry.visibility =
+          std::max(entry.visibility, symbol.isPublic ? Visibility::Public : Visibility::Private);
+      if (!symbol.id) continue;
+      if (entry.id && *entry.id != *symbol.id) {
+        diag.error(symbol.source, "trying to add resource '" + nameOf(symbol.type, symbol.name) +
+                                      "' with ID " + hex("0x%08x", *symbol.id) +
+                                      " but resource already has ID " + hex("0x%08x", *entry.id));
+        continue;
       }
-      PendingValue value{r.config, r.product, std::move(r.value), r.source};
-      if (!merge(compiled[{r.package, {r.type, r.name}}], value, Stage::Compile)) {
-        diag.error(r.source, "duplicate value for resource '" +
-                                 (r.package.empty() ? "" : r.package + ":") +
-                                 nameOf(r.type, r.name) + "' with config '" + toString(r.config) +
-                                 "'");
-      }
+      entry.id = symbol.id;
+      entry.idSource = symbol.source;
     }
-    for (auto& [qualified, values] : compiled) {
+    if (i == resources.size()) break;
+    ParsedResource& r = resources[i];
+    if (!file || r.source.file != *file) files.emplace_back();
+    file = &r.source.file;
+    // An id an XML file makes in another package fails link, but in android, which it only warns
+    // of (#83).
+    if (r.inXmlFile && !r.package.empty() && r.package != name && r.package != "android") {
+      externalIds.emplace(std::pair(r.package, r.name), r.source);
+    }
+    PendingValue value{r.config, r.product, std::move(r.value), r.source};
+    if (!merge(files.back()[{r.package, {r.type, r.name}}].values, value, Stage::Compile)) {
+      diag.error(r.source, "duplicate value for resource '" +
+                               (r.package.empty() ? "" : r.package + ":") + nameOf(r.type, r.name) +
+                               "' with config '" + toString(r.config) + "'");
+    }
+  }
+  if (!diag.empty()) return std::nullopt;
+
+  // Every value of every entry, one for each configuration and product.
+  std::map<Key, PendingEntry> entries;
+  for (FileTable& table : files) {
+    for (auto& [qualified, compiled] : table) {
       const auto& [package, key] = qualified;
       // aapt2 link merges only what is defined in the package being linked, written or not, after
       // compile has resolved what the file defines in each (#109): an <attr> a
@@ -585,8 +611,26 @@ std::optional<Package> buildPackage(ParsedFolder folder, const std::string& name
       // that package's attr, or fails to. So is an id @+pkg:id/ makes, and a reference to it
       // then fails (#131).
       if (!package.empty() && package != name) continue;
-      for (PendingValue& value : values) {
-        if (!merge(entries[key].values, value, Stage::Link)) {
+      PendingEntry& entry = entries[key];
+      // TableMerger's MergeEntry, before the values: the higher visibility stays, and the id with
+      // public, if any; of two public ones, both ids, if they have them, must be the same. So a
+      // file that makes an entry public first, without an id, keeps the id a later one gives out
+      // (#154).
+      if (compiled.visibility > entry.visibility) {
+        if (compiled.visibility == Visibility::Public) {
+          entry.id = compiled.id;
+          entry.idSource = compiled.idSource;
+        }
+        entry.visibility = compiled.visibility;
+      } else if (compiled.visibility == Visibility::Public &&
+                 entry.visibility == Visibility::Public && entry.id && compiled.id &&
+                 *entry.id != *compiled.id) {
+        diag.error(compiled.idSource,
+                   "cannot merge entry '" + key.second + "': conflicting public IDs");
+        continue;
+      }
+      for (PendingValue& value : compiled.values) {
+        if (!merge(entry.values, value, Stage::Link)) {
           diag.error(value.source, "resource '" + nameOf(key.first, key.second) +
                                        "' has a conflicting value for configuration (" +
                                        toString(value.config) + ")");
@@ -603,26 +647,9 @@ std::optional<Package> buildPackage(ParsedFolder folder, const std::string& name
   }
   for (const SymbolDecl& s : folder.symbols) {
     const auto it = entries.find({s.type, s.name});
-    if (it == entries.end()) {
+    if (it == entries.end() || it->second.values.empty()) {
       diag.error(s.source, "no definition for declared symbol '" + nameOf(s.type, s.name) + "'");
-      continue;
     }
-    PendingEntry& entry = it->second;
-    entry.isPublic |= s.isPublic;
-    if (!s.id) continue;
-    if (entry.id && *entry.id != *s.id) {
-      // Of two ids, compile fails on one file's, and link on those of two files (#154).
-      if (entry.idSource.file == s.source.file) {
-        diag.error(s.source, "trying to add resource '" + nameOf(s.type, s.name) + "' with ID " +
-                                 hex("0x%08x", *s.id) + " but resource already has ID " +
-                                 hex("0x%08x", *entry.id));
-      } else {
-        diag.error(s.source, "cannot merge entry '" + s.name + "': conflicting public IDs");
-      }
-      continue;
-    }
-    entry.id = s.id;
-    entry.idSource = s.source;
   }
 
   // ProductFilter with no product asked for: of each configuration, the value with no product
@@ -727,7 +754,7 @@ std::optional<Package> buildPackage(ParsedFolder folder, const std::string& name
     Entry entry;
     entry.id = entryId(resId);
     entry.name = key.second;
-    entry.isPublic = entries[key].isPublic;
+    entry.isPublic = entries[key].visibility == Visibility::Public;
     const auto type = std::find_if(package.types.begin(), package.types.end(),
                                    [&](const TypeTable& t) { return t.id == typeId(resId); });
     type->entries.push_back(std::move(entry));

@@ -510,6 +510,80 @@ CASES = {
     "public-given-two-types": values("<string name='a'>a</string><string name='b'>b</string>"
                                      "<public type='string' name='a' id='0x7f010000'/>"
                                      "<public type='string' name='b' id='0x7f0a0000'/>"),
+    # Link merges the visibility of each file's entry before its values: the higher stays, and the
+    # id with public; of two public ones, both ids, if any, must be the same. So a file that makes
+    # it public first, without an id, keeps a later file's id out (#154).
+    "public-given-after-public": {
+        "values/a.xml": "<resources><string name='q'>x</string><string name='r'>x</string>"
+                        "<public type='string' name='q'/></resources>",
+        "values/b.xml": "<resources><public type='string' name='q' id='0x7f010005'/></resources>"},
+    "public-given-after-public-twice": {
+        "values/a.xml": "<resources><string name='q'>x</string>"
+                        "<public type='string' name='q'/></resources>",
+        "values/b.xml": "<resources><public type='string' name='q' id='0x7f010005'/></resources>",
+        "values/c.xml": "<resources><public type='string' name='q' id='0x7f010006'/></resources>"},
+    "public-given-around-public": {
+        "values/a.xml": "<resources><string name='q'>x</string>"
+                        "<public type='string' name='q' id='0x7f010005'/></resources>",
+        "values/b.xml": "<resources><public type='string' name='q'/></resources>",
+        "values/c.xml": "<resources><public type='string' name='q' id='0x7f010006'/></resources>"},
+    "public-given-after-values-and-public": {
+        "values/a.xml": "<resources><string name='q'>x</string><string name='r'>x</string>"
+                        "</resources>",
+        "values/b.xml": "<resources><public type='string' name='q'/></resources>",
+        "values/c.xml": "<resources><public type='string' name='q' id='0x7f010005'/></resources>"},
+    "public-given-after-public-in-file": values(
+        "<string name='q'>x</string><string name='r'>x</string><public type='string' name='q'/>"
+        "<public type='string' name='q' id='0x7f010005'/>"),
+    "public-given-after-private": {
+        "values/a.xml": "<resources><string name='q'>x</string><string name='r'>x</string>"
+                        "<java-symbol type='string' name='q'/></resources>",
+        "values/b.xml": "<resources><public type='string' name='q' id='0x7f010005'/></resources>"},
+    "public-given-before-private": {
+        "values/a.xml": "<resources><string name='q'>x</string><string name='r'>x</string>"
+                        "<public type='string' name='q' id='0x7f010005'/></resources>",
+        "values/b.xml": "<resources><java-symbol type='string' name='q'/></resources>"},
+    "public-given-two-in-later-file": {
+        "values/a.xml": "<resources><string name='q'>x</string>"
+                        "<public type='string' name='q' id='0x7f010000'/></resources>",
+        "values/b.xml": "<resources><public type='string' name='q' id='0x7f010001'/>"
+                        "<public type='string' name='q' id='0x7f010000'/></resources>"},
+    # The first error, which compile gives of each file in the order written, and before any of
+    # link, and link of each entry in the order of type and name (#154).
+    "public-given-two-before-duplicate": values(
+        "<public type='string' name='a' id='0x7f010000'/>"
+        "<public type='string' name='a' id='0x7f010001'/>"
+        "<string name='a'>1</string><string name='a'>2</string>"),
+    "public-given-two-after-duplicate": values(
+        "<string name='a'>1</string><string name='a'>2</string>"
+        "<public type='string' name='a' id='0x7f010000'/>"
+        "<public type='string' name='a' id='0x7f010001'/>"),
+    "public-given-two-before-conflict": {
+        "values/a.xml": "<resources><string name='q'>x</string><string name='z'>1</string>"
+                        "<public type='string' name='q' id='0x7f010000'/></resources>",
+        "values/b.xml": "<resources><public type='string' name='q' id='0x7f010001'/>"
+                        "<string name='z'>2</string></resources>"},
+    "public-given-two-after-conflict": {
+        "values/a.xml": "<resources><string name='b'>1</string><string name='q'>x</string>"
+                        "<public type='string' name='q' id='0x7f010000'/></resources>",
+        "values/b.xml": "<resources><public type='string' name='q' id='0x7f010001'/>"
+                        "<string name='b'>2</string></resources>"},
+    "public-given-two-in-file-after-conflict": {
+        "values/a.xml": "<resources><string name='z'>1</string></resources>",
+        "values/b.xml": "<resources><string name='z'>2</string></resources>",
+        "values/c.xml": "<resources><string name='q'>x</string>"
+                        "<public type='string' name='q' id='0x7f010000'/>"
+                        "<public type='string' name='q' id='0x7f010001'/></resources>"},
+    "public-given-two-in-file-after-no-value": {
+        "values/a.xml": "<resources><public type='string' name='nope'/></resources>",
+        "values/b.xml": "<resources><string name='q'>x</string>"
+                        "<public type='string' name='q' id='0x7f010000'/>"
+                        "<public type='string' name='q' id='0x7f010001'/></resources>"},
+    "duplicate-after-conflict": {
+        "values/a.xml": "<resources><string name='z'>1</string></resources>",
+        "values/b.xml": "<resources><string name='z'>2</string></resources>",
+        "values/c.xml": "<resources><string name='q'>1</string><string name='q'>2</string>"
+                        "</resources>"},
     # aapt2 fails a check of its own on an entry id of 0xffff, which no case has.
 
     # Attributes.

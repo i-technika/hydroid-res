@@ -934,7 +934,8 @@ class Parser {
       }
       id = static_cast<ResId>(v->intValue());
     }
-    out_.symbols.push_back({*t, res.name, /*isPublic=*/true, id, res.source});
+    out_.symbols.push_back(
+        {*t, res.name, /*isPublic=*/true, id, res.source, out_.resources.size()});
     // A public id is also its definition, which aapt2 keeps in the configuration of the folder,
     // as it does a value of any resource there, and only warns of the <public> (#82). It has the
     // product of the <public> (#136).
@@ -954,7 +955,8 @@ class Parser {
       return false;
     }
     // It marks the resource private, which no table or dump shows, but it must exist.
-    out_.symbols.push_back({*t, res.name, /*isPublic=*/false, std::nullopt, res.source});
+    out_.symbols.push_back(
+        {*t, res.name, /*isPublic=*/false, std::nullopt, res.source, out_.resources.size()});
     return false;
   }
 

@@ -36,7 +36,9 @@
 //     although it holds nothing at runtime. Entry ids go to the entries of a type in the order of
 //     their names, as bytes, from 0. An id a <public id=""> gives is kept, and left out of those
 //     the others take, which are then the lowest left. It must be of the package, of the one type
-//     id of its type, and of no other entry; one entry can have only one.
+//     id of its type, and of no other entry. A file can give an entry one id, and files that make
+//     it public the same one, but once a file has made it public without one, a later file's id
+//     is left out, as aapt2 link merges them.
 //   - <attr> and <declare-styleable> always go in the default configuration, as do the ids that
 //     @+id/ makes, in values or in the attributes of an XML file, and those of the names of
 //     <enum> and <flag>. The id a <public type="id"> defines goes in the configuration of its
