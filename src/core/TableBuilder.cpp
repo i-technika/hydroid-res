@@ -183,7 +183,9 @@ class Linker {
                                const char* what = "resource") {
     const std::string written =
         (own(name.package) ? "" : name.package + ":") + name.typeName() + "/" + name.entry;
-    // No package has a resource of a type no ResType stands for (#142).
+    // No package hydroid loads has a resource of a type no ResType stands for (#142), though
+    // android.jar has ^attr-private, which a reference to android finds once it can be loaded
+    // (#98).
     const bool kept = name.otherType.empty();
     if (own(name.package)) {
       const auto it = ids_.find({name.type, name.entry});
@@ -194,6 +196,11 @@ class Linker {
       return std::nullopt;
     } else if (kept) {
       if (std::optional<ResId> id = deps_.find(name.package, name.type, name.entry)) return id;
+    }
+    // aapt2 looks for a macro to put its contents in place of the reference, and says so.
+    if (name.otherType == "macro") {
+      diag_.error(source, "failed to find definition for " + written);
+      return std::nullopt;
     }
     diag_.error(source, std::string(what) + " " + written + " not found");
     return std::nullopt;

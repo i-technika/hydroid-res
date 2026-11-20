@@ -22,7 +22,7 @@ void parseValues(std::string_view xml, const std::filesystem::path& file, const 
 
 // A reference as aapt2's ResourceUtils reads one: @[+][*][package:]type/entry, or
 // ?[package:][attr/]entry, with whitespace around. The package is as written, not resolved. The
-// type may be one no ResType stands for (ResName::otherType), which nothing loaded has.
+// type may be one no ResType stands for (ResName::otherType), which no package hydroid loads has.
 struct ParsedReference {
   ResName name;
   bool attr = false;    // ?

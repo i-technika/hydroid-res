@@ -156,7 +156,8 @@ CASES = {
     "xml-link-found-public-id": layout('x="@id/p"', "<public type='id' name='p'/>"),
     "xml-link-not-references": layout('x="@string/" y="@+string/s" z="@foo/bar" w="?attr/" v="?" '
                                       'u="@" t="@+id/" s="string/missing"'),
-    # The types of a reference no resource can have (#142), which overlayable is not one of.
+    # The types of a reference no resource of the case has (#142), which overlayable is not one
+    # of.
     "xml-link-config-varying": layout('x="@configVarying/c"'),
     "xml-link-attr-private": layout('x="@^attr-private/c"'),
     "xml-link-macro": layout('x="@macro/m"'),
@@ -370,7 +371,7 @@ CASES = {
                         "<string name='s' xmlns:p='urn:x'>@p:string/t</string></resources>"},
     "ref-unknown-type": values("<color name='c'>@colour/c</color>"),
     "ref-no-entry": values("<string name='c'>@string/</string>"),
-    # Types aapt2 reads in a reference though no resource of them can be loaded, so that nothing
+    # Types aapt2 reads in a reference though no resource of the case is of them, so that nothing
     # so named is found, as overlayable, which it does not read in one, is text (#142).
     "ref-config-varying": values("<string name='s'>@configVarying/c</string>"),
     "ref-attr-private": values("<string name='s'>@^attr-private/c</string>"),

@@ -851,7 +851,9 @@ TEST(ResourceTable, IdOfAPackageInAValuesFile) {
 
 // A reference of a type aapt2 has and no ResType stands for, as macro, names nothing, though an
 // anim, the ResType a ResName holds by default, has the name, in the package itself or in another
-// (#142). The golden cases load no other package, and have no anim of the name.
+// (#142), in a value, a style item and an attribute of an XML file. aapt2 says so of a macro in
+// its own words. The golden cases load no other package, have no anim of the name and do not
+// compare errors.
 TEST(ResourceTable, ReferenceOfATypeWithNoResTypeIsNotFound) {
   TempDir dir;
   ResourceTable table;
@@ -861,24 +863,24 @@ TEST(ResourceTable, ReferenceOfATypeWithNoResTypeIsNotFound) {
   for (const std::string ref :
        {"@macro/a", "@configVarying/a", "@^attr-private/a", "@com.lib:macro/a",
         "@*com.lib:configVarying/a", "@com.lib:^attr-private/a"}) {
-    errors.clear();
-    EXPECT_FALSE(
-        load(table, dir,
-             {{"anim/a.xml", "<set/>"},
-              {"values/v.xml", "<resources><string name='s'>" + ref + "</string></resources>"},
-              {"layout/l.xml", "<a/>"}},  // the one of the last round
-             "com.example", 0x7f, &errors))
-        << ref;
-    ASSERT_EQ(errors.size(), 1u) << ref << errorsOf(errors);
-    EXPECT_EQ(errors[0].message, "resource " + ref.substr(ref[1] == '*' ? 2 : 1) + " not found");
-
-    // In an attribute of an XML file too.
-    errors.clear();
-    EXPECT_FALSE(load(table, dir,
-                      {{"values/v.xml", "<resources/>"}, {"layout/l.xml", "<a x='" + ref + "'/>"}},
-                      "com.example", 0x7f, &errors))
-        << ref;
-    ASSERT_EQ(errors.size(), 1u) << ref << errorsOf(errors);
+    const std::string name = ref.substr(ref[1] == '*' ? 2 : 1);
+    const std::string expected = name.find("macro/") != std::string::npos
+                                     ? "failed to find definition for " + name
+                                     : "resource " + name + " not found";
+    const std::string values = "<resources><attr name='t' format='string'/>";
+    for (const auto& [v, layout] : std::vector<std::pair<std::string, std::string>>{
+             {values + "<string name='s'>" + ref + "</string></resources>", "<a/>"},
+             {values + "<style name='S'><item name='t'>" + ref + "</item></style></resources>",
+              "<a/>"},
+             {values + "</resources>", "<a x='" + ref + "'/>"}}) {
+      errors.clear();
+      EXPECT_FALSE(load(table, dir,
+                        {{"anim/a.xml", "<set/>"}, {"values/v.xml", v}, {"layout/l.xml", layout}},
+                        "com.example", 0x7f, &errors))
+          << v << layout;
+      ASSERT_EQ(errors.size(), 1u) << v << layout << errorsOf(errors);
+      EXPECT_EQ(errors[0].message, expected) << v << layout;
+    }
   }
   EXPECT_FALSE(table.find("com.lib:macro/a"));
   EXPECT_FALSE(table.find("@configVarying/a", "com.lib"));
