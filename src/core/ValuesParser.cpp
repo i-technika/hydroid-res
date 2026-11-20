@@ -310,10 +310,10 @@ class Parser {
         res.product = std::string(*product);
       }
       children_.clear();
-      if (!parseResource(node, res) || !add(std::move(res))) continue;
-      for (size_t c = 0; c < children_.size(); c++) {
-        if (!add(std::move(children_[c].resource))) c += children_[c].children;
-      }
+      if (!parseResource(node, res)) continue;
+      res.children = children_.size();
+      add(std::move(res));
+      for (ParsedResource& child : children_) add(std::move(child));
     }
   }
 
@@ -323,15 +323,11 @@ class Parser {
     diag_.error(at(node), std::move(message));
   }
 
-  // AddResourcesToTable's check of the name. False if it fails.
-  bool add(ParsedResource res) {
-    if (!isValidEntryName(res.name)) {
-      diag_.error(res.source, "resource '" + std::string(toString(res.type)) + "/" + res.name +
-                                  "' has invalid entry name '" + res.name + "'");
-      return false;
-    }
+  // A resource read, whose name the table builder checks when it adds it, as AddResourcesToTable
+  // does, after the resources before it (#159).
+  void add(ParsedResource res) {
+    res.checkName = true;
     out_.resources.push_back(std::move(res));
-    return true;
   }
 
   // An id that @+[package:]id/ makes, its name checked as any resource's. aapt2's ParseXml adds it
@@ -913,8 +909,8 @@ class Parser {
       // defined in that package, as ParseDeclareStyleable names it, which the table builder sees
       // is the one being loaded (#109). It comes before the ids of its <enum>s and <flag>s.
       if (std::get<ParsedAttr>(attr.value).formats != kFormatAny) {
-        children_.insert(children_.begin() + static_cast<ptrdiff_t>(ids),
-                         {std::move(attr), children_.size() - ids});
+        attr.children = children_.size() - ids;
+        children_.insert(children_.begin() + static_cast<ptrdiff_t>(ids), std::move(attr));
       }
       styleable.attrs.push_back(std::move(ref));
       return true;
@@ -980,13 +976,8 @@ class Parser {
   // aapt2's child_resources of the element being read, in the order AddResourcesToTable adds them
   // after the element's resource: the <attr>s of a <declare-styleable>, each followed by its own
   // children, and the ids of <enum>s and <flag>s. A resource's children go in only if it is read
-  // and its name is valid (#156), though aapt2 leaves them out too when it is a duplicate, which
-  // only compile sees (#159).
-  struct Child {
-    ParsedResource resource;
-    size_t children = 0;  // how many of those that follow are its own
-  };
-  std::vector<Child> children_;
+  // (#156), and the table builder adds them only if it adds it (#159).
+  std::vector<ParsedResource> children_;
 };
 
 }  // namespace
