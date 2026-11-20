@@ -1,5 +1,6 @@
 #include "core/ValuesParser.h"
 
+#include <cstddef>
 #include <memory>
 #include <utility>
 #include <vector>
@@ -308,7 +309,9 @@ class Parser {
       if (std::optional<std::string_view> product = nonEmptyAttribute(node, "product")) {
         res.product = std::string(*product);
       }
-      if (parseResource(node, res)) add(std::move(res));
+      children_.clear();
+      if (!parseResource(node, res) || !add(std::move(res))) continue;
+      for (ParsedResource& child : children_) add(std::move(child));
     }
   }
 
@@ -318,17 +321,20 @@ class Parser {
     diag_.error(at(node), std::move(message));
   }
 
-  // AddResourcesToTable's check of the name.
-  void add(ParsedResource res) {
+  // AddResourcesToTable's check of the name. False if it fails.
+  bool add(ParsedResource res) {
     if (!isValidEntryName(res.name)) {
       diag_.error(res.source, "resource '" + std::string(toString(res.type)) + "/" + res.name +
                                   "' has invalid entry name '" + res.name + "'");
-      return;
+      return false;
     }
     out_.resources.push_back(std::move(res));
+    return true;
   }
 
-  // An id that @+[package:]id/ or an <enum> or <flag> makes, its name checked as any resource's.
+  // An id that @+[package:]id/ makes, its name checked as any resource's. aapt2's ParseXml adds it
+  // to the table as soon as it reads it, before the resource it is in, and whether that one is
+  // read or not.
   void addId(const std::string& name, const Source& source, const std::string& package = "") {
     ParsedResource id = makeIdResource(name, source);
     id.package = package;
@@ -871,7 +877,7 @@ class Parser {
           ok = false;
           continue;
         }
-        addId(s.name, s.source);
+        children_.push_back(makeIdResource(s.name, s.source));
         attr.symbols.insert(pos, std::move(s));
       } else if (!(plain && (name == "skip" || name == "eat-comment"))) {
         error(child, "unknown tag <" + std::string(name) + "> in <attr>");
@@ -899,11 +905,14 @@ class Parser {
       attr.name = ref.entry;
       attr.package = ref.package;
       attr.source = at(child);
+      const size_t ids = children_.size();
       if (!parseAttr(child, attr, /*weak=*/true)) return false;
       // An <attr> with no format only refers to one defined elsewhere. One with a package is
       // defined in that package, as ParseDeclareStyleable names it, which the table builder sees
-      // is the one being loaded (#109).
-      if (std::get<ParsedAttr>(attr.value).formats != kFormatAny) add(std::move(attr));
+      // is the one being loaded (#109). It comes before the ids of its <enum>s and <flag>s.
+      if (std::get<ParsedAttr>(attr.value).formats != kFormatAny) {
+        children_.insert(children_.begin() + static_cast<ptrdiff_t>(ids), std::move(attr));
+      }
       styleable.attrs.push_back(std::move(ref));
       return true;
     });
@@ -965,6 +974,10 @@ class Parser {
   const Config& config_;
   ParsedFolder& out_;
   Diagnostics& diag_;
+  // aapt2's child_resources of the element being read: the <attr>s of a <declare-styleable> and the
+  // ids of <enum>s and <flag>s, each <attr> before its ids. AddResourcesToTable adds them after
+  // the element's resource, and none of them if it is not read or its name is not valid (#156).
+  std::vector<ParsedResource> children_;
 };
 
 }  // namespace

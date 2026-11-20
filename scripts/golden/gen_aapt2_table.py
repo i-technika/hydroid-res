@@ -619,6 +619,25 @@ CASES = {
     "public-id-given-two-before-parser-error": values(
         "<public type='id' name='i' id='0x7f010000'/><public type='id' name='i' id='0x7f010001'/>"
         "<item type='id' name='j'>x</item>"),
+    # The <attr>s of a <declare-styleable> and the ids of <enum>s and <flag>s go into the table
+    # after the resource they are in, and not at all if it fails or is a duplicate (#156).
+    "styleable-attrs-twice-in-failed": values(
+        "<declare-styleable name='s'><attr name='a' format='string'/>"
+        "<attr name='a' format='integer'/><attr name='b' format='colour'/></declare-styleable>"),
+    "styleable-attr-in-failed-after-other": values(
+        "<declare-styleable name='s'><attr name='a' format='string'/></declare-styleable>"
+        "<declare-styleable name='t'><attr name='a' format='integer'/>"
+        "<attr name='b' format='colour'/></declare-styleable>"),
+    "styleable-attr-in-failed-after-attr": values(
+        "<attr name='a' format='integer'/><declare-styleable name='s'>"
+        "<attr name='a' format='string'/><attr name='b' format='colour'/></declare-styleable>"),
+    "styleable-duplicate-attr-bad-name": values(
+        "<declare-styleable name='s'><attr name='a' format='string'/></declare-styleable>"
+        "<declare-styleable name='s'><attr name='1b' format='string'/></declare-styleable>"),
+    "attr-duplicate-enum-bad-name": values(
+        "<attr name='e' format='string'/><attr name='e'><enum name='1x' value='1'/></attr>"),
+    "attr-failed-enum-bad-name": values(
+        "<attr name='a'><enum name='1x' value='1'/><enum name='y' value='z'/></attr>"),
     # aapt2 fails a check of its own on an entry id of 0xffff, which no case has.
 
     # Attributes.
