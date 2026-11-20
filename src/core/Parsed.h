@@ -111,7 +111,8 @@ struct ParsedAttr {
     Source source;
   };
   uint32_t formats = kFormatAny;
-  // An <attr> of a <declare-styleable>, which yields to one given anywhere else.
+  // An <attr> of a <declare-styleable>, which yields to another of its file, as aapt2 compile
+  // has it, but not to one of another file, which aapt2 link merges (#81).
   bool weak = false;
   int32_t min = std::numeric_limits<int32_t>::min();
   int32_t max = std::numeric_limits<int32_t>::max();
@@ -162,7 +163,8 @@ struct ParsedXmlAttribute {
   ParsedItem value;
 };
 
-// What a res/ folder holds, in the order read.
+// What a res/ folder holds, in the order read: the resources of a file together, which the table
+// builder merges as aapt2 compile does the file before link merges the files (#88).
 struct ParsedFolder {
   std::vector<ParsedResource> resources;
   std::vector<SymbolDecl> symbols;

@@ -1,6 +1,7 @@
 #include "core/TableBuilder.h"
 
 #include <algorithm>
+#include <filesystem>
 #include <map>
 #include <unordered_map>
 #include <utility>
@@ -32,10 +33,15 @@ std::string nameOf(ResType type, const std::string& entry) {
   return std::string(toString(type)) + "/" + entry;
 }
 
-// Ids and the <attr>s of <declare-styleable>s, which yield to any other value.
-bool isWeak(const ParsedValue& v) {
+// Where two values of one configuration and product meet: in one file, which aapt2 compile turns
+// into a table of its own, or in two, whose tables aapt2 link merges.
+enum class Stage : uint8_t { Compile, Link };
+
+// Ids and, in the file that defines them, the <attr>s of <declare-styleable>s, which yield to any
+// other value. aapt2 link sees no <attr> as weak (#81): of two that agree, it keeps the first.
+bool isWeak(const ParsedValue& v, Stage stage) {
   if (const auto* item = std::get_if<ParsedItem>(&v)) return item->kind == ParsedItem::Kind::Id;
-  if (const auto* attr = std::get_if<ParsedAttr>(&v)) return attr->weak;
+  if (const auto* attr = std::get_if<ParsedAttr>(&v)) return attr->weak && stage == Stage::Compile;
   return false;
 }
 
@@ -48,20 +54,40 @@ bool compatible(const ParsedAttr& a, const ParsedAttr& b) {
 enum class Collision : uint8_t { KeepOriginal, TakeNew, Conflict };
 
 // ResourceTable::ResolveValueCollision, for two values of one configuration and product.
-Collision resolveCollision(const ParsedValue& existing, const ParsedValue& incoming) {
+Collision resolveCollision(const ParsedValue& existing, const ParsedValue& incoming, Stage stage) {
   const auto* existingAttr = std::get_if<ParsedAttr>(&existing);
   const auto* incomingAttr = std::get_if<ParsedAttr>(&incoming);
+  const bool existingWeak = isWeak(existing, stage);
+  const bool incomingWeak = isWeak(incoming, stage);
   if (!incomingAttr) {
-    if (isWeak(incoming)) return Collision::KeepOriginal;
-    return isWeak(existing) ? Collision::TakeNew : Collision::Conflict;
+    if (incomingWeak) return Collision::KeepOriginal;
+    return existingWeak ? Collision::TakeNew : Collision::Conflict;
   }
-  if (!existingAttr) return isWeak(existing) ? Collision::TakeNew : Collision::Conflict;
+  if (!existingAttr) return existingWeak ? Collision::TakeNew : Collision::Conflict;
   if (compatible(*existingAttr, *incomingAttr)) {
-    return existingAttr->weak ? Collision::TakeNew : Collision::KeepOriginal;
+    return existingWeak ? Collision::TakeNew : Collision::KeepOriginal;
   }
-  if (existingAttr->weak && existingAttr->formats == kFormatAny) return Collision::TakeNew;
-  if (incomingAttr->weak && incomingAttr->formats == kFormatAny) return Collision::KeepOriginal;
+  if (existingWeak && existingAttr->formats == kFormatAny) return Collision::TakeNew;
+  if (incomingWeak && incomingAttr->formats == kFormatAny) return Collision::KeepOriginal;
   return Collision::Conflict;
+}
+
+// Puts `incoming` among the `values` of one entry, as `stage` resolves its collision with the value
+// of its configuration and product. False on a conflict, `incoming` left as it was.
+bool merge(std::vector<PendingValue>& values, PendingValue& incoming, Stage stage) {
+  const auto same = std::find_if(values.begin(), values.end(), [&](const PendingValue& v) {
+    return v.config == incoming.config && v.product == incoming.product;
+  });
+  if (same == values.end()) {
+    values.push_back(std::move(incoming));
+    return true;
+  }
+  switch (resolveCollision(same->value, incoming.value, stage)) {
+    case Collision::KeepOriginal: return true;
+    case Collision::TakeNew: *same = std::move(incoming); return true;
+    case Collision::Conflict: return false;
+  }
+  return false;
 }
 
 // The kinds of value a Value is, as attribute formats (AndroidTypeToAttributeTypeMask of the
@@ -482,33 +508,47 @@ std::optional<Package> buildPackage(ParsedFolder folder, const std::string& name
   std::map<Key, PendingEntry> entries;
   // The ids XML files make in other packages, by package and name, each where first made.
   std::map<std::pair<std::string, std::string>, Source> externalIds;
-  for (ParsedResource& r : folder.resources) {
-    // aapt2 link merges only what is defined in the package being linked: an <attr> a
-    // <declare-styleable> defines in another package is left out, and the styleable then finds
-    // that package's attr, or fails to (#109). So is an id @+pkg:id/ makes in a values file, and
-    // a reference to it then fails (#131). One an XML file makes fails link, but in android,
-    // which it only warns of (#83).
-    if (!r.package.empty() && r.package != name) {
-      if (r.inXmlFile && r.package != "android") {
+  // aapt2 compiles each file into a table of its own, where a weak value yields to another of the
+  // file, then link merges the tables in the order of the files, where an <attr> is not weak
+  // (#88). The resources of a file are together, in the order the files are read (#80).
+  std::vector<ParsedResource>& resources = folder.resources;
+  for (size_t begin = 0, end = 0; begin < resources.size(); begin = end) {
+    const std::filesystem::path& file = resources[begin].source.file;
+    for (end = begin + 1; end < resources.size() && resources[end].source.file == file;) end++;
+
+    // The file's table: of each package as written ("" before any other), type and name, one value
+    // for each configuration and product.
+    std::map<std::pair<std::string, Key>, std::vector<PendingValue>> compiled;
+    for (size_t i = begin; i < end; i++) {
+      ParsedResource& r = resources[i];
+      // An id an XML file makes in another package fails link, but in android, which it only
+      // warns of (#83).
+      if (r.inXmlFile && !r.package.empty() && r.package != name && r.package != "android") {
         externalIds.emplace(std::pair(r.package, r.name), r.source);
       }
-      continue;
+      PendingValue value{r.config, r.product, std::move(r.value), r.source};
+      if (!merge(compiled[{r.package, {r.type, r.name}}], value, Stage::Compile)) {
+        diag.error(r.source, "duplicate value for resource '" +
+                                 (r.package.empty() ? "" : r.package + ":") +
+                                 nameOf(r.type, r.name) + "' with config '" + toString(r.config) +
+                                 "'");
+      }
     }
-    PendingEntry& entry = entries[{r.type, r.name}];
-    auto same = std::find_if(entry.values.begin(), entry.values.end(), [&](const PendingValue& v) {
-      return v.config == r.config && v.product == r.product;
-    });
-    if (same == entry.values.end()) {
-      entry.values.push_back({r.config, r.product, std::move(r.value), r.source});
-      continue;
-    }
-    switch (resolveCollision(same->value, r.value)) {
-      case Collision::KeepOriginal: break;
-      case Collision::TakeNew: *same = {r.config, r.product, std::move(r.value), r.source}; break;
-      case Collision::Conflict:
-        diag.error(r.source, "duplicate value for resource '" + nameOf(r.type, r.name) +
-                                 "' with config '" + toString(r.config) + "'");
-        break;
+    for (auto& [qualified, values] : compiled) {
+      const auto& [package, key] = qualified;
+      // aapt2 link merges only what is defined in the package being linked, written or not, after
+      // compile has resolved what the file defines in each (#109): an <attr> a
+      // <declare-styleable> defines in another package is left out, and the styleable then finds
+      // that package's attr, or fails to. So is an id @+pkg:id/ makes, and a reference to it
+      // then fails (#131).
+      if (!package.empty() && package != name) continue;
+      for (PendingValue& value : values) {
+        if (!merge(entries[key].values, value, Stage::Link)) {
+          diag.error(value.source, "resource '" + nameOf(key.first, key.second) +
+                                       "' has a conflicting value for configuration (" +
+                                       toString(value.config) + ")");
+        }
+      }
     }
   }
   // One error for each such id, after merging and in the order of package and name, as aapt2's
