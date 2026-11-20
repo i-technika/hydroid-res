@@ -193,6 +193,10 @@ struct ParsedFolder {
   std::vector<ParsedResource> resources;
   std::vector<SymbolDecl> symbols;
   std::vector<ParsedXmlAttribute> xmlAttributes;
+  // An error of each file that compiles to the .flat name of a file before it, as values/a.xml to
+  // that of values-/a.xml (#122). aapt2 compiles both, and link, which only runs if compile gave
+  // no error, fails on the archive that holds the name twice before anything else (#158).
+  std::vector<Diagnostic> sameFlatName;
 };
 
 inline void Diagnostics::error(const Source& where, std::string message) {

@@ -252,15 +252,16 @@ void scanResFolder(const fs::path& res, ParsedFolder& out, Diagnostics& diag) {
     // The name aapt2 compile gives the file: the folder's name, less a '-' nothing follows, '_'
     // and the file's name, with .arsc for the .xml of a values file, then .flat. aapt2 link
     // fails on two files of one name, "Duplicate entries in archive", as values-/a.xml and
-    // values/a.xml (#122).
+    // values/a.xml (#122), but compile reads and compiles both, so the second is read too, and
+    // its errors are compile's (#158).
     const size_t dash = dirName.find('-');
     std::string flat =
         dash != std::string::npos && dash + 1 == dirName.size() ? dirName.substr(0, dash) : dirName;
     flat += "_" + (values ? name + ".arsc" : fileName) + ".flat";
     if (const auto [it, added] = flats.emplace(flat, path); !added) {
-      diag.error({file, 0}, "Duplicate entries in archive: compiles to " + flat + ", as " +
-                                it->second + " does");
-      continue;
+      out.sameFlatName.push_back(
+          {file, 0,
+           "Duplicate entries in archive: compiles to " + flat + ", as " + it->second + " does"});
     }
     std::string text;
     if (const char* why = read(file, &text)) {
