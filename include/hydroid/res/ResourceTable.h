@@ -40,7 +40,9 @@
 //     folder. Of the values with a product="", the one with none or "default" stays.
 //   - A style without parent="" is the child of its name up to its last '.', which must exist.
 //     Its items are read against the format of their attribute, as Android does.
-//   - Every reference must name a resource of the table.
+//   - Every reference must name a resource of the table. One of another package must be <public>
+//     there, but for a private reference: @*, * before a style parent or an attribute's name, or
+//     a prefix or attribute of an http://schemas.android.com/apk/prv/res/ namespace.
 //   - The attributes of XML files are linked as aapt2 links them, but those of tools:, which it
 //     leaves alone: one of a package's namespace (android:text, or app:x of res-auto) must name
 //     an <attr> of the table, and its value be one that <attr> takes; any reference in one must
@@ -213,7 +215,8 @@ HYDROID_RES_API std::ostream& operator<<(std::ostream& os, const Diagnostic& d);
 class ResourceTable {
  public:
   // Loads the res/ folder at `res` as the package `name` with the id `id`, after those already
-  // here, which its references may name by their package name, as aapt2 link takes them with -I.
+  // here, which its references may name by their package name, as aapt2 link takes them with -I:
+  // what such a package makes <public>, and anything else only by a private reference.
   // On failure the table is left as it was, and the problems are added to `errors` if it is not
   // null. Pointers into the table do not survive a call that adds a package. A name in the folder
   // that is not Unicode text (on Windows) is read as aapt2 reads it: a folder of res/ so named has

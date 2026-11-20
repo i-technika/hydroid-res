@@ -946,6 +946,12 @@ TEST(ResourceTable, AnotherPackagesPrivateResourceNeedsAPrivateReference) {
       {"<style name='S' parent='@com.other:style/PS'/>", "", ""},
       {"<style name='S'><item name='*com.other:qa'>x</item></style>", "", ""},
       {"<style name='S'><item name='q:qa'>x</item><item name='o:pa'>x</item></style>", "", ""},
+      // A public prefix leaves @* and * private.
+      {"<string name='s'>@*o:string/priv</string>", "", ""},
+      {"<style name='S' parent='@*o:style/QS'/>", "", ""},
+      {"<style name='S'><item name='*o:qa'>x</item></style>", "", ""},
+      {"<declare-styleable name='D'><attr name='*o:qa'/></declare-styleable>", "", ""},
+      {"", "x='@*o:string/priv'", ""},
       {"<declare-styleable name='D'><attr name='*com.other:qa'/></declare-styleable>", "", ""},
       {"", "x='@*com.other:string/priv' y='@q:string/priv' z='?q:attr/qa' w='@o:string/pub'", ""},
       {"", "q:qa='1' o:pa='1'", ""},
