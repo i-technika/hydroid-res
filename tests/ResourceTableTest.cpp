@@ -1265,11 +1265,12 @@ TEST(ResourceTable, XmlFileLinksIntoAndroidOnceLoaded) {
   const std::vector<std::pair<std::string, std::string>> rejected = {
       {intoAndroid[0], "resource android:id/gen not found"},
       {intoAndroid[1], "attribute android:nosuch not found"},
+      // With no package, as aapt2 names it, where "not found" gives one (#167).
       {intoAndroid[2],
-       "'foo' is incompatible with attribute android:layout_width (attr) dimension|enum "
+       "'foo' is incompatible with attribute layout_width (attr) dimension|enum "
        "[match_parent=4294967295]"},
       {intoAndroid[3],
-       "'foo' is incompatible with attribute android:layout_width (attr) dimension|enum "
+       "'foo' is incompatible with attribute layout_width (attr) dimension|enum "
        "[match_parent=4294967295]"},
       {intoAndroid[4], "resource android:string/nosuch not found"},
       {intoAndroid[5], "resource android:attr/nosuch not found"},
@@ -1383,6 +1384,15 @@ TEST(ResourceTable, EachItemReadsTheAttrItNames) {
                   {"layout/l.xml", layout + "app:n='z'><b app:n='z'/></a>"}},
                  "com.another", 0x7c),
       (std::vector<std::string>{incompatible, incompatible}))
+      << errorsOf(errors);
+  // An <attr> of another app's package is named with no package too, where "not found" gives it
+  // (#167).
+  EXPECT_EQ(messagesOf({{"layout/l.xml", layout + "lib:mode='off'><b lib:nosuch='1'/></a>"}},
+                       "com.more", 0x7a),
+            (std::vector<std::string>{
+                "'off' is incompatible with attribute mode (attr) enum [on=5]",
+                "attribute com.lib:nosuch not found",
+            }))
       << errorsOf(errors);
 }
 
