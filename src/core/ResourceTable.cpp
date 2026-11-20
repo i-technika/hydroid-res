@@ -76,9 +76,8 @@ bool ResourceTable::addPackage(const std::filesystem::path& res, std::string_vie
     return false;
   }
   for (const TypeTable& type : loaded->types) {
-    for (size_t e = 0; e < type.entries.size(); e++) {
-      byName_[key(loaded->name, type.type, type.entries[e].name)] =
-          makeResId(id, type.id, static_cast<uint16_t>(e));
+    for (const Entry& e : type.entries) {
+      byName_[key(loaded->name, type.type, e.name)] = makeResId(id, type.id, e.id);
     }
   }
   packages_.push_back(std::move(*loaded));
@@ -125,7 +124,7 @@ std::optional<std::string> ResourceTable::nameOf(ResId id) const {
   const Package* p = package(packageId(id));
   const Entry* e = p ? p->entry(id) : nullptr;
   if (!e) return std::nullopt;
-  return key(p->name, p->types[typeId(id) - 1].type, e->name);
+  return key(p->name, p->typeWithId(typeId(id))->type, e->name);
 }
 
 }  // namespace hydroid::res

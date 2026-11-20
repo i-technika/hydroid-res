@@ -147,6 +147,7 @@ struct SymbolDecl {
   ResType type = ResType::Anim;
   std::string name;
   bool isPublic = false;
+  std::optional<ResId> id;  // <public id="">
   Source source;
 };
 
