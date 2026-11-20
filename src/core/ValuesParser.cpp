@@ -916,8 +916,9 @@ class Parser {
       return false;
     }
     out_.symbols.push_back({*t, res.name, /*isPublic=*/true, res.source});
-    // A public id is also its definition.
-    if (*t == ResType::Id) addId(res.name, res.source);
+    // A public id is also its definition, which aapt2 keeps in the configuration of the folder,
+    // as it does a value of any resource there, and only warns of the <public> (#82).
+    if (*t == ResType::Id) add(makeIdResource(res.name, res.source, config_));
     return false;  // nothing more to add
   }
 
@@ -956,10 +957,11 @@ bool isValidEntryName(std::string_view name) {
   return true;
 }
 
-ParsedResource makeIdResource(std::string name, const Source& source) {
+ParsedResource makeIdResource(std::string name, const Source& source, const Config& config) {
   ParsedResource id;
   id.type = ResType::Id;
   id.name = std::move(name);
+  id.config = config;
   ParsedItem item;
   item.kind = ParsedItem::Kind::Id;
   item.source = source;
