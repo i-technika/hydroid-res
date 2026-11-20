@@ -5,7 +5,10 @@
 #include <gtest/gtest.h>
 #include <nlohmann/json.hpp>
 
+#include <algorithm>
 #include <fstream>
+#include <map>
+#include <set>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -87,12 +90,187 @@ TEST(Aapt2Table, GoldenAppDumpsLikeAapt2) {
                        HYDROID_AAPT2_APP_TABLE);
 }
 
-// Small res/ folders, many of which aapt2 rejects: hydroid must reject the same, and dump the
-// others the same.
+// aapt2's error as hydroid's errors put it, with the file it names in `path` ("" if none).
+// hydroid's errors leave out the name of `package` where they name a resource of it: "resource
+// string/a (aka com.probe:string/a) not found" and "no default product defined for resource
+// com.probe:string/a" lose "(aka ...)" and "com.probe:". They leave the file to Diagnostic::file:
+// "invalid file path 'res/foo\x.png'" loses " 'res/foo\x.png'", and `path` is "res/foo/x.png".
+std::string likeHydroid(std::string error, const std::string& package, std::string* path) {
+  path->clear();
+  if (const size_t at = error.find(" 'res/"); at != std::string::npos) {
+    const size_t end = error.find('\'', at + 2);
+    if (end != std::string::npos) {
+      *path = error.substr(at + 2, end - at - 2);
+      std::replace(path->begin(), path->end(), '\\', '/');
+      error.erase(at, end + 1 - at);
+    }
+  }
+  for (size_t at; (at = error.find(" (aka ")) != std::string::npos;) {
+    const size_t end = error.find(')', at);
+    if (end == std::string::npos) break;
+    error.erase(at, end + 1 - at);
+  }
+  const std::string prefix = package + ":";
+  for (size_t at = 0; (at = error.find(prefix, at)) != std::string::npos;) {
+    // Not in "attr/com.probe:", the name of an entry.
+    if (at == 0 || error[at - 1] == ' ' || error[at - 1] == '\'') {
+      error.erase(at, prefix.size());
+    } else {
+      at += prefix.size();
+    }
+  }
+  return error;
+}
+
+// The first error of each, aapt2's as likeHydroid() puts it.
+struct OtherWords {
+  std::string aapt2;
+  std::string hydroid;
+};
+
+// The cases aapt2 rejects whose first error hydroid gives for the same reason in other words, and
+// the words of the two. A case leaves the list once hydroid's words take in aapt2's.
+const std::map<std::string, OtherWords, std::less<>> kOtherWords = {
+    // aapt2 finds two of the same name in the zip of what it compiled; hydroid names the files.
+    {"file-same-flat-values",
+     {"Duplicate entries in archive", "compiles to values_a.arsc.flat, as values-/a.xml does"}},
+    {"file-same-flat-raw",
+     {"Duplicate entries in archive", "compiles to raw_x.txt.flat, as raw-/x.txt does"}},
+    // aapt2 names the configuration; hydroid the folder.
+    {"folder-bad-config",
+     {"invalid configuration 'land-hdpi-port'",
+      "invalid configuration in folder name 'raw-land-hdpi-port'"}},
+    // aapt2 names the id with its type.
+    {"xml-id-invalid-name",
+     {"id 'id/1bad' has an invalid entry name", "id '1bad' has an invalid entry name"}},
+    // aapt2 names a missing attribute without its type, hydroid with it.
+    {"xml-link-attr-not-found", {"attribute foo not found", "attribute attr/foo not found"}},
+    {"xml-link-attr-not-an-attr", {"attribute foo not found", "attribute attr/foo not found"}},
+    {"xml-link-attr-android-name", {"attribute text not found", "attribute attr/text not found"}},
+    {"xml-link-attr-other-package",
+     {"attribute com.other:foo not found",
+      "attribute com.other:attr/foo not found: no package 'com.other' is loaded"}},
+    // aapt2 prints the attribute as "(attr) integer", with an enum's or flags' symbols.
+    {"xml-link-attr-own-namespace",
+     {"'x' is incompatible with attribute foo (attr) integer",
+      "'x' is incompatible with attribute foo integer"}},
+    {"xml-link-attr-own-private-namespace",
+     {"'x' is incompatible with attribute foo (attr) integer",
+      "'x' is incompatible with attribute foo integer"}},
+    {"xml-link-attr-namespace-on-child",
+     {"'x' is incompatible with attribute foo (attr) integer",
+      "'x' is incompatible with attribute foo integer"}},
+    {"xml-link-integer-text",
+     {"'x' is incompatible with attribute foo (attr) integer",
+      "'x' is incompatible with attribute foo integer"}},
+    {"xml-link-integer-empty",
+     {"'' is incompatible with attribute foo (attr) integer",
+      "'' is incompatible with attribute foo integer"}},
+    {"xml-link-integer-float-far",
+     {"'9638178525' is incompatible with attribute foo (attr) integer|float",
+      "'9638178525' is incompatible with attribute foo integer|float"}},
+    {"xml-link-dimension-float",
+     {"'1.5' is incompatible with attribute foo (attr) dimension",
+      "'1.5' is incompatible with attribute foo dimension"}},
+    {"xml-link-color-name",
+     {"'red' is incompatible with attribute foo (attr) reference|color",
+      "'red' is incompatible with attribute foo reference|color"}},
+    {"xml-link-color-not-a-reference",
+     {"'@ string/s' is incompatible with attribute foo (attr) color",
+      "'@ string/s' is incompatible with attribute foo color"}},
+    {"xml-link-reference-text",
+     {"'x' is incompatible with attribute foo (attr) reference",
+      "'x' is incompatible with attribute foo reference"}},
+    {"xml-link-enum-integer",
+     {"'2' is incompatible with attribute foo (attr) enum [x=1]",
+      "'2' is incompatible with attribute foo enum"}},
+    {"xml-link-enum-empty",
+     {"'' is incompatible with attribute foo (attr) enum [x=1]",
+      "'' is incompatible with attribute foo enum"}},
+    {"xml-link-flags-unknown",
+     {"'x|z' is incompatible with attribute foo (attr) flags [x=1]",
+      "'x|z' is incompatible with attribute foo flags"}},
+    // aapt2 prints the value as "(primitive) type=0x10 data=0x00000003"; hydroid names the
+    // attribute instead.
+    {"order-whole-path-swapped",
+     {"(primitive) type=0x10 data=0x00000003 is less than minimum integer 5",
+      "style attribute attr/n: less than the minimum 5"}},
+    {"order-whole-path-styles-swapped",
+     {"(primitive) type=0x10 data=0x00000003 is less than minimum integer 5",
+      "style attribute attr/n: less than the minimum 5"}},
+    {"order-trailing-dash",
+     {"(primitive) type=0x10 data=0x00000003 is less than minimum integer 5",
+      "style attribute attr/n: less than the minimum 5"}},
+    {"attr-weak-then-strong-files",
+     {"(primitive) type=0x10 data=0x00000003 is less than minimum integer 5",
+      "style attribute attr/n: less than the minimum 5"}},
+    {"attr-weak-then-weak-files",
+     {"(primitive) type=0x10 data=0x00000003 is less than minimum integer 5",
+      "style attribute attr/n: less than the minimum 5"}},
+    {"attr-strong-then-weak-files",
+     {"(primitive) type=0x10 data=0x00000003 is less than minimum integer 5",
+      "style attribute attr/n: less than the minimum 5"}},
+    {"styleable-define-own-before-plain",
+     {"(primitive) type=0x10 data=0x00000003 is less than minimum integer 5",
+      "style attribute attr/n: less than the minimum 5"}},
+    {"style-integer-range",
+     {"(primitive) type=0x10 data=0x00000004 is greater than maximum integer 3",
+      "style attribute attr/a: greater than the maximum 3"}},
+    {"style-integer-range-low",
+     {"(primitive) type=0x10 data=0xffffffff is less than minimum integer 0",
+      "style attribute attr/a: less than the minimum 0"}},
+    // aapt2 prints a tag as "<namespace:name>", in <attr> and <style> only ":name>"; hydroid
+    // as it is written, and where.
+    {"attr-unknown-child", {":foo>", "unknown tag <foo> in <attr>"}},
+    {"styleable-unknown-child", {"unknown tag <:foo>", "unknown tag <foo> in <declare-styleable>"}},
+    {"style-unknown-child", {":foo>", "unknown tag <foo> in <style>"}},
+    {"array-unknown-child", {"unknown tag <:foo>", "unknown tag <foo> in <array>"}},
+    {"array-xliff-child",
+     {"unknown tag <urn:oasis:names:tc:xliff:document:1.2:g>", "unknown tag <xliff:g> in <array>"}},
+    // aapt2 quotes the attribute.
+    {"style-key-missing",
+     {"style attribute 'attr/nope' not found", "style attribute attr/nope not found"}},
+    {"style-key-not-attr",
+     {"style attribute 'attr/i' not found", "style attribute attr/i not found"}},
+    {"style-key-star",
+     {"style attribute 'attr/*n' not found", "style attribute attr/*n not found"}},
+    {"style-key-empty-after-colon",
+     {"style attribute 'attr/com.probe:' not found", "style attribute attr/com.probe: not found"}},
+    {"style-key-star-only",
+     {"style attribute 'attr/*' not found", "style attribute attr/* not found"}},
+    // aapt2 prints the value's kind in parentheses, and a styled string with its spans.
+    {"style-integer-bad",
+     {"expected integer but got (raw string) x", "expected integer but got raw string x"}},
+    {"style-enum-integer",
+     {"expected enum but got (raw string) 2", "expected enum but got raw string 2"}},
+    {"style-enum-unknown",
+     {"expected enum but got (raw string) y", "expected enum but got raw string y"}},
+    {"style-flags-integer",
+     {"expected flags but got (raw string) 2", "expected flags but got raw string 2"}},
+    {"style-flags-unknown",
+     {"expected flags but got (raw string) x|y", "expected flags but got raw string x|y"}},
+    {"style-flags-empty-part",
+     {"expected flags but got (raw string) x||x", "expected flags but got raw string x||x"}},
+    {"style-color-attr",
+     {"expected color but got (raw string) red", "expected color but got raw string red"}},
+    {"style-styled-to-integer",
+     {"expected integer but got (styled string) \"1\" b:0,0",
+      "style attribute attr/a: expected integer"}},
+    // aapt2 quotes the symbol.
+    {"public-missing",
+     {"no definition for declared symbol 'string/nope'",
+      "no definition for declared symbol string/nope"}},
+    {"java-symbol-missing",
+     {"no definition for declared symbol 'string/nope'",
+      "no definition for declared symbol string/nope"}},
+};
+
+// Small res/ folders, many of which aapt2 rejects: hydroid must reject the same, for the same
+// reason, and dump the others the same.
 TEST(Aapt2Table, CasesLikeAapt2) {
   const nlohmann::json golden = nlohmann::json::parse(readFile(HYDROID_AAPT2_TABLE_CASES));
   const std::string package = golden.at("package").get<std::string>();
-  int rejected = 0;
+  std::set<std::string, std::less<>> rejected;
   ASSERT_GT(golden.at("cases").size(), 150u);
   for (const nlohmann::json& c : golden.at("cases")) {
     const std::string name = c.at("name").get<std::string>();
@@ -106,10 +284,38 @@ TEST(Aapt2Table, CasesLikeAapt2) {
     std::vector<Diagnostic> errors;
     const bool loaded = table.addPackage(dir.path() / "res", package, kAppPackageId, &errors);
     if (c.at("aapt2").is_null()) {
-      rejected++;
-      EXPECT_FALSE(loaded) << "aapt2 rejects it (" << c.value("error", "")
-                           << "), hydroid takes it:\n"
-                           << dumpOf(table);
+      rejected.insert(name);
+      std::string path;
+      const std::string aapt2 = likeHydroid(c.at("error").get<std::string>(), package, &path);
+      if (loaded) {
+        ADD_FAILURE() << "aapt2 rejects it (" << aapt2 << "), hydroid takes it:\n" << dumpOf(table);
+        continue;
+      }
+      if (errors.empty()) {
+        ADD_FAILURE() << "aapt2 rejects it (" << aapt2 << "), hydroid with no error";
+        continue;
+      }
+      // The first errors of the two, as the later ones may come of the first.
+      const std::string& first = errors.front().message;
+      if (!path.empty()) {
+        const std::string file = errors.front().file.generic_string();
+        EXPECT_TRUE(file.size() >= path.size() &&
+                    file.compare(file.size() - path.size(), path.size(), path) == 0)
+            << "aapt2 names " << path << ", hydroid " << file;
+      }
+      const auto other = kOtherWords.find(name);
+      if (other == kOtherWords.end()) {
+        EXPECT_NE(first.find(aapt2), std::string::npos)
+            << "aapt2 rejects it: " << aapt2 << "\nhydroid:" << errorsOf(errors);
+        continue;
+      }
+      EXPECT_EQ(aapt2, other->second.aapt2) << "aapt2's error is not the one kOtherWords has";
+      if (first.find(aapt2) != std::string::npos) {
+        ADD_FAILURE() << "hydroid says what aapt2 says now, " << aapt2
+                      << "; take the case out of kOtherWords";
+      } else {
+        EXPECT_EQ(first, other->second.hydroid) << "aapt2 rejects it: " << aapt2;
+      }
       continue;
     }
     if (!loaded) {
@@ -119,7 +325,10 @@ TEST(Aapt2Table, CasesLikeAapt2) {
     const std::string difference = firstDifference(c.at("aapt2").get<std::string>(), dumpOf(table));
     EXPECT_TRUE(difference.empty()) << difference;
   }
-  EXPECT_GT(rejected, 50);
+  EXPECT_GT(rejected.size(), 50u);
+  for (const auto& [name, words] : kOtherWords) {
+    EXPECT_TRUE(rejected.count(name)) << "kOtherWords has " << name << ", not a case aapt2 rejects";
+  }
 }
 
 // gen_aapt2_strings.py's element for row `i`.
