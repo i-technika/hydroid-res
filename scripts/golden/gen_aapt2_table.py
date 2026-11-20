@@ -303,9 +303,17 @@ CASES = {
     "attr-any-then-color": values("<attr name='a'/><attr name='a' format='color'/>"),
     "attr-in-config": values("<attr name='a' format='color'/>", "values-land"),
     # What aapt2 only warns of in a folder with qualifiers, and hydroid takes without a word
-    # (#130). type="id" puts its id in that folder's configuration, which is #82's.
+    # (#130).
     "public-in-config": values("<string name='s'>x</string><public type='string' name='s'/>",
                                "values-land"),
+    # The id a <public type="id"> defines is in the configuration of its folder, beside the one of
+    # the default configuration, while the ids @+id/ and <enum> make are in the default one (#82).
+    "public-id-in-config": {"values/v.xml": "<resources><id name='both'/></resources>",
+                            "values-land/v.xml": "<resources><public type='id' name='x'/>"
+                                                 "<public type='id' name='both'/></resources>"},
+    "id-plus-in-config": values("<string name='s'>@+id/made</string>"
+                                "<attr name='a'><enum name='e' value='1'/></attr>", "values-land"),
+    "xml-ids-in-config": {"layout-land/l.xml": f'<a {ANDROID} android:id="@+id/in_land"/>'},
     "java-symbol-in-config": values("<string name='s'>x</string>"
                                     "<java-symbol type='string' name='s'/>", "values-land"),
     "attr-in-two-configs": {"values/v.xml": "<resources><attr name='a' format='color'/></resources>",

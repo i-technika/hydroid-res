@@ -140,9 +140,11 @@ struct ParsedFolder {
 bool isValidEntryName(std::string_view name);
 
 // The id resource that @+id/`name`, in a values file or an attribute of an XML file, or an <enum>
-// or <flag> makes: weak, in the default configuration, its value only standing for its ResId. The
-// one place that says what such a resource is, for the values parser and the scanner (#90).
-ParsedResource makeIdResource(std::string name, const Source& source);
+// or <flag> makes, or a <public type="id"> defines: weak, its value only standing for its ResId.
+// It is in `config`: the default configuration but for that of a <public>, which is in that of
+// its folder, as any value there is (#82). The one place that says what such a resource is, for
+// the values parser and the scanner (#90).
+ParsedResource makeIdResource(std::string name, const Source& source, const Config& config = {});
 
 // Attribute::MaskString: "reference|color", "any" for kFormatAny.
 std::string formatsToString(uint32_t formats);
