@@ -960,6 +960,43 @@ TEST(ResourceTable, FilesOfOneCompiledNameFail) {
             "Duplicate entries in archive: compiles to values_a.arsc.flat, as values-/a.xml does");
 }
 
+// aapt2 compiles both files of one compiled name, and link, which fails on them, only runs if
+// compile gave no error (#158): compile's errors, of the second file too, come alone, and the one
+// of the name comes before any other of link.
+TEST(ResourceTable, FilesOfOneCompiledNameFailAtLink) {
+  const std::string s = "<resources><string name='s'>s</string></resources>";
+  const std::string duplicate =
+      "Duplicate entries in archive: compiles to values_a.arsc.flat, as values-/a.xml does";
+  using Files = std::vector<std::pair<std::string, std::string>>;
+  const std::vector<std::pair<Files, std::vector<std::string>>> cases = {
+      {{{"values-/a.xml", s},
+        {"values/a.xml", s},
+        {"values/b.xml",
+         "<resources><string name='q'>1</string><string name='q'>2</string></resources>"}},
+       {"duplicate value for resource 'string/q' with config ''"}},
+      {{{"values-/a.xml", s},
+        {"values/a.xml", "<resources><attr name='a' format='colour'/></resources>"}},
+       {"invalid attribute format 'colour'"}},
+      {{{"layout-/l.xml", "<a/>"}, {"layout/l.xml", "<a"}}, {"xml parser error"}},
+      // Not the value that the two files of one name give, nor a reference that is not found, nor
+      // a symbol of no value.
+      {{{"values-/a.xml", "<resources><string name='s'>@string/missing</string></resources>"},
+        {"values/a.xml",
+         "<resources><string name='s'>t</string><public type='string' name='nope'/></resources>"}},
+       {duplicate}},
+  };
+  for (const auto& [files, expected] : cases) {
+    TempDir dir;
+    ResourceTable table;
+    std::vector<Diagnostic> errors;
+    EXPECT_FALSE(load(table, dir, files, "com.example", 0x7f, &errors)) << files.back().second;
+    ASSERT_EQ(errors.size(), expected.size()) << files.back().second << errorsOf(errors);
+    for (size_t i = 0; i < expected.size(); i++) {
+      EXPECT_EQ(errors[i].message.substr(0, expected[i].size()), expected[i]) << errors[i];
+    }
+  }
+}
+
 // A folder of no configuration and an @+id/ of no valid name fail with aapt2's words, then what
 // hydroid adds (#149). aapt2 names the qualifiers, all that follows the first '-', and the id as
 // written, its package too. CasesLikeAapt2 sees only that hydroid's words take in aapt2's, not

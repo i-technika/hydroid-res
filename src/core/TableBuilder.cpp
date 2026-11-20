@@ -622,6 +622,10 @@ std::optional<Package> buildPackage(ParsedFolder folder, const std::string& name
     }
   }
   if (!diag.empty()) return std::nullopt;
+  // Link opens the archive compile wrote before it merges anything, and fails on one that holds a
+  // name twice with no other error (#158).
+  for (const Diagnostic& d : folder.sameFlatName) diag.error({d.file, d.line}, d.message);
+  if (!diag.empty()) return std::nullopt;
 
   // Every value of every entry, one for each configuration and product.
   std::map<Key, PendingEntry> entries;

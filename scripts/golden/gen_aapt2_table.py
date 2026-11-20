@@ -102,6 +102,20 @@ CASES = {
                               "values/a.xml": "<resources><string name='t'>t</string></resources>"},
     "file-same-flat-raw": {"raw-/x.txt": "x", "raw/x.txt": "y"},
     "file-same-flat-other-name": {"raw-/x.txt": "x", "raw/y.txt": "y"},
+    # Compile compiles both, and link, which fails on them before anything else, only runs if
+    # compile gave no error (#158).
+    "file-same-flat-compile-error": {
+        "values-/a.xml": "<resources><string name='s'>s</string></resources>",
+        "values/a.xml": "<resources><string name='t'>t</string></resources>",
+        "values/b.xml": "<resources><string name='q'>1</string><string name='q'>2</string>"
+                        "</resources>"},
+    "file-same-flat-parser-error-in-second": {
+        "values-/a.xml": "<resources><string name='s'>s</string></resources>",
+        "values/a.xml": "<resources><attr name='a' format='colour'/></resources>"},
+    "file-same-flat-link-error": {
+        "values-/a.xml": "<resources><string name='s'>@string/missing</string></resources>",
+        "values/a.xml": "<resources><string name='s'>t</string>"
+                        "<public type='string' name='nope'/></resources>"},
     "file-and-value": {"raw/s.txt": "x",
                        "values/v.xml": "<resources><item type='raw' name='s'>@raw/s</item></resources>"},
     "folder-unknown-type": {"foo/x.png": "x"},
