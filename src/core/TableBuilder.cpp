@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <filesystem>
+#include <limits>
 #include <map>
 #include <unordered_map>
 #include <utility>
@@ -125,10 +126,27 @@ struct AttrInfo {
     IntFormat format;
   };
   uint32_t formats = kFormatAny;
-  int32_t min = 0;
-  int32_t max = 0;
+  int32_t min = std::numeric_limits<int32_t>::min();
+  int32_t max = std::numeric_limits<int32_t>::max();
   std::vector<Symbol> symbols;
 };
+
+// Attribute::Print, as an error names an attribute: "(attr) enum [x=1, y=2] min=0", each symbol's
+// value as the uint32_t it is. aapt2 adds " [weak]" to a weak one, which link sees none as (#81).
+std::string printed(const AttrInfo& attr) {
+  std::string out = "(attr) " + formatsToString(attr.formats);
+  if (!attr.symbols.empty()) {
+    out += " [";
+    for (size_t i = 0; i < attr.symbols.size(); ++i) {
+      if (i) out += ", ";
+      out += attr.symbols[i].name + "=" + std::to_string(attr.symbols[i].value);
+    }
+    out += ']';
+  }
+  if (attr.min != std::numeric_limits<int32_t>::min()) out += " min=" + std::to_string(attr.min);
+  if (attr.max != std::numeric_limits<int32_t>::max()) out += " max=" + std::to_string(attr.max);
+  return out;
+}
 
 class Linker {
  public:
@@ -168,7 +186,7 @@ class Linker {
     if (attribute.attr && linksInto(attribute.attr->package)) {
       const ResName& attr = *attribute.attr;
       attrName = (own(attr.package) ? "" : attr.package + ":") + attr.entry;
-      const std::optional<ResId> id = resolve(attr, value.source, "attribute");
+      const std::optional<ResId> id = resolve(attr, value.source, Naming::XmlAttribute);
       if (!id) return;
       info = attrInfo(attr, *id);
       if (!info) {
@@ -184,7 +202,7 @@ class Linker {
       case ParsedItem::Kind::Raw:
         if (info && !(info->formats & kFormatString) && !parseForAttr(value.text, *info)) {
           diag_.error(value.source, "'" + value.text + "' is incompatible with attribute " +
-                                        attrName + " " + formatsToString(info->formats));
+                                        attrName + " " + printed(*info));
         }
         return;
       case ParsedItem::Kind::Literal:
@@ -205,15 +223,28 @@ class Linker {
     return own(package) || package != "android" || deps_.package(package);
   }
 
+  // What a reference resolve() fails to find stands for, which its error names as aapt2 does.
+  enum class Naming {
+    Resource,        // "resource string/s"
+    XmlAttribute,    // "attribute foo": WriteAttributeName leaves out the type
+    StyleAttribute,  // "style attribute 'attr/foo'", quoted
+  };
+
   std::optional<ResId> resolve(const ResName& name, const Source& source,
-                               const char* what = "resource") {
-    const std::string written =
-        (own(name.package) ? "" : name.package + ":") + name.typeName() + "/" + name.entry;
+                               Naming naming = Naming::Resource) {
+    const std::string prefix = own(name.package) ? "" : name.package + ":";
+    const std::string written = prefix + name.typeName() + "/" + name.entry;
     // aapt2 looks for a macro to put its contents in place of the reference, in any package, and
     // says so when there is none.
     if (name.otherType == "macro") {
       diag_.error(source, "failed to find definition for " + written);
       return std::nullopt;
+    }
+    std::string what;
+    switch (naming) {
+      case Naming::Resource: what = "resource " + written; break;
+      case Naming::XmlAttribute: what = "attribute " + prefix + name.entry; break;
+      case Naming::StyleAttribute: what = "style attribute '" + written + "'"; break;
     }
     // No package hydroid loads has a resource of a type no ResType stands for (#142), so that a
     // reference of one is not looked for. android.jar has ^attr-private, which aapt2 finds: the
@@ -223,19 +254,18 @@ class Linker {
       const auto it = ids_.find({name.type, name.entry});
       if (kept && it != ids_.end()) return it->second;
     } else if (!deps_.package(name.package)) {
-      diag_.error(source, std::string(what) + " " + written + " not found: no package '" +
-                              name.package + "' is loaded");
+      diag_.error(source, what + " not found: no package '" + name.package + "' is loaded");
       return std::nullopt;
     } else if (kept) {
       if (std::optional<ResId> id = deps_.find(name.package, name.type, name.entry)) {
         // ReferenceLinker::IsSymbolVisible: what another package does not make <public> only a
         // private reference may name (#141).
         if (name.privateReference || deps_.entry(*id)->isPublic) return id;
-        diag_.error(source, std::string(what) + " " + written + " is private");
+        diag_.error(source, what + " is private");
         return std::nullopt;
       }
     }
-    diag_.error(source, std::string(what) + " " + written + " not found");
+    diag_.error(source, what + " not found");
     return std::nullopt;
   }
 
@@ -333,8 +363,9 @@ class Linker {
       const std::optional<std::string> s = buildString(text, &why);
       return Value::string(pooled(s ? *s : text));
     }
+    // RawString::Print.
     diag_.error(raw.source,
-                "expected " + formatsToString(attr.formats) + " but got raw string " + text);
+                "expected " + formatsToString(attr.formats) + " but got (raw string) " + text);
     return std::nullopt;
   }
 
@@ -404,15 +435,17 @@ class Linker {
       }
     }
     for (const ParsedStyle::Item& item : parsed.items) {
-      const std::optional<ResId> attrId = resolve(item.attr, item.value.source, "style attribute");
+      const std::optional<ResId> attrId =
+          resolve(item.attr, item.value.source, Naming::StyleAttribute);
       if (!attrId) {
         ok = false;
         continue;
       }
       const std::optional<AttrInfo> info = attrInfo(item.attr, *attrId);
       if (!info) {
-        diag_.error(item.value.source, "style attribute " + nameOf(ResType::Attr, item.attr.entry) +
-                                           " is not an <attr>");
+        diag_.error(
+            item.value.source,
+            "style attribute '" + nameOf(ResType::Attr, item.attr.entry) + "' is not an <attr>");
         ok = false;
         continue;
       }
@@ -561,7 +594,7 @@ std::optional<Package> buildPackage(ParsedFolder folder, const std::string& name
   for (const SymbolDecl& s : folder.symbols) {
     const auto it = entries.find({s.type, s.name});
     if (it == entries.end()) {
-      diag.error(s.source, "no definition for declared symbol " + nameOf(s.type, s.name));
+      diag.error(s.source, "no definition for declared symbol '" + nameOf(s.type, s.name) + "'");
       continue;
     }
     it->second.isPublic |= s.isPublic;
