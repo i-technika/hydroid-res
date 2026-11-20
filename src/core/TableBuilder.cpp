@@ -198,7 +198,7 @@ class Linker {
   // <attr>'s min and max, nor its type against a reference's. Problems go to the diagnostics.
   void linkXmlAttribute(const ParsedXmlAttribute& attribute) {
     const ParsedItem& value = attribute.value;
-    std::optional<AttrInfo> info;
+    const AttrInfo* info = nullptr;
     std::string attrName;
     if (attribute.attr && linksInto(attribute.attr->package)) {
       const ResName& attr = *attribute.attr;
@@ -314,8 +314,15 @@ class Linker {
     return std::nullopt;
   }
 
-  // The <attr> a style item names, or nullopt if `id` is not one.
-  std::optional<AttrInfo> attrInfo(const ResName& name, ResId id) {
+  // The <attr> a style item or an XML attribute names, or null if `id` is not one. Each is read
+  // once, as an app's styles name the same <attr>s in many items (#92).
+  const AttrInfo* attrInfo(const ResName& name, ResId id) {
+    const auto [it, added] = attrInfos_.try_emplace(id);
+    if (added) it->second = readAttrInfo(name, id);
+    return it->second ? &*it->second : nullptr;
+  }
+
+  std::optional<AttrInfo> readAttrInfo(const ResName& name, ResId id) const {
     AttrInfo info;
     if (own(name.package)) {
       for (const PendingValue& v : entries_.at({ResType::Attr, name.entry})) {
@@ -458,7 +465,7 @@ class Linker {
         ok = false;
         continue;
       }
-      const std::optional<AttrInfo> info = attrInfo(item.attr, *attrId);
+      const AttrInfo* info = attrInfo(item.attr, *attrId);
       if (!info) {
         diag_.error(
             item.value.source,
@@ -548,6 +555,8 @@ class Linker {
   const ResourceTable& deps_;
   Diagnostics& diag_;
   std::unordered_map<std::string, uint32_t> stringIndex_;
+  // What attrInfo() has read of each <attr>, by its id: nullopt for an id that is not one.
+  std::unordered_map<ResId, std::optional<AttrInfo>> attrInfos_;
 };
 
 }  // namespace

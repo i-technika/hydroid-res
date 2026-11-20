@@ -1281,6 +1281,74 @@ TEST(ResourceTable, IncompatibleXmlAttributeNamesTheAttrAsAapt2Does) {
   }
 }
 
+// Link reads each <attr> once, of this package or another, for all the style items and XML
+// attributes that name it (#92): each reads it as the first did, an <attr> of the name of another
+// package's as its own, and each that gives what the <attr> does not take fails on its own.
+TEST(ResourceTable, EachItemReadsTheAttrItNames) {
+  TempDir dir;
+  ResourceTable table;
+  std::vector<Diagnostic> errors;
+  ASSERT_TRUE(load(table, dir,
+                   {{"values/v.xml",
+                     "<resources><attr name='mode'><enum name='on' value='5'/></attr>"
+                     "<public type='attr' name='mode'/></resources>"}},
+                   "com.lib", 0x7e, &errors))
+      << errorsOf(errors);
+  const std::string layout =
+      "<a xmlns:app='http://schemas.android.com/apk/res-auto' "
+      "xmlns:lib='http://schemas.android.com/apk/res/com.lib' ";
+  ASSERT_TRUE(load(table, dir,
+                   {{"values/v.xml",
+                     "<resources><attr name='mode'><enum name='on' value='7'/></attr>"
+                     "<attr name='size'><flag name='a' value='1'/><flag name='b' value='2'/></attr>"
+                     "<style name='A'><item name='com.lib:mode'>on</item>"
+                     "<item name='mode'>on</item><item name='size'>a</item></style>"
+                     "<style name='B'><item name='mode'>on</item>"
+                     "<item name='com.lib:mode'>on</item><item name='size'>a|b</item></style>"
+                     "</resources>"},
+                    {"layout/l.xml", layout + "app:size='b' app:mode='on' lib:mode='on'/>"}},
+                   "com.example", 0x7f, &errors))
+      << errorsOf(errors);
+  const Package& app = *table.package("com.example");
+  for (const auto& [style, size] : {std::pair{"A", 1}, std::pair{"B", 3}}) {
+    SCOPED_TRACE(style);
+    const Style& s = app.styles[valueOf(table, std::string("com.example:style/") + style).index()];
+    ASSERT_EQ(s.items.size(), 3u);
+    // In the order of the <attr>s' ids, com.lib's first; aapt2 reads the two modes as 5 and 7.
+    EXPECT_EQ(s.items[0].value, Value::integer(5));
+    EXPECT_EQ(s.items[1].value, Value::integer(7));
+    EXPECT_EQ(s.items[2].value, Value::integer(size, IntFormat::Hex));
+  }
+
+  // What aapt2 37.0.0 says, which links the XML files only once the values have linked.
+  const auto messagesOf = [&](const std::vector<std::pair<std::string, std::string>>& files,
+                              const std::string& name, uint8_t id) {
+    errors.clear();
+    EXPECT_FALSE(load(table, dir, files, name, id, &errors));
+    std::vector<std::string> messages;
+    for (const Diagnostic& d : errors) messages.push_back(d.message);
+    return messages;
+  };
+  const std::string n = "expected integer but got (raw string) z";
+  const std::string mode = "expected enum but got (raw string) off";
+  EXPECT_EQ(messagesOf({{"values/v.xml",
+                         "<resources><attr name='n' format='integer'/>"
+                         "<style name='A'><item name='n'>z</item>"
+                         "<item name='com.lib:mode'>off</item></style>"
+                         "<style name='B'><item name='n'>z</item>"
+                         "<item name='com.lib:mode'>off</item></style></resources>"}},
+                       "com.other", 0x7d),
+            (std::vector<std::string>{n, mode, n, mode}))
+      << errorsOf(errors);
+  const std::string incompatible = "'z' is incompatible with attribute n (attr) integer";
+  EXPECT_EQ(
+      messagesOf({{"values/v.xml", "<resources><attr name='n' format='integer'/></resources>"},
+                  {"layout/l.xml", layout + "app:n='z'><b app:n='z'/></a>"}},
+                 "com.another", 0x7c),
+      (std::vector<std::string>{incompatible, incompatible}))
+      << errorsOf(errors);
+}
+
 // The dump writes numbers as printf does in the C locale, whatever the host app set.
 TEST(TableDump, NumbersIgnoreTheLocale) {
   TempDir dir;
