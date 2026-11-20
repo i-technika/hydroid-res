@@ -43,8 +43,12 @@ class Diagnostics {
 // A resource by name, @[package:]type/entry. An empty package is the one being loaded.
 struct ResName {
   ResName() = default;
-  ResName(std::string package, ResType type, std::string entry, std::string_view otherType = {})
-      : package(std::move(package)), type(type), entry(std::move(entry)), otherType(otherType) {}
+  ResName(std::string inPackage, ResType inType, std::string inEntry,
+          std::string_view inOtherType = {})
+      : package(std::move(inPackage)),
+        type(inType),
+        entry(std::move(inEntry)),
+        otherType(inOtherType) {}
 
   std::string package;
   ResType type = ResType::Anim;

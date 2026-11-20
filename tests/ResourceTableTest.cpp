@@ -852,21 +852,27 @@ TEST(ResourceTable, IdOfAPackageInAValuesFile) {
 // A reference of a type aapt2 has and no ResType stands for, as macro, names nothing, though an
 // anim, the ResType a ResName holds by default, has the name, in the package itself or in another
 // (#142), in a value, a style item and an attribute of an XML file. aapt2 says so of a macro in
-// its own words. The golden cases load no other package, have no anim of the name and do not
-// compare errors.
+// its own words, also in a package not loaded. The golden cases load no other package, have no
+// anim of the name and do not compare errors.
 TEST(ResourceTable, ReferenceOfATypeWithNoResTypeIsNotFound) {
   TempDir dir;
   ResourceTable table;
   std::vector<Diagnostic> errors;
   ASSERT_TRUE(load(table, dir, {{"anim/a.xml", "<set/>"}}, "com.lib", 0x7e, &errors))
       << errorsOf(errors);
-  for (const std::string ref :
-       {"@macro/a", "@configVarying/a", "@^attr-private/a", "@com.lib:macro/a",
-        "@*com.lib:configVarying/a", "@com.lib:^attr-private/a"}) {
-    const std::string name = ref.substr(ref[1] == '*' ? 2 : 1);
-    const std::string expected = name.find("macro/") != std::string::npos
-                                     ? "failed to find definition for " + name
-                                     : "resource " + name + " not found";
+  const std::pair<const char*, const char*> cases[] = {
+      {"@macro/a", "failed to find definition for macro/a"},
+      {"@configVarying/a", "resource configVarying/a not found"},
+      {"@^attr-private/a", "resource ^attr-private/a not found"},
+      {"@com.lib:macro/a", "failed to find definition for com.lib:macro/a"},
+      {"@*com.lib:configVarying/a", "resource com.lib:configVarying/a not found"},
+      {"@com.lib:^attr-private/a", "resource com.lib:^attr-private/a not found"},
+      {"@com.none:macro/a", "failed to find definition for com.none:macro/a"},
+      {"@com.none:configVarying/a",
+       "resource com.none:configVarying/a not found: no package 'com.none' is loaded"},
+  };
+  for (const auto& [written, expected] : cases) {
+    const std::string ref = written;
     const std::string values = "<resources><attr name='t' format='string'/>";
     for (const auto& [v, layout] : std::vector<std::pair<std::string, std::string>>{
              {values + "<string name='s'>" + ref + "</string></resources>", "<a/>"},
