@@ -434,6 +434,157 @@ CASES = {
                                      "<public type='id' name='x' product='default'/>"),
     "public-id-product-beside-id": values("<id name='x'/>"
                                           "<public type='id' name='x' product='tablet'/>"),
+    # The id a <public id=""> gives is kept, and the others take the lowest left (#154).
+    "public-given-entry-gap": values("<string name='a'>a</string><string name='b'>b</string>"
+                                     "<string name='c'>c</string>"
+                                     "<public type='string' name='b' id='0x7f010003'/>"),
+    "public-given-entry-first": values("<string name='a'>a</string><string name='b'>b</string>"
+                                       "<public type='string' name='b' id='0x7f010000'/>"),
+    "public-given-entries-between": values(
+        "<string name='a'>a</string><string name='b'>b</string><string name='c'>c</string>"
+        "<string name='d'>d</string><public type='string' name='d' id='0x7f010000'/>"
+        "<public type='string' name='c' id='0x7f010002'/>"),
+    "public-given-type-gap": values("<string name='a'>a</string><bool name='t'>true</bool>"
+                                    "<public type='string' name='a' id='0x7f050000'/>"),
+    "public-given-type-first": values("<string name='a'>a</string><bool name='t'>true</bool>"
+                                      "<public type='string' name='a' id='0x7f010000'/>"),
+    "public-given-attr": values("<attr name='x' format='string'/>"
+                                "<style name='S'><item name='x'>v</item></style>"
+                                "<public type='attr' name='x' id='0x7f0a0005'/>"),
+    "public-given-referred": values("<string name='a'>a</string><string name='r'>@string/a</string>"
+                                    "<public type='string' name='a' id='0x7f010007'/>"),
+    "public-given-id": values("<string name='s'>@+id/y</string>"
+                              "<public type='id' name='y' id='0x7f020001'/>"
+                              "<public type='id' name='x' id='0x7f020000'/>"),
+    "public-given-in-config": values("<string name='q'>x</string>"
+                                     "<public type='string' name='q' id='0x7f010000'/>",
+                                     "values-land"),
+    "public-given-written": values("<string name='a'>a</string><string name='b'>b</string>"
+                                   "<public type='string' name='a' id=' 0x0007f01000A '/>"
+                                   "<public type='string' name='b' id=''/>"),
+    "public-given-twice": values("<string name='a'>a</string>"
+                                 "<public type='string' name='a' id='0x7f010000'/>"
+                                 "<public type='string' name='a' id='0x7f010000'/>"),
+    "public-given-files-same": {
+        "values/a.xml": "<resources><string name='q'>x</string>"
+                        "<public type='string' name='q' id='0x7f010001'/></resources>",
+        "values/b.xml": "<resources><public type='string' name='q' id='0x7f010001'/></resources>"},
+    "public-given-file-without": {
+        "values/a.xml": "<resources><string name='q'>x</string>"
+                        "<public type='string' name='q' id='0x7f010001'/></resources>",
+        "values/b.xml": "<resources><public type='string' name='q'/></resources>"},
+    "public-given-not-hex": values("<string name='a'>a</string>"
+                                   "<public type='string' name='a' id='2130771968'/>"),
+    "public-given-not-number": values("<string name='a'>a</string>"
+                                      "<public type='string' name='a' id='abc'/>"),
+    "public-given-upper-x": values("<string name='a'>a</string>"
+                                   "<public type='string' name='a' id='0X7F010000'/>"),
+    "public-given-negative": values("<string name='a'>a</string>"
+                                    "<public type='string' name='a' id='-0x7f010000'/>"),
+    "public-given-too-long": values("<string name='a'>a</string>"
+                                    "<public type='string' name='a' id='0x17f010000'/>"),
+    "public-given-no-digits": values("<string name='a'>a</string>"
+                                     "<public type='string' name='a' id='0x'/>"),
+    "public-given-type-zero": values("<string name='a'>a</string>"
+                                     "<public type='string' name='a' id='0x7f000000'/>"),
+    "public-given-other-package": values("<string name='a'>a</string>"
+                                         "<public type='string' name='a' id='0x7e010000'/>"),
+    "public-given-package-zero": values("<string name='a'>a</string>"
+                                        "<public type='string' name='a' id='0x7f0100'/>"),
+    "public-given-no-value": values("<public type='string' name='nope' id='0x7f010000'/>"),
+    "public-given-two-in-file": values("<string name='a'>a</string>"
+                                       "<public type='string' name='a' id='0x7f010000'/>"
+                                       "<public type='string' name='a' id='0x7f010001'/>"),
+    # Link reports this of the .flat file it takes from its folder, "1/values_b.arsc.flat:
+    # error: ..." (#152).
+    "public-given-two-in-files": {
+        "values/a.xml": "<resources><string name='q'>x</string>"
+                        "<public type='string' name='q' id='0x7f010000'/></resources>",
+        "values/b.xml": "<resources><public type='string' name='q' id='0x7f010001'/></resources>"},
+    "public-given-entry-taken": values("<string name='a'>a</string><string name='b'>b</string>"
+                                       "<public type='string' name='a' id='0x7f010000'/>"
+                                       "<public type='string' name='b' id='0x7f010000'/>"),
+    "public-given-type-taken": values("<string name='a'>a</string><bool name='t'>true</bool>"
+                                      "<public type='string' name='a' id='0x7f020000'/>"
+                                      "<public type='bool' name='t' id='0x7f020001'/>"),
+    "public-given-two-types": values("<string name='a'>a</string><string name='b'>b</string>"
+                                     "<public type='string' name='a' id='0x7f010000'/>"
+                                     "<public type='string' name='b' id='0x7f0a0000'/>"),
+    # Link merges the visibility of each file's entry before its values: the higher stays, and the
+    # id with public; of two public ones, both ids, if any, must be the same. So a file that makes
+    # it public first, without an id, keeps a later file's id out (#154).
+    "public-given-after-public": {
+        "values/a.xml": "<resources><string name='q'>x</string><string name='r'>x</string>"
+                        "<public type='string' name='q'/></resources>",
+        "values/b.xml": "<resources><public type='string' name='q' id='0x7f010005'/></resources>"},
+    "public-given-after-public-twice": {
+        "values/a.xml": "<resources><string name='q'>x</string>"
+                        "<public type='string' name='q'/></resources>",
+        "values/b.xml": "<resources><public type='string' name='q' id='0x7f010005'/></resources>",
+        "values/c.xml": "<resources><public type='string' name='q' id='0x7f010006'/></resources>"},
+    "public-given-around-public": {
+        "values/a.xml": "<resources><string name='q'>x</string>"
+                        "<public type='string' name='q' id='0x7f010005'/></resources>",
+        "values/b.xml": "<resources><public type='string' name='q'/></resources>",
+        "values/c.xml": "<resources><public type='string' name='q' id='0x7f010006'/></resources>"},
+    "public-given-after-values-and-public": {
+        "values/a.xml": "<resources><string name='q'>x</string><string name='r'>x</string>"
+                        "</resources>",
+        "values/b.xml": "<resources><public type='string' name='q'/></resources>",
+        "values/c.xml": "<resources><public type='string' name='q' id='0x7f010005'/></resources>"},
+    "public-given-after-public-in-file": values(
+        "<string name='q'>x</string><string name='r'>x</string><public type='string' name='q'/>"
+        "<public type='string' name='q' id='0x7f010005'/>"),
+    "public-given-after-private": {
+        "values/a.xml": "<resources><string name='q'>x</string><string name='r'>x</string>"
+                        "<java-symbol type='string' name='q'/></resources>",
+        "values/b.xml": "<resources><public type='string' name='q' id='0x7f010005'/></resources>"},
+    "public-given-before-private": {
+        "values/a.xml": "<resources><string name='q'>x</string><string name='r'>x</string>"
+                        "<public type='string' name='q' id='0x7f010005'/></resources>",
+        "values/b.xml": "<resources><java-symbol type='string' name='q'/></resources>"},
+    "public-given-two-in-later-file": {
+        "values/a.xml": "<resources><string name='q'>x</string>"
+                        "<public type='string' name='q' id='0x7f010000'/></resources>",
+        "values/b.xml": "<resources><public type='string' name='q' id='0x7f010001'/>"
+                        "<public type='string' name='q' id='0x7f010000'/></resources>"},
+    # The first error, which compile gives of each file in the order written, and before any of
+    # link, and link of each entry in the order of type and name (#154).
+    "public-given-two-before-duplicate": values(
+        "<public type='string' name='a' id='0x7f010000'/>"
+        "<public type='string' name='a' id='0x7f010001'/>"
+        "<string name='a'>1</string><string name='a'>2</string>"),
+    "public-given-two-after-duplicate": values(
+        "<string name='a'>1</string><string name='a'>2</string>"
+        "<public type='string' name='a' id='0x7f010000'/>"
+        "<public type='string' name='a' id='0x7f010001'/>"),
+    "public-given-two-before-conflict": {
+        "values/a.xml": "<resources><string name='q'>x</string><string name='z'>1</string>"
+                        "<public type='string' name='q' id='0x7f010000'/></resources>",
+        "values/b.xml": "<resources><public type='string' name='q' id='0x7f010001'/>"
+                        "<string name='z'>2</string></resources>"},
+    "public-given-two-after-conflict": {
+        "values/a.xml": "<resources><string name='b'>1</string><string name='q'>x</string>"
+                        "<public type='string' name='q' id='0x7f010000'/></resources>",
+        "values/b.xml": "<resources><public type='string' name='q' id='0x7f010001'/>"
+                        "<string name='b'>2</string></resources>"},
+    "public-given-two-in-file-after-conflict": {
+        "values/a.xml": "<resources><string name='z'>1</string></resources>",
+        "values/b.xml": "<resources><string name='z'>2</string></resources>",
+        "values/c.xml": "<resources><string name='q'>x</string>"
+                        "<public type='string' name='q' id='0x7f010000'/>"
+                        "<public type='string' name='q' id='0x7f010001'/></resources>"},
+    "public-given-two-in-file-after-no-value": {
+        "values/a.xml": "<resources><public type='string' name='nope'/></resources>",
+        "values/b.xml": "<resources><string name='q'>x</string>"
+                        "<public type='string' name='q' id='0x7f010000'/>"
+                        "<public type='string' name='q' id='0x7f010001'/></resources>"},
+    "duplicate-after-conflict": {
+        "values/a.xml": "<resources><string name='z'>1</string></resources>",
+        "values/b.xml": "<resources><string name='z'>2</string></resources>",
+        "values/c.xml": "<resources><string name='q'>1</string><string name='q'>2</string>"
+                        "</resources>"},
+    # aapt2 fails a check of its own on an entry id of 0xffff, which no case has.
 
     # Attributes.
     "attr-formats": values("<attr name='a' format=' color | reference '/><attr name='b'/>"

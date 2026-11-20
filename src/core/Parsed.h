@@ -147,7 +147,11 @@ struct SymbolDecl {
   ResType type = ResType::Anim;
   std::string name;
   bool isPublic = false;
+  std::optional<ResId> id;  // <public id="">
   Source source;
+  // How many resources of the folder were read before it, which places it among them, as aapt2
+  // compile adds them to the table of a file in the order written (#154).
+  size_t position = 0;
 };
 
 // An attribute of an XML file as aapt2's XmlReferenceLinker links it (#132): the <attr> its

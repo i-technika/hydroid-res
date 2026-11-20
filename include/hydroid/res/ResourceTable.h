@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <array>
 #include <cstdint>
 #include <filesystem>
@@ -33,7 +34,11 @@
 //     one name, as values-/a.xml and values/a.xml.
 //   - Type ids go to the types there are, in the order of ResType from 1, styleable included,
 //     although it holds nothing at runtime. Entry ids go to the entries of a type in the order of
-//     their names, as bytes, from 0.
+//     their names, as bytes, from 0. An id a <public id=""> gives is kept, and left out of those
+//     the others take, which are then the lowest left. It must be of the package, of the one type
+//     id of its type, and of no other entry. A file can give an entry one id, and files that make
+//     it public the same one, but once a file has made it public without one, a later file's id
+//     is left out, as aapt2 link merges them.
 //   - <attr> and <declare-styleable> always go in the default configuration, as do the ids that
 //     @+id/ makes, in values or in the attributes of an XML file, and those of the names of
 //     <enum> and <flag>. The id a <public type="id"> defines goes in the configuration of its
@@ -54,10 +59,9 @@
 // repeats (--no-auto-version, --no-version-vectors, --no-version-transitions,
 // --no-resource-removal, --no-resource-deduping).
 //
-// Not read yet, and so an error: <public> with an id, <public-group>, <staging-public-group>,
-// <overlayable>, <macro>, <add-resource>, <configVarying>, and inline XML resources
-// (<aapt:attr>). The table keeps an XML file as a file, and nothing of its contents; the XML
-// trees are step 8.
+// Not read yet, and so an error: <public-group>, <staging-public-group>, <overlayable>, <macro>,
+// <add-resource>, <configVarying>, and inline XML resources (<aapt:attr>). The table keeps an XML
+// file as a file, and nothing of its contents; the XML trees are step 8.
 
 namespace hydroid::res {
 
@@ -153,6 +157,7 @@ struct Candidate {
 };
 
 struct Entry {
+  uint16_t id = 0;  // its entry id
   std::string name;
   bool isPublic = false;  // <public>
   // In the order of compareConfigs, one for each configuration.
@@ -162,7 +167,9 @@ struct Entry {
 struct TypeTable {
   ResType type = ResType::Anim;
   uint8_t id = 0;
-  std::vector<Entry> entries;  // by entry id
+  // In the order of their ids, which leave out those no entry has: those before an id a <public>
+  // gives, or between two.
+  std::vector<Entry> entries;
 };
 
 // One package of the table. A pooled Value (Value::index) is a position in the pool of its kind
@@ -170,7 +177,7 @@ struct TypeTable {
 struct Package {
   uint8_t id = 0;
   std::string name;
-  std::vector<TypeTable> types;  // by type id, from 1
+  std::vector<TypeTable> types;  // in the order of their ids, as the entries of one
 
   std::vector<std::string> strings;  // String
   std::vector<StyledString> styledStrings;
@@ -187,20 +194,26 @@ struct Package {
     }
     return nullptr;
   }
+  // The type of the type id `typeId`, or nullptr.
+  const TypeTable* typeWithId(uint8_t typeId) const {
+    for (const TypeTable& table : types) {
+      if (table.id == typeId) return &table;
+    }
+    return nullptr;
+  }
   const Entry* entry(ResId resId) const {
-    const size_t typeIndex = typeId(resId);
-    const size_t entryIndex = entryId(resId);
-    if (packageId(resId) != id || typeIndex == 0 || typeIndex > types.size()) return nullptr;
-    const TypeTable& table = types[typeIndex - 1];
-    return entryIndex < table.entries.size() ? &table.entries[entryIndex] : nullptr;
+    const TypeTable* table = packageId(resId) == id ? typeWithId(typeId(resId)) : nullptr;
+    if (!table) return nullptr;
+    const auto it = std::lower_bound(table->entries.begin(), table->entries.end(), entryId(resId),
+                                     [](const Entry& e, uint16_t entry) { return e.id < entry; });
+    return it != table->entries.end() && it->id == entryId(resId) ? &*it : nullptr;
   }
 };
 
 // A problem that keeps a res/ folder from loading. There are no warnings: where aapt2 only warns
 // and goes on, as of an id @+android:id/ makes in an XML file or a <public> in a folder with
 // qualifiers, hydroid goes on too and says nothing (#130), where it reads what is warned of at
-// all: what it does not read yet, as <public-group>, <overlayable> or a <public> with an id, is
-// an error in any folder.
+// all: what it does not read yet, as <public-group> or <overlayable>, is an error in any folder.
 struct Diagnostic {
   std::filesystem::path file;  // empty for none
   int line = 0;                // 0 for none

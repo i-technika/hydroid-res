@@ -208,7 +208,7 @@ class ValuePrinter {
 
   std::string refName(ResId id) const {
     if (const Entry* e = ownEntry(id)) {
-      return std::string(toString(package_.types[typeId(id) - 1].type)) + "/" + e->name;
+      return std::string(toString(package_.typeWithId(typeId(id))->type)) + "/" + e->name;
     }
     return hex8(id);
   }
@@ -334,9 +334,8 @@ void dump(std::ostream& os, const ResourceTable& table) {
       p.println("type " + std::string(toString(type.type)) + " id=" + hex2(type.id) +
                 " entryCount=" + std::to_string(type.entries.size()));
       p.indent();
-      for (size_t e = 0; e < type.entries.size(); e++) {
-        const Entry& entry = type.entries[e];
-        const ResId id = makeResId(package.id, type.id, static_cast<uint16_t>(e));
+      for (const Entry& entry : type.entries) {
+        const ResId id = makeResId(package.id, type.id, entry.id);
         p.println("resource " + hex8(id) + " " + toString(type.type) + "/" + entry.name +
                   (entry.isPublic ? " PUBLIC" : ""));
         p.indent();

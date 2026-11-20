@@ -154,6 +154,37 @@ TEST(ResourceTable, FindsByName) {
   EXPECT_EQ(table.package(0x7f)->type(ResType::Dimen), nullptr);
 }
 
+// The ids a <public> gives leave out others, which no lookup finds (#154).
+TEST(ResourceTable, FindsAroundTheIdsAPublicGives) {
+  TempDir dir;
+  ResourceTable table;
+  std::vector<Diagnostic> errors;
+  ASSERT_TRUE(load(table, dir,
+                   {{"values/v.xml",
+                     "<resources><string name='a'>a</string><string name='b'>b</string>"
+                     "<color name='c'>#fff</color>"
+                     "<public type='string' name='b' id='0x7f050003'/></resources>"}},
+                   "com.example", 0x7f, &errors))
+      << errorsOf(errors);
+  const Package& p = *table.package(0x7f);
+  ASSERT_EQ(p.types.size(), 2u);
+  EXPECT_EQ(p.types[0].id, 1);  // color, the lowest type id left
+  EXPECT_EQ(p.types[1].id, 5);
+  ASSERT_EQ(p.types[1].entries.size(), 2u);
+  EXPECT_EQ(p.types[1].entries[0].id, 0);
+  EXPECT_EQ(p.types[1].entries[1].id, 3);
+  EXPECT_EQ(p.typeWithId(5), p.type(ResType::String));
+  EXPECT_EQ(p.typeWithId(2), nullptr);
+  EXPECT_EQ(table.find("com.example", ResType::String, "a"), 0x7f050000u);
+  EXPECT_EQ(table.find("com.example", ResType::String, "b"), 0x7f050003u);
+  EXPECT_EQ(table.entry(0x7f050003)->name, "b");
+  EXPECT_EQ(table.nameOf(0x7f050003), "com.example:string/b");
+  for (ResId none : {0x7f050001u, 0x7f050002u, 0x7f050004u, 0x7f020000u}) {
+    EXPECT_EQ(table.entry(none), nullptr) << std::hex << none;
+    EXPECT_FALSE(table.nameOf(none)) << std::hex << none;
+  }
+}
+
 TEST(ResourceTable, FillsValuesAndPools) {
   TempDir dir;
   ResourceTable table;

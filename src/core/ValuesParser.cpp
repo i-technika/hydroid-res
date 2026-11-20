@@ -922,11 +922,20 @@ class Parser {
       error(el, "invalid resource type '" + std::string(*type) + "' in <public>");
       return false;
     }
-    if (nonEmptyAttribute(el, "id")) {
-      error(el, "<public> with an id is not supported yet");
-      return false;
+    // ResourceUtils::ParseResourceId: hex, as ResTable::stringToInt reads it, of a type other than
+    // 0. The package is checked when ids are given, as aapt2 link does (#154).
+    std::optional<ResId> id;
+    if (std::optional<std::string_view> text = nonEmptyAttribute(el, "id")) {
+      std::optional<Value> v = parseInteger(*text);
+      if (!v || v->intFormat() != IntFormat::Hex ||
+          typeId(static_cast<ResId>(v->intValue())) == 0) {
+        error(el, "invalid resource ID '" + std::string(*text) + "' in <public>");
+        return false;
+      }
+      id = static_cast<ResId>(v->intValue());
     }
-    out_.symbols.push_back({*t, res.name, /*isPublic=*/true, res.source});
+    out_.symbols.push_back(
+        {*t, res.name, /*isPublic=*/true, id, res.source, out_.resources.size()});
     // A public id is also its definition, which aapt2 keeps in the configuration of the folder,
     // as it does a value of any resource there, and only warns of the <public> (#82). It has the
     // product of the <public> (#136).
@@ -946,7 +955,8 @@ class Parser {
       return false;
     }
     // It marks the resource private, which no table or dump shows, but it must exist.
-    out_.symbols.push_back({*t, res.name, /*isPublic=*/false, res.source});
+    out_.symbols.push_back(
+        {*t, res.name, /*isPublic=*/false, std::nullopt, res.source, out_.resources.size()});
     return false;
   }
 
