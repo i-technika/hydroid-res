@@ -36,12 +36,14 @@ struct LocaleConfig {
 // LocaleConfig.parseLocaleConfig: the LocaleConfig of a file such as res/xml/locales_config.xml:
 // a root <locale-config>, with android:defaultLocale perhaps, holding a <locale> for each locale,
 // which android:name gives. Anything else in the root is passed over. A name is read as
-// Locale.forLanguageTag reads it, up to its first subtag that is not well-formed ("en-US-ab" is
-// en-US); a <locale> without a name, or of one with no language, is the root locale, which
-// matches no other, and is left out. A default of no language is "und", as ResourcesImpl gives
-// it. nullopt, with what and where in `errors` if given, if the file cannot be read, is no XML,
-// has another root, or has a default that is not, as written, one of the names: Android has no
-// default for an app then, and the locales without one change nothing.
+// LocaleList.forLanguageTags reads it: each of its tags between commas up to its first subtag
+// that is not well-formed ("en-US-ab" is en-US), as parseLanguageTag reads it, which takes no
+// extended language (zh-yue-HK is zh, where Java has yue-HK). A <locale> without a name, a
+// language "null" to Android, or of a name with no language, the root locale, matches none of
+// the user's, and is left out. A default of no language is "und", as ResourcesImpl gives it.
+// nullopt, with what and where in `errors` if given, if the file cannot be read, is no XML, has
+// another root, or has a default that is not, as written, one of the names: Android has no default
+// for an app then, and the locales without one change nothing.
 HYDROID_RES_API std::optional<LocaleConfig> parseLocaleConfig(
     const std::filesystem::path& file, std::vector<Diagnostic>* errors = nullptr);
 

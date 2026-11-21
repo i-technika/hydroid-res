@@ -1022,6 +1022,26 @@ TEST(ResourcesLocaleConfig, OneLocaleChosenLaterWithADefaultIsWidenedByTheLocale
   EXPECT_EQ(from(resources, table, "y"), "fr");
 }
 
+// The locales a choice left are those of that choice: once the table has changed and they are
+// chosen afresh, the ones it left before are a change like any other.
+TEST(ResourcesLocaleConfig, AChangedTableForgetsTheLocalesItLeft) {
+  TempDir dir;
+  ResourceTable table;
+  addStrings(table, dir, {{"", {"x", "y"}}, {"es", {"x"}}, {"fr", {"y"}}});
+  Resources resources(table);
+  resources.setLocaleConfig(localeConfig({"en-US"}, "en-US"));
+  // fr, not the first, is chosen: Android would leave fr, de, es.
+  resources.setConfiguration(Config{}, tags({"de-DE", "fr-FR", "es-ES"}));
+  EXPECT_EQ(chosen(resources), "fr-rFR");
+  // Now the table has de, so de, the first, is chosen afresh, and leaves them as they are.
+  addPackage(table, dir, {"de"}, "com.example.lib", 0x7e);
+  EXPECT_EQ(chosen(resources), "de-rDE");
+  // fr, de, es are then a change, of which fr, the first, is chosen alone: x is not es's.
+  resources.setConfiguration(Config{}, tags({"fr-FR", "de-DE", "es-ES"}));
+  EXPECT_EQ(chosen(resources), "fr-rFR");
+  EXPECT_EQ(from(resources, table, "x"), "default");
+}
+
 // Whether a call that reads comes between, the next call after the table has changed is the
 // same: the table is taken in first.
 TEST(ResourcesLocaleConfig, AChangedTableIsTakenInBeforeTheCall) {
@@ -1135,6 +1155,23 @@ TEST(ParseLocaleConfig, ReadsANameAsLocaleForLanguageTagDoes) {
   ASSERT_TRUE(und);
   ASSERT_TRUE(und->defaultLocale);
   EXPECT_EQ(toString(*und->defaultLocale), "und");
+
+  // A name of several, as LocaleConfig joins the names with ',' and LocaleList splits them, each
+  // locale once; the default is still the name as written.
+  std::vector<Diagnostic> commaErrors;
+  const std::optional<LocaleConfig> several = parseLocaleConfig(
+      writeFile(dir, std::string("<locale-config ") + kAndroid +
+                         " android:defaultLocale=\"fr\"><locale android:name=\"fr,de-DE\"/>"
+                         "<locale android:name=\"de-DE\"/><locale android:name=\"fr\"/>"
+                         "</locale-config>"),
+      &commaErrors);
+  ASSERT_TRUE(several) << (commaErrors.empty() ? "" : commaErrors[0].message);
+  ASSERT_EQ(several->supported.size(), 2u);
+  EXPECT_EQ(toString(several->supported[0]), "fr");
+  EXPECT_EQ(toString(several->supported[1]), "de-rDE");
+  EXPECT_FALSE(parseLocaleConfig(writeFile(
+      dir, std::string("<locale-config ") + kAndroid +
+               " android:defaultLocale=\"fr\"><locale android:name=\"fr,de\"/></locale-config>")));
 }
 
 TEST(ParseLocaleConfig, FailsAsLocaleConfigDoes) {

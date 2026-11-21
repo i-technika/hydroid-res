@@ -29,7 +29,9 @@ const char* androidAttribute(pugi::xml_node element, std::string_view name) {
 
 // Locale.forLanguageTag, which leaves out the first subtag that is not well-formed and all those
 // after it: the locale of the longest run of subtags from the first that parseLanguageTag reads,
-// or nullopt if there is none, for the root locale, which has no language.
+// or nullopt if there is none, for the root locale, which has no language. Where parseLanguageTag
+// and the JDK differ, it is as parseLanguageTag reads: an extended language, as yue of
+// zh-yue-HK, which the JDK takes for the language, is read as no well-formed subtag, so zh.
 std::optional<Config> forLanguageTag(std::string_view tag) {
   for (;;) {
     if (std::optional<Config> locale = parseLanguageTag(tag)) return locale;
@@ -69,11 +71,24 @@ std::optional<LocaleConfig> parseLocaleConfig(const std::filesystem::path& file,
     if (child.type() != pugi::node_element || detail::localName(child.name()) != "locale") {
       continue;
     }
-    // LocaleConfig takes a <locale> without a name, which is the root locale to it, as is one of
-    // a name with no language. The root locale matches no other, so they are left out.
+    // LocaleConfig joins the names with ',' and has LocaleList.forLanguageTags split them again,
+    // so a name of several is several locales. A <locale> without a name is "null" to it, a
+    // language no user's locale is of, and a name with no language is the root locale, which
+    // matches no other: both are left out, as they would change nothing.
     const char* name = androidAttribute(child, "name");
     if (name == nullptr || !names.insert(name).second) continue;
-    if (std::optional<Config> locale = forLanguageTag(name)) config.supported.push_back(*locale);
+    std::string_view rest = name;
+    for (;;) {
+      const size_t comma = rest.find(',');
+      if (std::optional<Config> locale = forLanguageTag(rest.substr(0, comma))) {
+        // LocaleList drops a locale it already has.
+        bool seen = false;
+        for (const Config& s : config.supported) seen = seen || s == *locale;
+        if (!seen) config.supported.push_back(*locale);
+      }
+      if (comma == std::string_view::npos) break;
+      rest.remove_prefix(comma + 1);
+    }
   }
 
   if (const char* defaultLocale = androidAttribute(root, "defaultLocale")) {
