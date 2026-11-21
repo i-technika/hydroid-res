@@ -481,6 +481,18 @@ CASES = {
     "product-configs": {"values/v.xml": "<resources><string name='p' product='tablet'>t</string>"
                                         "<string name='p'>d</string></resources>",
                         "values-land/v.xml": "<resources><string name='p'>l</string></resources>"},
+    # aapt2 assigns ids and links every value, those ProductFilter leaves out too, before it
+    # filters products (#180).
+    "product-only-ref-missing": values("<string name='p' product='tablet'>@string/nothing</string>"),
+    "product-only-beside-ref-missing": values("<string name='p' product='tablet'>t</string>"
+                                              "<string name='q'>@string/nothing</string>"),
+    "product-left-out-ref-missing": values("<string name='p' product='tablet'>@string/nothing</string>"
+                                           "<string name='p'>d</string>"),
+    "product-only-attr-style-key": values("<attr name='r' format='integer' product='tablet'/>"
+                                          "<style name='S'><item name='r'>1</item></style>"),
+    "product-only-beside-bad-public-id": values("<string name='p' product='tablet'>t</string>"
+                                                "<string name='a'>a</string>"
+                                                "<public type='string' name='a' id='0x7e010000'/>"),
     # The id a <public type="id"> defines has the product of the <public> (#136).
     "public-id-product-only": values("<public type='id' name='x' product='tablet'/>"),
     "public-id-two-defaults": values("<public type='id' name='x'/>"
