@@ -221,17 +221,20 @@ TEST(SdkBaseline, LocaleTablesComeFromScriptPins) {
                       << " does not name, once in its header, the release and commit it is of";
 }
 
-// The port itself is not read, only what each file says it was ported from: ConfigMatch.cpp and
-// LocaleData.h name the release of BRANCH, as do README.md and Version.h, and any other
-// android<N>-release they name is held to it too. Raising BRANCH without them fails here (#215),
-// so that a new release is not taken without looking at the code that says it follows the old
-// one.
+// The port itself is not read, only what each file says it was ported from: the code ported from
+// AOSP (ConfigMatch.cpp, LocaleData.h, ConfigParser.cpp) and the tests ported with it name the
+// release of BRANCH, as do README.md and Version.h, and any other android<N>-release they name is
+// held to it too. Raising BRANCH without them fails here (#215), so that a new release is not
+// taken without looking at the code that says it follows the old one.
 TEST(SdkBaseline, PortNamesScriptRelease) {
   std::string branch;
   ASSERT_NO_FATAL_FAILURE(readScriptPin(HYDROID_LOCALE_SCRIPT, "BRANCH", &branch));
   const std::regex release(R"(android\d+-release)");
-  for (const char* path : {HYDROID_CONFIG_MATCH_SOURCE, HYDROID_LOCALE_DATA_HEADER, HYDROID_README,
-                           HYDROID_VERSION_HEADER}) {
+  for (const char* relative :
+       {"src/core/ConfigMatch.cpp", "src/core/LocaleData.h", "src/core/ConfigParser.cpp",
+        "tests/ConfigMatchTest.cpp", "tests/ConfigParserTest.cpp", "README.md",
+        "include/hydroid/res/Version.h"}) {
+    const std::string path = std::string(HYDROID_SOURCE_DIR) + "/" + relative;
     std::ifstream in(path);
     ASSERT_TRUE(in) << "cannot open " << path;
     std::stringstream file;
