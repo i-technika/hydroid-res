@@ -5,12 +5,14 @@ add_executable(hydroid-res-tests
   Aapt2TableTest.cpp
   Aapt2ValueTest.cpp
   ComplexTest.cpp
+  ConfigMatchTest.cpp
   ConfigParserTest.cpp
-  GoldenColorTest.cpp
   GoldenComplexTest.cpp
+  GoldenMatchTest.cpp
   PathUtf8Test.cpp
   PublicHeaderTest.cpp
   ResourceTableTest.cpp
+  ResourcesTest.cpp
   SdkBaselineTest.cpp
   SmokeTest.cpp
   Utf8Test.cpp
@@ -34,10 +36,13 @@ target_compile_definitions(hydroid-res-tests PRIVATE
   HYDROID_AOSP_RES_DIRS="${PROJECT_SOURCE_DIR}/golden/aosp/framework_res_dirs.txt"
   HYDROID_GOLDEN_APP_GRADLE="${PROJECT_SOURCE_DIR}/golden/app/build.gradle.kts"
   HYDROID_GOLDEN_DIR="${PROJECT_SOURCE_DIR}/golden/data"
+  HYDROID_LOCALE_SCRIPT="${PROJECT_SOURCE_DIR}/scripts/gen_locale_data.py"
+  HYDROID_LOCALE_TABLES="${PROJECT_SOURCE_DIR}/src/core/LocaleDataTables.inc"
   HYDROID_NUMERIC_QUALIFIERS="${PROJECT_SOURCE_DIR}/scripts/golden/numeric_qualifiers.tsv"
   HYDROID_PROJECT_VERSION="${PROJECT_VERSION}"
   HYDROID_PUBLIC_INCLUDE_DIRS="${public_include_dirs}"
   HYDROID_README="${PROJECT_SOURCE_DIR}/README.md"
+  HYDROID_SOURCE_DIR="${PROJECT_SOURCE_DIR}"
   HYDROID_TABLE_RES_DIR="${PROJECT_SOURCE_DIR}/golden/table/res"
   HYDROID_TEST_RES_DIR="${PROJECT_SOURCE_DIR}/golden/app/src/main/res"
   HYDROID_VERSION_HEADER="${PROJECT_SOURCE_DIR}/include/hydroid/res/Version.h")
@@ -108,6 +113,14 @@ if(TARGET hydroid-rc)
       "-DRC=$<TARGET_FILE:hydroid-rc>"
       "-DDIR=${CMAKE_CURRENT_BINARY_DIR}/rc-unicode-path"
       -P ${CMAKE_CURRENT_SOURCE_DIR}/CheckRcUnicodePath.cmake)
+  # hydroid-rc pick prints what Android picked of the golden app under a condition (#202).
+  add_test(NAME HydroidRc.PicksWhatAndroidPicked
+    COMMAND ${CMAKE_COMMAND}
+      "-DRC=$<TARGET_FILE:hydroid-rc>"
+      "-DRES=${PROJECT_SOURCE_DIR}/golden/app/src/main/res"
+      "-DGOLDEN=${PROJECT_SOURCE_DIR}/golden/data"
+      "-DTABLE=${PROJECT_SOURCE_DIR}/golden/table/res"
+      -P ${CMAKE_CURRENT_SOURCE_DIR}/CheckRcPick.cmake)
   # And ends with an error, not an abort, on an argument with no UTF-8, which only Windows passes.
   if(WIN32)
     add_test(NAME HydroidRc.FailsOnNonUnicodeArgument

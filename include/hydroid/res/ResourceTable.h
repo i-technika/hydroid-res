@@ -64,6 +64,14 @@
 // repeats (--no-auto-version, --no-version-vectors, --no-version-transitions,
 // --no-resource-removal, --no-resource-deduping).
 //
+// A locale with a variant is a configuration of its own, as aapt2 keeps it (but for the two
+// variants after a region of a b+ name of four subtags, which aapt2 and hydroid drop:
+// values-b+de+DE+1901+1996/ is de-rDE, #225). The Android Gradle plugin (9.5.1) compiles values
+// and most files with a compiler of its own, which writes the variant of a locale with no script
+// as empty: an app it builds has values-b+de+DE+1901/ as values-de/, and raw-b+de+DE+1901/ as
+// raw-de/, and it fails on values-b+de+1901/ (#198). hydroid does not do that, and so can pick
+// another value from such a folder than that app does.
+//
 // Not read yet, and so an error: <public-group>, <staging-public-group>, <overlayable>, <macro>,
 // <add-resource>, <configVarying>, and inline XML resources (<aapt:attr>). The table keeps an XML
 // file as a file, and nothing of its contents; the XML trees are step 8.
@@ -259,7 +267,35 @@ class ResourceTable {
   // "com.example:string/app_name", or nullopt for an id of no resource.
   HYDROID_RES_API std::optional<std::string> nameOf(ResId id) const;
 
+  // A number that changes whenever what the table holds may: when it adds a package, and when it
+  // is assigned or moved from. It never comes back to a value it had in this table, so what is
+  // kept of the table can be kept by it, as Resources keeps what it picked.
+  uint64_t revision() const { return revision_.value; }
+
  private:
+  // Holds the revision through the table's implicit copies and moves: a table copied or moved
+  // into takes the revision of the one it is made from, and one assigned to, or moved from, goes
+  // to its next.
+  struct Revision {
+    uint64_t value = 0;
+
+    Revision() = default;
+    Revision(const Revision&) = default;
+    Revision(Revision&& other) noexcept : value(other.value) { other.value++; }
+    Revision& operator=(const Revision&) noexcept {
+      value++;
+      return *this;
+    }
+    Revision& operator=(Revision&& other) noexcept {
+      value++;
+      if (&other != this) other.value++;
+      return *this;
+    }
+  };
+
+  // First, so that the implicit assignments change it before what it holds: one that throws
+  // part of the way has changed it all the same.
+  Revision revision_;
   std::vector<Package> packages_;
   std::unordered_map<std::string, ResId> byName_;  // "package:type/name"
 };

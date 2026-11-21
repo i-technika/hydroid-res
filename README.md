@@ -12,7 +12,7 @@ resolves values exactly as Android does, for UIKit, GTK4 and WinUI 3. Design and
 | `include/hydroid_res.h` | Stable C API, used by the Swift adapter |
 | `src/core/` | Shared core: parsers, ResourceTable, Config matching, Theme/Style |
 | `src/capi/` | C API implementation |
-| `tools/hydroid-rc/` | `res/` → `.hrt` binary table compiler; for now `hydroid-rc dump <res>` |
+| `tools/hydroid-rc/` | `res/` → `.hrt` binary table compiler; for now `hydroid-rc dump <res>` and `hydroid-rc pick <res> <qualifiers>` |
 | `tests/` | GoogleTest unit and golden tests |
 | `golden/` | Android test app + instrumentation test that dumps Android's answers |
 | `golden/data/` | The dumped golden JSON the C++ tests compare against |
@@ -20,6 +20,7 @@ resolves values exactly as Android does, for UIKit, GTK4 and WinUI 3. Design and
 | `golden/aapt2/` | What the SDK's aapt2 makes of literal values, resource folder names, strings and whole `res/` folders |
 | `golden/aosp/` | The folder names of AOSP's framework `res/`, which must all parse |
 | `scripts/golden/` | Runs the dump on a device and pulls the JSON; runs aapt2 for `golden/aapt2/` |
+| `scripts/gen_locale_data.py` | Makes `src/core/LocaleDataTables.inc`, the locale tables matching goes by, from AOSP's |
 
 ## Build and test
 
@@ -76,8 +77,10 @@ git ls-files -z -- '*.h' '*.cpp' | xargs -0 clang-format -i
 ## Golden data
 
 All of it comes from one API level, `kEmulatedSdkVersion` in `include/hydroid/res/Version.h`
-(37): the emulator, the golden app's `compileSdk` and `targetSdk`, and the build-tools and
-platform the aapt2 scripts pin. `SdkBaseline` tests fail when one of them moves without the rest,
+(37): the emulator, the golden app's `compileSdk` and `targetSdk`, the build-tools and platform
+the aapt2 scripts pin, the AOSP release and commit `golden/aosp` lists the framework folders of,
+and the same release and commit `scripts/gen_locale_data.py` pins for the matching code and the
+locale tables. `SdkBaseline` tests fail when one of them moves without the rest,
 or when the aapt2 files were not made with the build-tools, platform and OS (`GOLDEN_HOST`,
 Windows) that `scripts/golden/gen_aapt2_values.py` pins, or when this README names others.
 
@@ -89,8 +92,45 @@ Open `golden/` in Android Studio, or build it with `golden/gradlew`. Then:
 python scripts/golden/pull_golden.py
 ```
 
-This runs `GoldenDumpTest` over 252 conditions (7 densities × 3 languages × night × orientation ×
-3 smallest widths) and writes `golden/data/*.json`.
+This runs `GoldenDumpTest` over 375 conditions and writes `golden/data/*.json`: a matrix of 252
+(7 densities × 3 languages × night × orientation × 3 smallest widths), and 123 more that each
+change one thing the matrix leaves alone, such as a locale of another region or script, a list
+of languages, the screen's size or shape, the UI mode, the input devices or the mcc. Each file
+records the `Configuration` the resources were resolved for and the value of every resource.
+`GoldenMatchTest` builds the same device from it and checks that hydroid picks the same values.
+To see by hand what hydroid picks for one device,
+`hydroid-rc pick <res> <qualifiers> [--locales <tag,...>] [<package>]` takes the device as the
+qualifiers of a folder name and its languages as BCP 47 tags, and prints the locale it chose and
+the value of each resource, with the configuration it comes from:
+
+```sh
+hydroid-rc pick golden/app/src/main/res ko-rKR-land-night-xhdpi --locales ko-KR com.itechnika.hydroid.golden
+```
+
+A device whose qualifiers name no version is of `kEmulatedSdkVersion`, not the one `parseConfig`
+raises them to (night is night-v8), and one whose qualifiers name a version is of that one, even
+below it (night-v4 is of API 4, where values-night/ is not picked).
+`HydroidRc.PicksWhatAndroidPicked` checks it against three conditions of `golden/data`, two of
+them of two languages.
+
+The `pick_` strings of the app's `values*/match.xml` are there for that: each has a value in
+`values/` and in some `values-<qualifiers>/`, which says the folder it is in, so the dump shows
+which folder Android took it from. A folder added for one needs a condition that picks it, or a
+line in `GoldenMatch.EveryFolderIsPickedSomewhere` saying why none does. Two things have no
+folder there, because the app is built by the Android Gradle plugin and dumped through the SDK:
+a locale with a variant and no script, and the grammatical gender (the SDK only sets it for a
+whole app).
+
+The plugin (9.5.1) compiles values and most files (raw, layout, xml) with a compiler of its own,
+not aapt2, and that writes the variant of a locale with no script as empty (#198). An app it
+builds has `values-b+de+DE+1901` as `values-de`, `values-b+ca+ES+valencia` as `values-ca` and
+`raw-b+de+DE+1901/x.txt` as `res/raw-de/x.txt`, and it fails on `values-b+de+1901`;
+`values-b+sr+Latn+RS+ekavsk` keeps its variant. No option turns that compiler off. hydroid
+follows aapt2, which keeps the variant, so from such a folder it can pick another value than
+an app built by the plugin does. (aapt2 drops variants only after a region in a `b+` name of
+four subtags, and hydroid with it: `values-b+de+DE+1901+1996` is `de-rDE`, #225.) The
+`folder-locale-variant` case of `table_cases.json` checks what aapt2 makes of them, and
+`ConfigMatchTest` the rules for variants, from AOSP's tests.
 
 The aapt2 files need only the SDK (build-tools 37.0.0 and platform android-37.0), no device, but
 they must be made on Windows: aapt2 writes some rows otherwise on Linux and macOS (#62).
@@ -110,3 +150,17 @@ prints a folder the same way, from hydroid's `ResourceTable`, to compare by hand
 
 On another OS the scripts stop. With `--any-host` they run anyway and write
 `build/aapt2-<os>-<cpu>/` instead of `golden/aapt2/`, to compare with the golden files.
+
+A folder added to the golden app goes into `configs.tsv` and `app_table.txt` too, so both
+scripts run again after it.
+
+## Locale tables
+
+Android matches a locale by its script, and picks between regions by the parent of each locale
+(es-MX under es-419 under es), from tables AOSP generates from ICU's CLDR data.
+`src/core/LocaleDataTables.inc` holds the same tables, made from AOSP's
+`libs/androidfw/LocaleDataLookup.cpp` at the commit of `android17-release` the script pins:
+
+```sh
+python scripts/gen_locale_data.py
+```

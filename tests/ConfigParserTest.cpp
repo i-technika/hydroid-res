@@ -86,6 +86,16 @@ TEST(ParseConfig, Bcp47Locale) {
   EXPECT_EQ(canonical("b+de+CH+19"), "de-r19");
   EXPECT_EQ(canonical("b+en+a"), "rejected");
   EXPECT_EQ(canonical("b+en+abcdefghi"), "rejected");
+  // Of four subtags, a short second one is the region and the two after it are dropped, however
+  // long (#225); otherwise the second is the script. Five fail.
+  EXPECT_EQ(canonical("b+de+DE+1901+1996"), "de-rDE");
+  EXPECT_EQ(canonical("b+ca+ES+valencia+1996"), "ca-rES");
+  EXPECT_EQ(canonical("b+es+419+1901+1996"), "es-r419");
+  EXPECT_EQ(canonical("b+de+DE+x+abcdefghi"), "de-rDE");
+  EXPECT_EQ(canonical("b+en+Latn+US+posix"), "b+en+Latn+US+posix");
+  EXPECT_EQ(canonical("b+de+1901+1996"), "b+de+1901+1996");
+  EXPECT_EQ(canonical("b+sr+Latn+RS+ekavsk+1996"), "rejected");
+  EXPECT_EQ(canonical("b+de+DE+1901+1996+abcde"), "rejected");
   // b+ is one part; a qualifier after it follows a '-'.
   EXPECT_EQ(canonical("b+en+US-ldrtl"), "en-rUS-ldrtl");
   EXPECT_EQ(canonical("b+en-rUS"), "rejected");
@@ -402,6 +412,87 @@ TEST(ParseResDir, RejectsBadQualifiers) {
 }
 
 // ---- Config --------------------------------------------------------------------------------
+
+// ---- language tags ---------------------------------------------------------------------------
+
+// The locale of a tag as a folder would name it, or "rejected".
+std::string localeOfTag(const char* tag) {
+  const std::optional<Config> c = parseLanguageTag(tag);
+  return c ? toString(*c) : "rejected";
+}
+
+TEST(ParseLanguageTag, LanguageScriptRegionVariant) {
+  EXPECT_EQ(localeOfTag("ko"), "ko");
+  EXPECT_EQ(localeOfTag("ko-KR"), "ko-rKR");
+  EXPECT_EQ(localeOfTag("fil-PH"), "fil-rPH");
+  EXPECT_EQ(localeOfTag("es-419"), "es-r419");
+  EXPECT_EQ(localeOfTag("sr-Latn"), "b+sr+Latn");
+  EXPECT_EQ(localeOfTag("sr-Latn-RS"), "b+sr+Latn+RS");
+  EXPECT_EQ(localeOfTag("zh-Hant-HK"), "b+zh+Hant+HK");
+  EXPECT_EQ(localeOfTag("de-DE-1901"), "b+de+DE+1901");
+  EXPECT_EQ(localeOfTag("de-1996"), "b+de+1996");
+  EXPECT_EQ(localeOfTag("ca-ES-valencia"), "b+ca+ES+valencia");
+  EXPECT_EQ(localeOfTag("sl-Latn-IT-nedis"), "b+sl+Latn+IT+nedis");
+  // Nothing but the locale is set.
+  Config ko;
+  ko.lang = {'k', 'o'};
+  ko.region = {'K', 'R'};
+  EXPECT_EQ(parseLanguageTag("ko-KR"), ko);
+}
+
+TEST(ParseLanguageTag, CaseIsThatOfAFolder) {
+  EXPECT_EQ(localeOfTag("KO-kr"), "ko-rKR");
+  EXPECT_EQ(localeOfTag("SR-LATN-rs"), "b+sr+Latn+RS");
+  EXPECT_EQ(localeOfTag("ca-es-VALENCIA"), "b+ca+ES+valencia");
+}
+
+TEST(ParseLanguageTag, LeavesOutExtensions) {
+  EXPECT_EQ(localeOfTag("ar-EG-u-nu-latn"), "ar-rEG");
+  EXPECT_EQ(localeOfTag("en-US-u-ca-gregory-nu-latn"), "en-rUS");
+  EXPECT_EQ(localeOfTag("de-x-private"), "de");
+  EXPECT_EQ(localeOfTag("de-DE-1901-x-1996"), "b+de+DE+1901");
+  // What follows the first subtag of one character is not looked at.
+  EXPECT_EQ(localeOfTag("en-u-toolongsubtag"), "en");
+  EXPECT_EQ(localeOfTag("ko-K"), "ko");
+}
+
+// What ResTable_config::setBcp47Locale (android17-release) gives: each variant is written over
+// the front of the one before.
+TEST(ParseLanguageTag, LaterVariantIsWrittenOverTheEarlier) {
+  EXPECT_EQ(localeOfTag("sl-rozaj-biske"), "b+sl+biske");
+  EXPECT_EQ(localeOfTag("de-DE-1901-1996"), "b+de+DE+1996");
+  EXPECT_EQ(localeOfTag("sl-Latn-IT-rozaj-nedis"), "b+sl+Latn+IT+nedis");
+  // A shorter variant leaves the tail of a longer one before it.
+  EXPECT_EQ(localeOfTag("ca-ES-valencia-1996"), "b+ca+ES+1996ncia");
+  EXPECT_EQ(localeOfTag("de-1996-1901"), "b+de+1901");
+}
+
+TEST(ParseLanguageTag, RejectsWhatIsNoLocale) {
+  for (const char* tag : {"",
+                          "-",
+                          "k",
+                          "korean",
+                          "ko-",
+                          "-KR",
+                          "ko--KR",
+                          "ko_KR",
+                          "ko-KOR",
+                          "ko-12",
+                          "ko-1234567890",
+                          "ko-KR-KP",
+                          "ko-Kore-Hang",
+                          "ko-KR-Kore",
+                          "ko-abc",
+                          "ko-KR-abcd",
+                          "k0-KR",
+                          "ko-K!",
+                          "ko-KR-vari ant",
+                          "x-private",
+                          "123",
+                          "zh-yue"}) {
+    EXPECT_EQ(localeOfTag(tag), "rejected") << tag;
+  }
+}
 
 TEST(Config, EqualityIsFieldByField) {
   EXPECT_EQ(parseConfig("hdpi"), parseConfig("hdpi-v4"));
