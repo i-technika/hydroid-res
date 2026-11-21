@@ -71,8 +71,9 @@ const Golden& golden() {
 }
 
 TEST(GoldenComplex, EveryConditionHasEveryDimensionAndFraction) {
-  // 7 densities x 3 languages x 2 x 2 x 3 widths, and the extras of GoldenDumpTest.kt.
-  EXPECT_EQ(golden().conditions, 252u + 125u);
+  // 7 densities x 3 languages x 2 x 2 x 3 widths, the extras of GoldenDumpTest.kt and the three
+  // grammatical genders.
+  EXPECT_EQ(golden().conditions, 252u + 125u + 3u);
   std::set<std::string> keys;
   for (const GoldenComplex& g : golden().values) {
     keys.insert(g.key);
