@@ -123,6 +123,16 @@ CASES = {
     "folder-bad-config": {"raw-land-hdpi-port/x.txt": "x"},
     "folder-language-config": {"raw-foo/x.txt": "x"},
     "folder-trailing-dash": {"raw-/x.txt": "x"},
+    # A locale with a variant is a configuration of its own, apart from de and de-rDE. The
+    # Android Gradle plugin compiles values on its own, and loses a variant that has no script
+    # with it: it builds values-b+de+DE+1901/ as values-de/, and fails on values-b+de+1901/
+    # (#198). hydroid follows aapt2.
+    "folder-locale-variant": {
+        **values("<string name='s'>default</string>"),
+        **{f"values-{q}/v.xml": f"<resources><string name='s'>{q}</string></resources>"
+           for q in ["de", "de-rDE", "b+de+DE+1901", "b+de+1901", "b+ca+ES+valencia",
+                     "b+en+US+posix", "b+sr+Latn+RS+ekavsk"]},
+    },
     "folder-empty-unknown": {"foo/.keep": ""},
     "values-not-xml": {"values/a.txt": "x"},
     "xml-malformed": {"layout/l.xml": "<a"},
