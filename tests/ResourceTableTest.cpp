@@ -1515,6 +1515,15 @@ TEST(ResourceTable, NoDefinitionComesAtLink) {
        {{"b.xml", 3, missing("string", "n")}}},
       {{{"values/a.xml", resources({publicN})}, {"values/b.xml", resources({"", publicN})}},
        {{"a.xml", 2, missing("string", "n")}}},
+      // A reference to it finds the entry, which has an id, and what reads it as an <attr> finds
+      // that it is none.
+      {{{"values/v.xml",
+         resources({"<public type='string' name='m'/>", "<string name='a'>@string/m</string>"})}},
+       {{"v.xml", 2, missing("string", "m")}}},
+      {{{"values/v.xml", resources({"<public type='attr' name='x'/>",
+                                    "<style name='s'><item name='x'>1</item></style>"})}},
+       {{"v.xml", 2, missing("attr", "x")},
+        {"v.xml", 3, "style attribute 'attr/x' is not an attribute"}}},
       // ProductFilter and the XML files come after link, which has failed.
       {{{"values/v.xml", resources({"<public type='string' name='z'/>",
                                     "<string name='p' product='tablet'>a</string>",
@@ -1537,6 +1546,23 @@ TEST(ResourceTable, NoDefinitionComesAtLink) {
     }
     EXPECT_TRUE(got == c.errors) << errorsOf(errors);
   }
+
+  // An entry with no value takes an id as any other, so one more of them than a type has ids
+  // fails where the ids are given, on the last by name, before any "no definition".
+  std::string symbols = "<resources>";
+  for (int i = 0; i <= 0x10000; i++) {
+    char name[16];
+    std::snprintf(name, sizeof name, "n%05d", i);
+    symbols += "\n<java-symbol type='string' name='" + std::string(name) + "'/>";
+  }
+  TempDir dir;
+  ResourceTable table;
+  std::vector<Diagnostic> errors;
+  EXPECT_FALSE(load(table, dir, {{"values/v.xml", symbols + "\n</resources>"}}, "com.example", 0x7f,
+                    &errors));
+  ASSERT_EQ(errors.size(), 1u) << errorsOf(errors);
+  EXPECT_EQ(errors[0].line, 0x10000 + 2);
+  EXPECT_EQ(errors[0].message, "more than 65536 resources of type string");
 }
 
 // What an XML file names in android is linked once a package android is loaded, as aapt2 links

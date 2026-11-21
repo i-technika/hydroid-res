@@ -1003,6 +1003,9 @@ CASES = {
                                     "<public type='string' name='q' id='0x7e010000'/>"),
     "public-missing-after-not-found": values("<public type='string' name='z'/>"
                                              "<string name='q'>@string/nothing</string>"),
+    # A reference to it finds the entry, which has an id: the only error is that of the entry.
+    "public-missing-referred": values("<public type='string' name='m'/>"
+                                      "<string name='a'>@string/m</string>"),
     "public-no-type": values("<string name='s'>s</string><public name='s'/>"),
     "public-bad-type": values("<string name='s'>s</string><public type='strings' name='s'/>"),
     "java-symbol": values("<string name='s'>s</string><java-symbol type='string' name='s'/>"
