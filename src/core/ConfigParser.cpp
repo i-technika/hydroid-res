@@ -398,4 +398,36 @@ std::optional<ResDir> parseResDir(std::string_view name) {
   return ResDir{std::string(name.substr(0, dash)), *config};
 }
 
+std::optional<Config> parseLanguageTag(std::string_view tag) {
+  const std::vector<std::string> subtags = splitLower(tag, '-');
+  const auto letters = [](std::string_view s) { return allOf(s, isLower); };
+  const auto digits = [](std::string_view s) { return allOf(s, isDigit); };
+
+  size_t i = 0;
+  const std::string& lang = subtags[i++];
+  if (lang.size() < 2 || lang.size() > 3 || !letters(lang)) return std::nullopt;
+  std::string_view script, region, variant;
+  if (i < subtags.size() && subtags[i].size() == 4 && letters(subtags[i])) script = subtags[i++];
+  if (i < subtags.size() && ((subtags[i].size() == 2 && letters(subtags[i])) ||
+                             (subtags[i].size() == 3 && digits(subtags[i])))) {
+    region = subtags[i++];
+  }
+  for (; i < subtags.size(); i++) {
+    const std::string& s = subtags[i];
+    if (!allOf(s, isAlnum)) return std::nullopt;
+    // An extension or private use, which goes on to the end of the tag.
+    if (s.size() == 1) break;
+    if (s.size() > 8 || s.size() < 4 || (s.size() == 4 && !isDigit(s[0]))) return std::nullopt;
+    if (variant.empty()) variant = s;
+  }
+
+  Config c;
+  setChars(c.lang, lang, keep);
+  setChars(c.script, script, keep);
+  c.script[0] = toUpper(c.script[0]);
+  setChars(c.region, region, toUpper);
+  setChars(c.variant, variant, keep);
+  return c;
+}
+
 }  // namespace hydroid::res

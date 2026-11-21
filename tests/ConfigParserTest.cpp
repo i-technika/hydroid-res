@@ -403,6 +403,76 @@ TEST(ParseResDir, RejectsBadQualifiers) {
 
 // ---- Config --------------------------------------------------------------------------------
 
+// ---- language tags ---------------------------------------------------------------------------
+
+// The locale of a tag as a folder would name it, or "rejected".
+std::string localeOfTag(const char* tag) {
+  const std::optional<Config> c = parseLanguageTag(tag);
+  return c ? toString(*c) : "rejected";
+}
+
+TEST(ParseLanguageTag, LanguageScriptRegionVariant) {
+  EXPECT_EQ(localeOfTag("ko"), "ko");
+  EXPECT_EQ(localeOfTag("ko-KR"), "ko-rKR");
+  EXPECT_EQ(localeOfTag("fil-PH"), "fil-rPH");
+  EXPECT_EQ(localeOfTag("es-419"), "es-r419");
+  EXPECT_EQ(localeOfTag("sr-Latn"), "b+sr+Latn");
+  EXPECT_EQ(localeOfTag("sr-Latn-RS"), "b+sr+Latn+RS");
+  EXPECT_EQ(localeOfTag("zh-Hant-HK"), "b+zh+Hant+HK");
+  EXPECT_EQ(localeOfTag("de-DE-1901"), "b+de+DE+1901");
+  EXPECT_EQ(localeOfTag("de-1996"), "b+de+1996");
+  EXPECT_EQ(localeOfTag("ca-ES-valencia"), "b+ca+ES+valencia");
+  EXPECT_EQ(localeOfTag("sl-Latn-IT-nedis"), "b+sl+Latn+IT+nedis");
+  // Nothing but the locale is set.
+  Config ko;
+  ko.lang = {'k', 'o'};
+  ko.region = {'K', 'R'};
+  EXPECT_EQ(parseLanguageTag("ko-KR"), ko);
+}
+
+TEST(ParseLanguageTag, CaseIsThatOfAFolder) {
+  EXPECT_EQ(localeOfTag("KO-kr"), "ko-rKR");
+  EXPECT_EQ(localeOfTag("SR-LATN-rs"), "b+sr+Latn+RS");
+  EXPECT_EQ(localeOfTag("ca-es-VALENCIA"), "b+ca+ES+valencia");
+}
+
+TEST(ParseLanguageTag, LeavesOutExtensionsAndLaterVariants) {
+  EXPECT_EQ(localeOfTag("ar-EG-u-nu-latn"), "ar-rEG");
+  EXPECT_EQ(localeOfTag("en-US-u-ca-gregory-nu-latn"), "en-rUS");
+  EXPECT_EQ(localeOfTag("de-x-private"), "de");
+  EXPECT_EQ(localeOfTag("sl-rozaj-biske"), "b+sl+rozaj");
+  // What follows the first subtag of one character is not looked at.
+  EXPECT_EQ(localeOfTag("en-u-toolongsubtag"), "en");
+  EXPECT_EQ(localeOfTag("ko-K"), "ko");
+}
+
+TEST(ParseLanguageTag, RejectsWhatIsNoLocale) {
+  for (const char* tag : {"",
+                          "-",
+                          "k",
+                          "korean",
+                          "ko-",
+                          "-KR",
+                          "ko--KR",
+                          "ko_KR",
+                          "ko-KOR",
+                          "ko-12",
+                          "ko-1234567890",
+                          "ko-KR-KP",
+                          "ko-Kore-Hang",
+                          "ko-KR-Kore",
+                          "ko-abc",
+                          "ko-KR-abcd",
+                          "k0-KR",
+                          "ko-K!",
+                          "ko-KR-vari ant",
+                          "x-private",
+                          "123",
+                          "zh-yue"}) {
+    EXPECT_EQ(localeOfTag(tag), "rejected") << tag;
+  }
+}
+
 TEST(Config, EqualityIsFieldByField) {
   EXPECT_EQ(parseConfig("hdpi"), parseConfig("hdpi-v4"));
   EXPECT_EQ(parseConfig("hdpi"), parseConfig("240dpi"));

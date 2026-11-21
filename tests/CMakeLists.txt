@@ -5,12 +5,14 @@ add_executable(hydroid-res-tests
   Aapt2TableTest.cpp
   Aapt2ValueTest.cpp
   ComplexTest.cpp
+  ConfigMatchTest.cpp
   ConfigParserTest.cpp
   GoldenColorTest.cpp
   GoldenComplexTest.cpp
   PathUtf8Test.cpp
   PublicHeaderTest.cpp
   ResourceTableTest.cpp
+  ResourcesTest.cpp
   SdkBaselineTest.cpp
   SmokeTest.cpp
   Utf8Test.cpp

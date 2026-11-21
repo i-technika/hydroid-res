@@ -62,4 +62,14 @@ struct ResDir {
 // '-' has no qualifiers, as in aapt2: "values-" is the default Config.
 HYDROID_RES_API std::optional<ResDir> parseResDir(std::string_view name);
 
+// The locale of a BCP 47 language tag, which is how a platform names the user's languages:
+// "ko", "ko-KR", "sr-Latn-RS", "es-419", "de-DE-1901". The Config has the language in
+// lowercase, the script as "Latn", the region in uppercase and the first variant in lowercase,
+// and nothing else. The subtags must be a language of 2 or 3 letters, then at most one script
+// of 4 letters, at most one region of 2 letters or 3 digits, and variants of 5 to 8 letters or
+// digits, or of 4 starting with a digit. Extensions and private use, from a subtag of one
+// character on, are left out ("ar-EG-u-nu-latn" is ar-EG; see Config.h on the numbering
+// system), as are the variants after the first. nullopt for any other tag.
+HYDROID_RES_API std::optional<Config> parseLanguageTag(std::string_view tag);
+
 }  // namespace hydroid::res
