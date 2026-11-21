@@ -90,7 +90,8 @@ class GoldenDumpTest {
             screenLayout = (screenLayout and mask.inv()) or value
         }
 
-        // A locale against the regions, scripts and variants the app has.
+        // A locale against the regions and scripts the app has, and with a variant, which no
+        // folder of the app has (README.md, Golden data).
         val locales = listOf(
             "en-GB", "en-AU", "en-IN", "en-CA", "en-PH", "en-001", "en-XA", "en",
             "es-ES", "es-MX", "es-AR", "es-US", "es-419", "es-GQ",

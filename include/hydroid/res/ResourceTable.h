@@ -65,10 +65,10 @@
 // --no-resource-removal, --no-resource-deduping).
 //
 // A locale with a variant is a configuration of its own, as aapt2 keeps it. The Android Gradle
-// plugin (9.5.1) compiles values with a compiler of its own, which writes the variant of a locale
-// with no script as empty: an app it builds has values-b+de+DE+1901/ as values-de/, and it fails
-// on values-b+de+1901/ (#198). hydroid does not do that, and so can pick another value from such
-// a folder than that app does.
+// plugin (9.5.1) compiles values and most files with a compiler of its own, which writes the
+// variant of a locale with no script as empty: an app it builds has values-b+de+DE+1901/ as
+// values-de/, and raw-b+de+DE+1901/ as raw-de/, and it fails on values-b+de+1901/ (#198). hydroid
+// does not do that, and so can pick another value from such a folder than that app does.
 //
 // Not read yet, and so an error: <public-group>, <staging-public-group>, <overlayable>, <macro>,
 // <add-resource>, <configVarying>, and inline XML resources (<aapt:attr>). The table keeps an XML

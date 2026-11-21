@@ -102,11 +102,13 @@ The `pick_` strings of the app's `values*/match.xml` are there for that: each ha
 which folder Android took it from. A folder added for one needs a condition that picks it, or a
 line in `GoldenMatch.EveryFolderIsPickedSomewhere` saying why none does. Two things have no
 folder there, because the app is built by the Android Gradle plugin and dumped through the SDK:
-a locale with a variant, and the grammatical gender (the SDK only sets it for a whole app).
+a locale with a variant and no script, and the grammatical gender (the SDK only sets it for a
+whole app).
 
-The plugin (9.5.1) compiles values with a compiler of its own, not aapt2, and that writes the
-variant of a locale with no script as empty (#198). An app it builds has `values-b+de+DE+1901`
-as `values-de` and `values-b+ca+ES+valencia` as `values-ca`, and it fails on `values-b+de+1901`;
+The plugin (9.5.1) compiles values and most files (raw, layout, xml) with a compiler of its own,
+not aapt2, and that writes the variant of a locale with no script as empty (#198). An app it
+builds has `values-b+de+DE+1901` as `values-de`, `values-b+ca+ES+valencia` as `values-ca` and
+`raw-b+de+DE+1901/x.txt` as `res/raw-de/x.txt`, and it fails on `values-b+de+1901`;
 `values-b+sr+Latn+RS+ekavsk` keeps its variant. No option turns that compiler off. hydroid
 follows aapt2, which keeps every variant, so from such a folder it can pick another value than
 an app built by the plugin does. The `folder-locale-variant` case of `table_cases.json` checks
