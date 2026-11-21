@@ -38,10 +38,10 @@ struct GoldenDevice {
 
 // The state of the device a condition records, as android.content.res.Configuration, cut into
 // ResTable_config's fields as NativeSetConfiguration (frameworks/base
-// core/jni/android_util_AssetManager.cpp) cuts them. Of what ResourcesImpl.updateConfiguration
-// does on the way, only the soft keyboard is done here; Resources::setConfiguration is left to
-// choose the locale and give it its old code, and to see to the version, the pixels and
-// navHidden (Config.h).
+// core/jni/android_util_AssetManager.cpp) cuts them, with the version the condition was taken on
+// (sdkIntFull). Of what ResourcesImpl.updateConfiguration does on the way, only the soft keyboard
+// is done here; Resources::setConfiguration is left to choose the locale and give it its old
+// code, and to see to the pixels and navHidden (Config.h).
 inline GoldenDevice goldenDevice(const nlohmann::json& condition) {
   const nlohmann::json& c = condition.at("configuration");
   const auto at = [&](const char* key) { return c.at(key).get<int>(); };
