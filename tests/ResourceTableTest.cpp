@@ -1417,6 +1417,11 @@ TEST(ResourceTable, MergeErrorsStopBeforeLink) {
        {{"b.xml", conflictS}}},
       {{{"layout/l.xml", "<a y='@+app:id/b'/>"}, {"values/c.xml", missing}},
        {{"l.xml", "defined resource 'app:id/b' for external package 'app'"}}},
+      // A symbol nothing defines is an error of link (#182), which an id in another package
+      // stops before.
+      {{{"layout/l.xml", "<a y='@+app:id/b'/>"},
+        {"values/a.xml", "<resources><public type='string' name='nodef'/></resources>"}},
+       {{"l.xml", "defined resource 'app:id/b' for external package 'app'"}}},
       // Every file conflicts with the first: only the second one's error.
       {{{"values/a.xml", strings("a")},
         {"values/b.xml", strings("b")},
@@ -1443,6 +1448,94 @@ TEST(ResourceTable, MergeErrorsStopBeforeLink) {
     std::vector<std::pair<std::string, std::string>> got;
     for (const Diagnostic& d : errors) got.emplace_back(d.file.filename().string(), d.message);
     EXPECT_EQ(got, c.errors) << errorsOf(errors);
+  }
+}
+
+// aapt2 37.0.0 gives "no definition for declared symbol" in ReferenceLinker, of each entry before
+// it links its values (#182): after the errors of ids, which stop link, and among those of
+// references in the order of type and name. It gives it once for an entry, where the first
+// declaration of the visibility it ends up with is written, and stops before ProductFilter and
+// the XML files. The golden cases see only the first error.
+TEST(ResourceTable, NoDefinitionComesAtLink) {
+  const auto resources = [](const std::vector<std::string>& lines) {
+    std::string text = "<resources>";
+    for (const std::string& line : lines) text += "\n" + line;
+    return text + "\n</resources>";
+  };
+  const auto missing = [](const std::string& type, const std::string& name) {
+    return "no definition for declared symbol '" + type + "/" + name + "'";
+  };
+  const std::string publicN = "<public type='string' name='n'/>";
+  const std::string symbolN = "<java-symbol type='string' name='n'/>";
+  struct Error {
+    std::string file;
+    int line;
+    std::string message;
+    bool operator==(const Error& o) const {
+      return file == o.file && line == o.line && message == o.message;
+    }
+  };
+  struct Case {
+    std::vector<std::pair<std::string, std::string>> files;
+    std::vector<Error> errors;
+  };
+  const std::vector<Case> cases = {
+      // After the error of a reference of an entry before it, and before that of one after.
+      {{{"values/v.xml",
+         resources({"<string name='a'>@string/n1</string>", "<public type='string' name='m'/>",
+                    "<string name='z'>@string/n2</string>"})}},
+       {{"v.xml", 2, "resource string/n1 not found"},
+        {"v.xml", 3, missing("string", "m")},
+        {"v.xml", 4, "resource string/n2 not found"}}},
+      // In the order of type, then name, not as written.
+      {{{"values/v.xml",
+         resources({"<public type='string' name='c'/>", "<public type='style' name='zz'/>",
+                    "<java-symbol type='string' name='a'/>", "<public type='attr' name='zz'/>"})}},
+       {{"v.xml", 5, missing("attr", "zz")},
+        {"v.xml", 4, missing("string", "a")},
+        {"v.xml", 2, missing("string", "c")},
+        {"v.xml", 3, missing("style", "zz")}}},
+      // The error of an id stops link before it, whether the id is of another entry or its own.
+      {{{"values/v.xml",
+         resources({"<public type='string' name='a'/>", "<string name='q'>q</string>",
+                    "<public type='string' name='q' id='0x7e010000'/>"})}},
+       {{"v.xml", 4,
+         "can't assign ID 0x7e010000 to resource string/q because package already has ID 7e"}}},
+      {{{"values/v.xml", resources({"<public type='string' name='nope' id='0x7f010000'/>",
+                                    "<string name='a'>a</string>",
+                                    "<public type='string' name='a' id='0x7f010000'/>"})}},
+       {{"v.xml", 2,
+         "can't assign ID 0x7f010000 to resource string/nope because entry ID is already assigned "
+         "to string/a"}}},
+      // Once for an entry: where it is first made public, or first declared if never public.
+      {{{"values/v.xml", resources({symbolN, publicN, publicN})}},
+       {{"v.xml", 3, missing("string", "n")}}},
+      {{{"values/v.xml", resources({symbolN, symbolN})}}, {{"v.xml", 2, missing("string", "n")}}},
+      {{{"values/a.xml", resources({symbolN})}, {"values/b.xml", resources({"", publicN})}},
+       {{"b.xml", 3, missing("string", "n")}}},
+      {{{"values/a.xml", resources({publicN})}, {"values/b.xml", resources({"", publicN})}},
+       {{"a.xml", 2, missing("string", "n")}}},
+      // ProductFilter and the XML files come after link, which has failed.
+      {{{"values/v.xml", resources({"<public type='string' name='z'/>",
+                                    "<string name='p' product='tablet'>a</string>",
+                                    "<string name='p' product='phone'>b</string>"})}},
+       {{"v.xml", 2, missing("string", "z")}}},
+      {{{"layout/l.xml", "<a y='@string/nothing'/>"},
+        {"values/v.xml", resources({"<public type='string' name='z'/>"})}},
+       {{"v.xml", 2, missing("string", "z")}}},
+  };
+  for (size_t i = 0; i < cases.size(); i++) {
+    const Case& c = cases[i];
+    SCOPED_TRACE("case " + std::to_string(i) + ": " + c.files.back().second);
+    TempDir dir;
+    ResourceTable table;
+    std::vector<Diagnostic> errors;
+    EXPECT_FALSE(load(table, dir, c.files, "com.example", 0x7f, &errors));
+    std::vector<Error> got;
+    for (const Diagnostic& d : errors) {
+      got.push_back({d.file.filename().string(), d.line, d.message});
+    }
+    EXPECT_TRUE(got == c.errors) << errorsOf(errors);
   }
 }
 
