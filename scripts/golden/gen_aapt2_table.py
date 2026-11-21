@@ -213,6 +213,8 @@ CASES = {
     "xml-link-attr-item-in-other-config": {**layout('app:r="1"', "<string name='s'>x</string>"),
                                            **values("<item type='attr' name='r'>@string/s</item>",
                                                     "values-land")},
+    "xml-link-attrref-item-not-an-attr": layout('x="?attr/r"', "<string name='s'>x</string>"
+                                                               "<item type='attr' name='r'>@string/s</item>"),
     "xml-link-attr-android-name": layout('app:text="1"'),
     "xml-link-attr-styleable": layout('app:foo="1"', "<declare-styleable name='S'>"
                                                      "<attr name='foo' format='integer'/>"
@@ -411,6 +413,26 @@ CASES = {
     "attrref-missing": values("<color name='c'>?attr/nope</color>"),
     "attrref-not-attr": values("<color name='c'>?color/x</color>"),
     "attrref-in-string": values("<string name='s'>?hello</string>"),
+    # A resource of type attr that is not an <attr> no reference finds, but one with no value of
+    # the default configuration (#175).
+    "attrref-attr-item-not-an-attr": values("<string name='s'>x</string><item type='attr' name='r'>@string/s</item>"
+                                            "<item type='string' name='t'>?attr/r</item>"),
+    "ref-attr-item-not-an-attr": values("<string name='s'>x</string><item type='attr' name='r'>@string/s</item>"
+                                        "<item type='string' name='t'>@attr/r</item>"),
+    "attrref-attr-item-in-other-config": {**values("<string name='s'>x</string>"
+                                                   "<item type='string' name='t'>?attr/r</item>"),
+                                          **values("<item type='attr' name='r'>@string/s</item>",
+                                                   "values-land")},
+    # Of product='default', which ProductFilter keeps as it is, the value is not one of no product,
+    # which is all aapt2's symbol table looks at.
+    "attrref-attr-item-default-product": values("<string name='s'>x</string>"
+                                                "<item type='attr' name='r' product='default'>@string/s</item>"
+                                                "<item type='string' name='t'>?attr/r</item>"),
+    "style-key-attr-item-default-product": values("<string name='s'>x</string>"
+                                                  "<item type='attr' name='r' product='default'>@string/s</item>"
+                                                  "<style name='S'><item name='r'>1</item></style>"),
+    "styleable-attr-item-not-an-attr": values("<string name='s'>x</string><item type='attr' name='r'>@string/s</item>"
+                                              "<declare-styleable name='S'><attr name='r'/></declare-styleable>"),
 
     # Literals.
     "empty-items": values("<integer name='i'></integer><color name='c'/><dimen name='d'>  </dimen>"

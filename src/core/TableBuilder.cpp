@@ -263,19 +263,25 @@ class Linker {
     return {};
   }
 
-  // A resource of type attr that is not an <attr>, as <item type='attr' name='r'>, found where an
-  // <attr> is named (#166). aapt2's symbol table has an attr of this package with a value of the
-  // default configuration only for an <attr>, which is always of it, and of another package only
-  // for an <attr>: it does not find the others. One of this package with no value of the default
-  // configuration it finds, with no <attr>.
+  // Whether aapt2's symbol table leaves out an attr of this package that it has an id for (#175).
+  // ResourceTableSymbolSource has one with a value of the default configuration and no product
+  // only for an <attr>, which is always of it: <item type='attr' name='r'> in values/ it does not
+  // find, by any reference, where one in values-land/ only, or of product='default', which
+  // ProductFilter keeps as it is, it finds, with no <attr>.
+  bool unfound(const ResName& name) const {
+    if (name.type != ResType::Attr) return false;
+    const std::vector<PendingValue>& values = entries_.at({ResType::Attr, name.entry});
+    return std::any_of(values.begin(), values.end(), [](const PendingValue& v) {
+      return v.config == Config{} && v.product.empty() &&
+             !std::holds_alternative<ParsedAttr>(v.value);
+    });
+  }
+
+  // An attr found where a style item or an XML attribute names an <attr>, which is not one (#166).
+  // resolve() has not found any other: this one is of this package, with no value of the default
+  // configuration and no product.
   void notAnAttr(const ResName& name, const Source& source, Naming naming) {
-    bool found = false;
-    if (own(name.package)) {
-      const std::vector<PendingValue>& values = entries_.at({ResType::Attr, name.entry});
-      found = std::none_of(values.begin(), values.end(),
-                           [](const PendingValue& v) { return v.config == Config{}; });
-    }
-    diag_.error(source, described(name, naming) + (found ? " is not an attribute" : " not found"));
+    diag_.error(source, described(name, naming) + " is not an attribute");
   }
 
   std::optional<ResId> resolve(const ResName& name, const Source& source,
@@ -293,16 +299,17 @@ class Linker {
     const bool kept = name.otherType.empty();
     if (own(name.package)) {
       const auto it = ids_.find({name.type, name.entry});
-      if (kept && it != ids_.end()) return it->second;
+      if (kept && it != ids_.end() && !unfound(name)) return it->second;
     } else if (!deps_.package(name.package)) {
       diag_.error(source, what + " not found: no package '" + name.package + "' is loaded");
       return std::nullopt;
     } else if (kept) {
       if (std::optional<ResId> id = deps_.find(name.package, name.type, name.entry)) {
-        // An attr of another package that is not an <attr> aapt2 does not find, before it asks
-        // whether the reference may name it.
-        if (naming != Naming::Resource && !attrInfo(name, *id)) {
-          notAnAttr(name, source, naming);
+        // An attr of another package that is not an <attr> aapt2 does not find, by any reference
+        // (#175), before it asks whether the reference may name it: AssetManagerSymbolSource
+        // finds an attr only with the bag of one.
+        if (name.type == ResType::Attr && !attrInfo(name, *id)) {
+          diag_.error(source, what + " not found");
           return std::nullopt;
         }
         // ReferenceLinker::IsSymbolVisible: what another package does not make <public> only a
@@ -344,8 +351,8 @@ class Linker {
     return std::nullopt;
   }
 
-  // The <attr> a style item or an XML attribute names, or null if `id` is not one. Each is read
-  // once, as an app's styles name the same <attr>s in many items (#92).
+  // The <attr> a reference of type attr names, or null if `id` is not one. Each is read once, as an
+  // app's styles name the same <attr>s in many items (#92).
   const AttrInfo* attrInfo(const ResName& name, ResId id) {
     const auto [it, added] = attrInfos_.try_emplace(id);
     if (added) it->second = readAttrInfo(name, id);
