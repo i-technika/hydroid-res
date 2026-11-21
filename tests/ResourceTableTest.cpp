@@ -1390,9 +1390,9 @@ TEST(ResourceTable, ProductFilterComesAfterLink) {
 
 // What fails to merge stops link before ids are given and references linked, now that
 // ProductFilter, which used to stop it, comes after link (#180). A conflict stops it before the
-// ids made in another package are looked for, too (#183). aapt2 37.0.0 merges one file at a time
-// and stops at the first that fails, so every error of that file is given and none of a file
-// after it (#185).
+// ids made in another package are looked for, too (#183). aapt2 37.0.0, given the .flat files one
+// by one, merges one at a time and stops at the first that fails, so every error of that file is
+// given and none of a file after it (#185).
 TEST(ResourceTable, MergeErrorsStopBeforeLink) {
   const std::string missing = "<resources><string name='q'>@string/nothing</string></resources>";
   const std::string conflictS = "resource 'string/s' has a conflicting value for configuration ()";
@@ -1433,8 +1433,9 @@ TEST(ResourceTable, MergeErrorsStopBeforeLink) {
         {"values/c.xml", strings("c")}},
        {{"b.xml", conflictS}, {"b.xml", conflictT}}},
   };
-  for (const Case& c : cases) {
-    SCOPED_TRACE(c.files[0].first + " " + c.files[0].second + ": " + c.errors[0].second);
+  for (size_t i = 0; i < cases.size(); i++) {
+    const Case& c = cases[i];
+    SCOPED_TRACE("case " + std::to_string(i) + ": " + c.files[0].first + " " + c.files[0].second);
     TempDir dir;
     ResourceTable table;
     std::vector<Diagnostic> errors;
