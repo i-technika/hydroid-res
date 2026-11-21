@@ -181,6 +181,17 @@ Config effectiveConfig(const Config& device, const std::vector<Config>& locales,
   return config;
 }
 
+// `config` with the script of its locale, where it names none and the tables know one, which
+// matches and isBetterThan otherwise work out for every value they are asked about.
+Config withScript(const Config& config) {
+  Config out = config;
+  if (out.script[0] == 0) {
+    out.script =
+        detail::computeScript(detail::packLanguage(out.lang), detail::packRegion(out.region));
+  }
+  return out;
+}
+
 }  // namespace
 
 const Candidate* bestCandidate(const Entry& entry, const Config& device) {
@@ -194,7 +205,12 @@ const Candidate* bestCandidate(const Entry& entry, const Config& device) {
 
 struct Resources::Impl {
   explicit Impl(const ResourceTable& t) : table(t), packageCount(t.packages().size()) {
-    config = effectiveConfig(device, locales, table);
+    setConfig(effectiveConfig(device, locales, table));
+  }
+
+  void setConfig(const Config& c) {
+    config = c;
+    matchConfig = withScript(c);
   }
 
   // Takes in the packages the table has added since the last call: what was picked from it is
@@ -202,7 +218,7 @@ struct Resources::Impl {
   void syncWithTable() {
     if (table.packages().size() == packageCount) return;
     packageCount = table.packages().size();
-    config = effectiveConfig(device, locales, table);
+    setConfig(effectiveConfig(device, locales, table));
     cache.clear();
     generation++;
   }
@@ -214,6 +230,7 @@ struct Resources::Impl {
   Config device;                // as setConfiguration was given it
   std::vector<Config> locales;  // as setConfiguration was given them
   Config config;                // effectiveConfig of those
+  Config matchConfig;           // withScript(config), which the values are picked by
   uint32_t generation = 0;
   std::unordered_map<ResId, const Candidate*> cache;  // of `config`, in the table as it is
 };
@@ -231,7 +248,7 @@ void Resources::setConfiguration(const Config& device, const std::vector<Config>
   impl_->locales = locales;
   if (config == impl_->config && packageCount == impl_->packageCount) return;
   impl_->packageCount = packageCount;
-  impl_->config = config;
+  impl_->setConfig(config);
   impl_->cache.clear();
   impl_->generation++;
 }
@@ -254,7 +271,7 @@ const Candidate* Resources::candidate(ResId id) const {
   if (const auto it = impl_->cache.find(id); it != impl_->cache.end()) return it->second;
   const Entry* entry = impl_->table.entry(id);
   if (entry == nullptr) return nullptr;
-  const Candidate* best = bestCandidate(*entry, impl_->config);
+  const Candidate* best = bestCandidate(*entry, impl_->matchConfig);
   impl_->cache.emplace(id, best);
   return best;
 }
