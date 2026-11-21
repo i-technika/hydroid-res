@@ -264,9 +264,10 @@ uint32_t Resources::generation() const {
   return impl_->generation;
 }
 
-const Candidate* Resources::candidate(ResId id) const {
+const Candidate* Resources::candidate(ResId id, uint32_t* generation) const {
   const std::lock_guard<std::mutex> lock(impl_->mutex);
   impl_->syncWithTable();
+  if (generation != nullptr) *generation = impl_->generation;
   if (const auto it = impl_->cache.find(id); it != impl_->cache.end()) return it->second;
   const Entry* entry = impl_->table.entry(id);
   if (entry == nullptr) return nullptr;

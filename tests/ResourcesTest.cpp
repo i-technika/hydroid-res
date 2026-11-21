@@ -206,6 +206,67 @@ TEST(Resources, KeepsACandidateUntilTheConfigurationChanges) {
   EXPECT_EQ(toString(day->config), "");
 }
 
+TEST(Resources, GivesTheGenerationOfACandidate) {
+  TempDir dir;
+  ResourceTable table;
+  addPackage(table, dir, {"night"});
+  Resources resources(table);
+  const ResId id = *table.find("com.example", ResType::String, "where");
+
+  resources.setConfiguration(dev("night"));
+  uint32_t generation = 0;
+  const Candidate* night = resources.candidate(id, &generation);
+  ASSERT_NE(night, nullptr);
+  EXPECT_EQ(generation, resources.generation());
+
+  resources.setConfiguration(dev("notnight"));
+  uint32_t after = generation;
+  EXPECT_NE(resources.candidate(id, &after), night);
+  EXPECT_NE(after, generation);
+  EXPECT_EQ(after, resources.generation());
+
+  // Of a resource it has not, too: that there is no value is as much of the generation.
+  uint32_t none = generation;
+  EXPECT_EQ(resources.candidate(makeResId(0x7f, 0x7f, 0), &none), nullptr);
+  EXPECT_EQ(none, after);
+}
+
+// The generation a candidate is given with is the one it was picked in (#207), as another thread
+// sets the configuration: one asked for after it might be of the configuration set in between.
+TEST(Resources, GivesTheGenerationOfACandidateAsTheConfigurationChanges) {
+  TempDir dir;
+  ResourceTable table;
+  addPackage(table, dir, {"night"});
+  Resources resources(table);
+  const ResId id = *table.find("com.example", ResType::String, "where");
+
+  // Each setConfiguration changes the configuration, so the generations of night are the odd
+  // ones, and those of the default configuration and of notnight the even ones.
+  const Config night = dev("night");
+  const Config notnight = dev("notnight");
+  std::atomic<int> wrong{0};
+  std::atomic<bool> done{false};
+  std::thread setter([&] {
+    for (int i = 0; i < 2000; i++) resources.setConfiguration(i % 2 == 0 ? night : notnight);
+    done = true;
+  });
+  std::vector<std::thread> readers;
+  for (int t = 0; t < 3; t++) {
+    readers.emplace_back([&] {
+      while (!done) {
+        uint32_t generation = 0;
+        const Candidate* c = resources.candidate(id, &generation);
+        const bool ofNight = c != nullptr && toString(c->config) == "night-v8";
+        if (ofNight != (generation % 2 == 1)) wrong++;
+      }
+    });
+  }
+  setter.join();
+  for (std::thread& reader : readers) reader.join();
+  EXPECT_EQ(wrong.load(), 0);
+  EXPECT_EQ(resources.generation(), 2000u);
+}
+
 TEST(Resources, SeesAPackageTheTableAdds) {
   TempDir dir;
   ResourceTable table;

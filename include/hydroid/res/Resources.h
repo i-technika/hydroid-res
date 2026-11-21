@@ -62,12 +62,16 @@ class Resources {
 
   // A number that changes whenever what `candidate` returns may: when setConfiguration changes
   // the configuration, and when the table has changed. What is derived from the values can be
-  // kept by it.
+  // kept by it: by the one `candidate` gives with them, or by one read before them, which at
+  // worst is older than they are, and has them thrown away at the next look. Not by one read
+  // after them: setConfiguration may have been called in between, on another thread, and the
+  // values of the configuration before would be kept as those of the new one.
   HYDROID_RES_API uint32_t generation() const;
 
   // The value of the resource `id` for the configuration, or nullptr if the table has no such
   // resource, or none of its values matches. The answers are kept until the generation changes.
-  HYDROID_RES_API const Candidate* candidate(ResId id) const;
+  // `generation`, if given, is set to the generation the answer is of.
+  HYDROID_RES_API const Candidate* candidate(ResId id, uint32_t* generation = nullptr) const;
 
  private:
   struct Impl;
