@@ -725,9 +725,13 @@ std::optional<Package> buildPackage(ParsedFolder folder, const std::string& name
         }
       }
     }
+    // aapt2 link, given the .flat files one by one as the golden cases give them
+    // (ordered_flats()), merges one at a time and stops at the first that fails to merge, with
+    // every error of that file and none of those after it (#185), before
+    // VerifyNoExternalPackages (#183). Given the archive of compile --dir, it goes on to the
+    // files after it.
+    if (!diag.empty()) return std::nullopt;
   }
-  // aapt2 stops at what fails to merge, before VerifyNoExternalPackages (#183).
-  if (!diag.empty()) return std::nullopt;
   // One error for each such id, after merging and in the order of package and name, as aapt2's
   // VerifyNoExternalPackages gives them from the merged table.
   for (const auto& [external, source] : externalIds) {
