@@ -84,7 +84,8 @@ bool matchesLanguageAndScript(const Locale& supported, const Locale& desired) {
   if (isPseudoLocale(supported) || isPseudoLocale(desired)) return false;
   const detail::ScriptCode supportedScript = likelyScript(supported);
   if (supportedScript[0] == '\0') {
-    // Nothing is known of the language: the regions must be the same, as before Android 7.
+    // Nothing is known of the language: the regions must be the same, as before Android 7, unless
+    // the table's names none.
     return supported.region[0] == '\0' || supported.region == desired.region;
   }
   return supportedScript == likelyScript(desired);
