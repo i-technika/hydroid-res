@@ -1390,31 +1390,58 @@ TEST(ResourceTable, ProductFilterComesAfterLink) {
 
 // What fails to merge stops link before ids are given and references linked, now that
 // ProductFilter, which used to stop it, comes after link (#180). A conflict stops it before the
-// ids made in another package are looked for, too (#183).
+// ids made in another package are looked for, too (#183). aapt2 37.0.0 merges one file at a time
+// and stops at the first that fails, so every error of that file is given and none of a file
+// after it (#185).
 TEST(ResourceTable, MergeErrorsStopBeforeLink) {
   const std::string missing = "<resources><string name='q'>@string/nothing</string></resources>";
-  const std::string conflict = "resource 'string/s' has a conflicting value for configuration ()";
-  const std::vector<std::pair<std::vector<std::pair<std::string, std::string>>, std::string>>
-      cases = {
-          {{{"values/a.xml", "<resources><string name='s'>a</string></resources>"},
-            {"values/b.xml", "<resources><string name='s'>b</string></resources>"},
-            {"values/c.xml", missing}},
-           conflict},
-          {{{"layout/l.xml", "<a y='@+app:id/b'/>"},
-            {"values/a.xml", "<resources><string name='s'>a</string></resources>"},
-            {"values/b.xml", "<resources><string name='s'>b</string></resources>"}},
-           conflict},
-          {{{"layout/l.xml", "<a y='@+app:id/b'/>"}, {"values/c.xml", missing}},
-           "defined resource 'app:id/b' for external package 'app'"},
-      };
-  for (const auto& [files, message] : cases) {
-    SCOPED_TRACE(files[0].first + ": " + message);
+  const std::string conflictS = "resource 'string/s' has a conflicting value for configuration ()";
+  const std::string conflictT = "resource 'string/t' has a conflicting value for configuration ()";
+  const auto strings = [](const std::string& value, const std::string& more = "") {
+    return "<resources><string name='s'>" + value + "</string>" + more + "</resources>";
+  };
+  const auto publicS = [](const std::string& id) {
+    return "<public type='string' name='s' id='" + id + "'/>";
+  };
+  struct Case {
+    std::vector<std::pair<std::string, std::string>> files;
+    // The file name and message of each error, in order.
+    std::vector<std::pair<std::string, std::string>> errors;
+  };
+  const std::vector<Case> cases = {
+      {{{"values/a.xml", strings("a")}, {"values/b.xml", strings("b")}, {"values/c.xml", missing}},
+       {{"b.xml", conflictS}}},
+      {{{"layout/l.xml", "<a y='@+app:id/b'/>"},
+        {"values/a.xml", strings("a")},
+        {"values/b.xml", strings("b")}},
+       {{"b.xml", conflictS}}},
+      {{{"layout/l.xml", "<a y='@+app:id/b'/>"}, {"values/c.xml", missing}},
+       {{"l.xml", "defined resource 'app:id/b' for external package 'app'"}}},
+      // Every file conflicts with the first: only the second one's error.
+      {{{"values/a.xml", strings("a")},
+        {"values/b.xml", strings("b")},
+        {"values/c.xml", strings("c")}},
+       {{"b.xml", conflictS}}},
+      // The file after the one that fails has an error of another kind.
+      {{{"values/a.xml", strings("a", publicS("0x7f010000"))},
+        {"values/b.xml", strings("b")},
+        {"values/c.xml", "<resources>" + publicS("0x7f010001") + "</resources>"}},
+       {{"b.xml", conflictS}}},
+      // Two conflicts in the file that fails: both, and not the one after it.
+      {{{"values/a.xml", strings("a", "<string name='t'>a</string>")},
+        {"values/b.xml", strings("b", "<string name='t'>b</string>")},
+        {"values/c.xml", strings("c")}},
+       {{"b.xml", conflictS}, {"b.xml", conflictT}}},
+  };
+  for (const Case& c : cases) {
+    SCOPED_TRACE(c.files[0].first + " " + c.files[0].second + ": " + c.errors[0].second);
     TempDir dir;
     ResourceTable table;
     std::vector<Diagnostic> errors;
-    EXPECT_FALSE(load(table, dir, files, "com.example", 0x7f, &errors));
-    ASSERT_EQ(errors.size(), 1u) << errorsOf(errors);
-    EXPECT_EQ(errors[0].message, message);
+    EXPECT_FALSE(load(table, dir, c.files, "com.example", 0x7f, &errors));
+    std::vector<std::pair<std::string, std::string>> got;
+    for (const Diagnostic& d : errors) got.emplace_back(d.file.filename().string(), d.message);
+    EXPECT_EQ(got, c.errors) << errorsOf(errors);
   }
 }
 
