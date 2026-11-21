@@ -7,15 +7,16 @@ on:
   workflow_dispatch:
     inputs:
       scope:
-        description: "full: every job; quick: core (ubuntu-24.04) and core (ubuntu-24.04, shared) only"
+        description: "full: every job; quick: core (ubuntu-24.04), its shared and its Clang job, and clang-format only"
         type: choice
         options: [full, quick]
         default: full
 
 # Two scopes. A pull request into a milestone's step<k>/ branch, which /fix-issue makes for each
-# sub-issue, runs the quick one: Linux, static and shared. Pushes to main, pull requests into main
-# (a milestone's own, from /open-ms) and a dispatch with scope=full (/close-ms) run every job.
-# Each job, or its matrix, repeats the test below, as `if:` and `strategy:` cannot read `env`:
+# sub-issue, runs the quick one, all on Linux: GCC, static and shared; Clang with the sanitizers;
+# and clang-format. Pushes to main, pull requests into main (a milestone's own, from /open-ms) and
+# a dispatch with scope=full (/close-ms) run every job. Each job left out of the quick scope, or
+# its matrix, repeats the test below, as `if:` and `strategy:` cannot read `env`:
 #   github.event_name == 'push' || github.base_ref == 'main' || inputs.scope == 'full'
 
 # A new push to a pull request makes the run still going for the old head pointless.
@@ -222,9 +223,11 @@ jobs:
       - name: Test
         run: ctest --test-dir build/installed --output-on-failure
 
+  # In the quick scope too. It is the one Clang there: code that GCC and MSVC take and Clang
+  # refuses would otherwise stop macos-15 and this job at the build in the milestone's full run,
+  # and keep every test merged after it from running under the sanitizers.
   sanitize:
     name: core (Clang, ASan and UBSan)
-    if: github.event_name == 'push' || github.base_ref == 'main' || inputs.scope == 'full'
     runs-on: ubuntu-24.04
     env:
       CC: clang
@@ -261,9 +264,9 @@ jobs:
       - name: Test
         run: ctest --preset sanitize
 
+  # In the quick scope too: it takes seconds, and not every PC has clang-format 23.1.5.
   format:
     name: clang-format
-    if: github.event_name == 'push' || github.base_ref == 'main' || inputs.scope == 'full'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
