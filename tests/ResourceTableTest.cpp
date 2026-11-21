@@ -15,6 +15,8 @@
 #include <sys/stat.h>
 #endif
 
+#include <algorithm>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>
@@ -481,6 +483,7 @@ TEST(ResourceTable, FailureLeavesTheTableAsItWas) {
                       "</resources>"}},
                     "com.b", 0x7f, &errors));
   EXPECT_FALSE(errors.empty());
+  const uint64_t revision = table.revision();
   EXPECT_FALSE(load(table, dir, {}, "com.c", 0x7e));  // the id is taken
   EXPECT_FALSE(load(table, dir, {}, "com.a", 0x7d));  // and the name
   EXPECT_FALSE(load(table, dir, {}, "com.d", 0));
@@ -488,7 +491,51 @@ TEST(ResourceTable, FailureLeavesTheTableAsItWas) {
   ASSERT_EQ(table.packages().size(), 1u);
   EXPECT_EQ(table.packages()[0].name, "com.a");
   EXPECT_FALSE(table.find("com.b:color/c"));
+  EXPECT_EQ(table.revision(), revision);
   EXPECT_TRUE(load(table, dir, {}, "com.e", 0x7f));
+  EXPECT_NE(table.revision(), revision);
+}
+
+// The revision of a table changes with what it holds, and never comes back to one it had (#205).
+TEST(ResourceTable, RevisionChangesWithWhatItHolds) {
+  TempDir dir;
+  ResourceTable table;
+  std::vector<uint64_t> seen = {table.revision()};
+  const auto changed = [&] {
+    const bool isNew = std::find(seen.begin(), seen.end(), table.revision()) == seen.end();
+    seen.push_back(table.revision());
+    return isNew;
+  };
+  ASSERT_TRUE(load(table, dir, {}, "com.a", 0x7e));
+  EXPECT_TRUE(changed());
+
+  // A copy holds what the table does, and takes its revision.
+  ResourceTable copy = table;
+  EXPECT_EQ(copy.revision(), table.revision());
+  ASSERT_TRUE(load(copy, dir, {}, "com.b", 0x7f));
+  EXPECT_EQ(table.packages().size(), 1u);
+
+  // Assigned what it held before, or a table of as many packages, it changes all the same.
+  table = copy;
+  EXPECT_TRUE(changed());
+  ResourceTable other;
+  ASSERT_TRUE(load(other, dir, {}, "com.c", 0x7e));
+  ASSERT_TRUE(load(other, dir, {}, "com.d", 0x7f));
+  const uint64_t otherRevision = other.revision();
+  table = std::move(other);
+  EXPECT_TRUE(changed());
+  EXPECT_NE(other.revision(), otherRevision);  // moved from
+  EXPECT_EQ(table.packages()[0].name, "com.c");
+
+  // Moved from, it may have lost what it held.
+  ResourceTable taken = std::move(table);
+  EXPECT_TRUE(changed());
+  EXPECT_EQ(taken.packages()[0].name, "com.c");
+  ResourceTable empty;
+  table = std::move(empty);
+  EXPECT_TRUE(changed());
+  ASSERT_TRUE(load(table, dir, {}, "com.a", 0x7e));
+  EXPECT_TRUE(changed());
 }
 
 TEST(ResourceTable, ErrorsSayWhere) {

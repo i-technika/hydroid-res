@@ -204,7 +204,7 @@ const Candidate* bestCandidate(const Entry& entry, const Config& device) {
 }
 
 struct Resources::Impl {
-  explicit Impl(const ResourceTable& t) : table(t), packageCount(t.packages().size()) {
+  explicit Impl(const ResourceTable& t) : table(t), tableRevision(t.revision()) {
     setConfig(effectiveConfig(device, locales, table));
   }
 
@@ -213,20 +213,19 @@ struct Resources::Impl {
     matchConfig = withScript(c);
   }
 
-  // Takes in the packages the table has added since the last call: what was picked from it is
-  // gone, and the locale may be another.
+  // Takes in what the table has changed since the last call, as the packages it has added: what
+  // was picked from it is gone, and the locale may be another.
   void syncWithTable() {
-    if (table.packages().size() == packageCount) return;
-    packageCount = table.packages().size();
+    if (table.revision() == tableRevision) return;
+    tableRevision = table.revision();
     setConfig(effectiveConfig(device, locales, table));
     cache.clear();
     generation++;
   }
 
   const ResourceTable& table;
-  std::mutex mutex;  // guards all that follows
-  // The table only ever adds packages, so their number tells when it has.
-  size_t packageCount;
+  std::mutex mutex;             // guards all that follows
+  uint64_t tableRevision;       // of the table as `config` and `cache` were made of it
   Config device;                // as setConfiguration was given it
   std::vector<Config> locales;  // as setConfiguration was given them
   Config config;                // effectiveConfig of those
@@ -242,12 +241,12 @@ Resources& Resources::operator=(Resources&& other) noexcept = default;
 
 void Resources::setConfiguration(const Config& device, const std::vector<Config>& locales) {
   const std::lock_guard<std::mutex> lock(impl_->mutex);
-  const size_t packageCount = impl_->table.packages().size();
+  const uint64_t tableRevision = impl_->table.revision();
   const Config config = effectiveConfig(device, locales, impl_->table);
   impl_->device = device;
   impl_->locales = locales;
-  if (config == impl_->config && packageCount == impl_->packageCount) return;
-  impl_->packageCount = packageCount;
+  if (config == impl_->config && tableRevision == impl_->tableRevision) return;
+  impl_->tableRevision = tableRevision;
   impl_->setConfig(config);
   impl_->cache.clear();
   impl_->generation++;

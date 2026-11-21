@@ -24,9 +24,10 @@ HYDROID_RES_API const Candidate* bestCandidate(const Entry& entry, const Config&
 
 // A table and the configuration of the device it is read for.
 //
-// Every member may be called from any thread at any time, but not while the table adds a
-// package. A candidate it returns is of the table: it stays what it is as the configuration
-// changes, and goes as the table's own entries do, when the table adds a package.
+// Every member may be called from any thread at any time, but not while the table changes. A
+// candidate it returns is of the table: it stays what it is as the configuration changes, and
+// goes as the table's own entries do, when the table changes: when it adds a package, or is
+// assigned or moved from (its revision, ResourceTable.h).
 class Resources {
  public:
   // For `table`, which must outlive this, and the default configuration, which only takes the
@@ -60,8 +61,8 @@ class Resources {
   HYDROID_RES_API Config configuration() const;
 
   // A number that changes whenever what `candidate` returns may: when setConfiguration changes
-  // the configuration, and when the table has added a package. What is derived from the values
-  // can be kept by it.
+  // the configuration, and when the table has changed. What is derived from the values can be
+  // kept by it.
   HYDROID_RES_API uint32_t generation() const;
 
   // The value of the resource `id` for the configuration, or nullptr if the table has no such
