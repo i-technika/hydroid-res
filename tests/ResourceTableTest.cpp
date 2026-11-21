@@ -187,8 +187,9 @@ TEST(ResourceTable, FindsAroundTheIdsAPublicGives) {
 
 // The last entry id, 0xffff, is one as any other: a <public> can give it, and the 65536th entry
 // of a type takes it. aapt2 37.0.0's IdAssigner gives it too, but aapt2 then stops on a check of
-// its own as it writes the table ("TableFlattener.cpp:175 Check failed"), with no error to
-// compare, so no golden case has such a folder (#190).
+// its own as it writes the binary table ("TableFlattener.cpp:175 Check failed"), with no error
+// to compare, so no golden case has such a folder (#190). It links one with --proto-format, and
+// gives the ids expected here.
 TEST(ResourceTable, GivesTheLastEntryId) {
   {
     TempDir dir;

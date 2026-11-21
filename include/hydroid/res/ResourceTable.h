@@ -40,8 +40,8 @@
 //     it public the same one, but once a file has made it public without one, a later file's id
 //     is left out, as aapt2 link merges them. The last entry id, 0xffff, is one as any other: a
 //     <public id=""> can give it, and the 65536th entry of a type takes it. aapt2 gives it too,
-//     then stops on a check of its own as it writes the table, with no error (#190), so aapt2
-//     builds no folder that has one.
+//     then stops on a check of its own as it writes the binary table, with no error (#190): it
+//     builds a folder that has one only with --proto-format, and with the same ids.
 //   - <attr> and <declare-styleable> always go in the default configuration, as do the ids that
 //     @+id/ makes, in values or in the attributes of an XML file, and those of the names of
 //     <enum> and <flag>. The id a <public type="id"> defines goes in the configuration of its

@@ -799,7 +799,7 @@ std::optional<Package> buildPackage(ParsedFolder folder, const std::string& name
   // its type, and of no other entry. Then the other types take the lowest type ids left from 1, in
   // the order of ResType, and the other entries of each type the lowest entry ids left from 0, in
   // the order of their names. 0xffff is an entry id as any other, here as in IdAssigner; aapt2
-  // stops on a check of its own later, as it writes a table that has it (#190).
+  // stops on a check of its own later, as it writes a binary table that has it (#190).
   std::map<Key, ResId> ids;
   std::map<ResType, uint8_t> typeIds;
   std::map<uint8_t, ResType> typeOfId;
