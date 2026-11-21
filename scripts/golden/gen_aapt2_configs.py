@@ -107,6 +107,8 @@ EDGE_CASES = [
     "b+en++US", "b++en", "b+en+",
     # Four subtags with a short second one: aapt2 keeps the region and drops the two after it.
     "b+de+DE+1901+1996", "b+ca+ES+valencia+1996", "b+es+419+1901+1996", "b+de+DE+x+abcdefghi",
+    # Beside them: two variants without a region, of which three subtags keep the second, and
+    # five subtags, which fail.
     "b+de+1901+1996", "b+sr+Latn+RS+ekavsk+1996", "b+de+DE+1901+1996+abcde",
     # Subtags BCP 47 does not allow, which aapt2 cuts short, packs wrongly or moves about.
     "b+e1", "b+e1+US", "en-r+x", "b+en+abcd", "b+en+xyz", "b+en+aaa", "b+sr+Latn+RS+",

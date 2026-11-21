@@ -110,9 +110,11 @@ not aapt2, and that writes the variant of a locale with no script as empty (#198
 builds has `values-b+de+DE+1901` as `values-de`, `values-b+ca+ES+valencia` as `values-ca` and
 `raw-b+de+DE+1901/x.txt` as `res/raw-de/x.txt`, and it fails on `values-b+de+1901`;
 `values-b+sr+Latn+RS+ekavsk` keeps its variant. No option turns that compiler off. hydroid
-follows aapt2, which keeps every variant, so from such a folder it can pick another value than
-an app built by the plugin does. The `folder-locale-variant` case of `table_cases.json` checks
-what aapt2 makes of them, and `ConfigMatchTest` the rules for variants, from AOSP's tests.
+follows aapt2, which keeps the variant, so from such a folder it can pick another value than
+an app built by the plugin does. (aapt2 drops variants only after a region in a `b+` name of
+four subtags, and hydroid with it: `values-b+de+DE+1901+1996` is `de-rDE`, #225.) The
+`folder-locale-variant` case of `table_cases.json` checks what aapt2 makes of them, and
+`ConfigMatchTest` the rules for variants, from AOSP's tests.
 
 The aapt2 files need only the SDK (build-tools 37.0.0 and platform android-37.0), no device, but
 they must be made on Windows: aapt2 writes some rows otherwise on Linux and macOS (#62).
