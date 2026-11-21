@@ -254,52 +254,38 @@ const Candidate* bestCandidate(const Entry& entry, const Config& device) {
 
 struct Resources::Impl {
   explicit Impl(const ResourceTable& t) : table(t), tableRevision(t.revision()) {
-    configs = effective(device, locales, chosen);
-    matchConfigs = withScripts(configs);
+    prepare(chosen, device, locales);
+    configs.swap(spareConfigs);
+    matchConfigs.swap(spareMatchConfigs);
   }
 
-  // effectiveConfig of `device` and each of `locales` at `chosen`, or of `device` alone.
-  static std::vector<Config> effective(const Config& device, const std::vector<Config>& locales,
-                                       const std::vector<size_t>& chosen) {
-    if (chosen.empty()) return {effectiveConfig(device, nullptr)};
-    std::vector<Config> out;
-    out.reserve(chosen.size());
-    for (const size_t i : chosen) out.push_back(effectiveConfig(device, &locales[i]));
-    return out;
+  // Makes into `spareConfigs` effectiveConfig of `d` and each of `l` at `c`, or of `d` alone, and
+  // into `spareMatchConfigs` withScript of each: what a call makes before it changes anything,
+  // so that one that throws leaves all as it was. They hold the configurations before the last
+  // that changed them, so one that changes only the device has the room it needs, and allocates
+  // nothing.
+  void prepare(const std::vector<size_t>& c, const Config& d, const std::vector<Config>& l) {
+    spareConfigs.clear();
+    spareMatchConfigs.clear();
+    if (c.empty()) {
+      spareConfigs.push_back(effectiveConfig(d, nullptr));
+    } else {
+      for (const size_t i : c) spareConfigs.push_back(effectiveConfig(d, &l[i]));
+    }
+    for (const Config& config : spareConfigs) spareMatchConfigs.push_back(withScript(config));
   }
 
-  static std::vector<Config> withScripts(const std::vector<Config>& of) {
-    std::vector<Config> out;
-    out.reserve(of.size());
-    for (const Config& config : of) out.push_back(withScript(config));
-    return out;
-  }
-
-  // What a call makes before it changes anything, so that one that throws leaves all as it was.
-  struct Next {
-    std::vector<size_t> chosen;
-    std::vector<Config> configs;
-    std::vector<Config> matchConfigs;
-  };
-
-  Next next(std::vector<size_t> c, const Config& d, const std::vector<Config>& l) const {
-    Next n;
-    n.configs = effective(d, l, c);
-    n.matchConfigs = withScripts(n.configs);
-    n.chosen = std::move(c);
-    return n;
-  }
-
-  // Makes `n` what the values are picked for, which changes what is picked if its
-  // configurations, or the default locale they are read with, are not those already, or the
-  // table has changed since.
-  void commit(Next& n, const std::optional<Config>& newDefault, uint64_t revision) noexcept {
-    chosen.swap(n.chosen);
-    const bool sameDefault = newDefault == defaultLocale || n.configs.size() == 1;
+  // Makes those prepare() made what the values are picked for, and `newChosen`, if given, the
+  // locales chosen. That changes what is picked if the configurations, or the default locale
+  // they are read with, are not those already, or the table has changed since.
+  void commit(std::vector<size_t>* newChosen, const std::optional<Config>& newDefault,
+              uint64_t revision) noexcept {
+    if (newChosen != nullptr) chosen.swap(*newChosen);
+    const bool sameDefault = newDefault == defaultLocale || spareConfigs.size() == 1;
     defaultLocale = newDefault;
-    if (n.configs == configs && sameDefault && revision == tableRevision) return;
-    configs.swap(n.configs);
-    matchConfigs.swap(n.matchConfigs);
+    if (spareConfigs == configs && sameDefault && revision == tableRevision) return;
+    configs.swap(spareConfigs);
+    matchConfigs.swap(spareMatchConfigs);
     tableRevision = revision;
     clearCaches();
     generation++;
@@ -336,9 +322,10 @@ struct Resources::Impl {
   void syncWithTable() {
     const uint64_t revision = table.revision();
     if (revision == tableRevision) return;
-    Next n = next(chooseLocales(locales, revision, localeConfig), device, locales);
+    std::vector<size_t> c = chooseLocales(locales, revision, localeConfig);
+    prepare(c, device, locales);
     const std::optional<Config> same = defaultLocale;
-    commit(n, same, revision);
+    commit(&c, same, revision);
   }
 
   void clearCaches() {
@@ -395,10 +382,13 @@ struct Resources::Impl {
   Config device;                // as setConfiguration was given it
   std::vector<Config> locales;  // as setConfiguration was given them
   LocaleConfig localeConfig;    // as setLocaleConfig was given it
-  std::optional<Config> defaultLocale;  // defaultLocaleOf(localeConfig)
-  std::vector<size_t> chosen;           // in `locales`, of those the resources are read in
-  std::vector<Config> configs;          // effectiveConfig of those, one at least
-  std::vector<Config> matchConfigs;     // withScript of each, which the values are picked by
+  std::optional<Config> defaultLocale;    // defaultLocaleOf(localeConfig)
+  std::vector<size_t> chosen;             // in `locales`, of those the resources are read in
+  std::vector<Config> configs;            // effectiveConfig of those, one at least
+  std::vector<Config> matchConfigs;       // withScript of each, which the values are picked by
+  std::vector<Config> spareConfigs;       // as prepare() made them, or those before `configs`
+  std::vector<Config> spareMatchConfigs;  // as prepare() made them, or those before
+                                          // `matchConfigs`
   uint32_t generation = 0;
   std::unordered_map<ResId, const Candidate*> cache;  // of `configs`, in the table as it is
   // As `cache`, of `configs` with another density, by the density.
@@ -419,19 +409,21 @@ void Resources::setConfiguration(const Config& device, const std::vector<Config>
   // As ResourcesImpl.updateConfigurationImpl, which asks for the locales of the table only when
   // the user's have changed: the locales are chosen again only when they, or the table, have.
   const bool localesChanged = locales != impl_->locales;
-  std::vector<Config> copy;
-  std::vector<size_t> chosen;
-  if (localesChanged || tableRevision != impl_->tableRevision) {
-    chosen = impl_->chooseLocales(locales, tableRevision, impl_->localeConfig);
-    if (localesChanged) copy = locales;
-  } else {
-    chosen = impl_->chosen;
+  if (!localesChanged && tableRevision == impl_->tableRevision) {
+    // The device alone: nothing is chosen again, and nothing allocated (#240). No vector is so
+    // much as made here, as an empty one allocates in MSVC's Debug library.
+    impl_->prepare(impl_->chosen, device, locales);
+    impl_->device = device;
+    impl_->commit(nullptr, impl_->defaultLocale, tableRevision);
+    return;
   }
-  Impl::Next n = impl_->next(std::move(chosen), device, locales);
+  std::vector<size_t> chosen = impl_->chooseLocales(locales, tableRevision, impl_->localeConfig);
+  std::vector<Config> copy;
+  if (localesChanged) copy = locales;
+  impl_->prepare(chosen, device, locales);
   if (localesChanged) impl_->locales.swap(copy);
   impl_->device = device;
-  const std::optional<Config> same = impl_->defaultLocale;
-  impl_->commit(n, same, tableRevision);
+  impl_->commit(&chosen, impl_->defaultLocale, tableRevision);
 }
 
 void Resources::setLocaleConfig(const LocaleConfig& config) {
@@ -439,11 +431,11 @@ void Resources::setLocaleConfig(const LocaleConfig& config) {
   const uint64_t tableRevision = impl_->table.revision();
   LocaleConfig copy = config;
   const std::optional<Config> defaultLocale = defaultLocaleOf(config);
-  Impl::Next n = impl_->next(impl_->chooseLocales(impl_->locales, tableRevision, config),
-                             impl_->device, impl_->locales);
+  std::vector<size_t> chosen = impl_->chooseLocales(impl_->locales, tableRevision, config);
+  impl_->prepare(chosen, impl_->device, impl_->locales);
   impl_->localeConfig.supported.swap(copy.supported);
   impl_->localeConfig.defaultLocale = copy.defaultLocale;
-  impl_->commit(n, defaultLocale, tableRevision);
+  impl_->commit(&chosen, defaultLocale, tableRevision);
 }
 
 Config Resources::configuration() const {
