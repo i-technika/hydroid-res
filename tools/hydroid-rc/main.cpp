@@ -36,7 +36,8 @@ int usage() {
                "        for none), and whose languages, the most wanted first, are the BCP 47\n"
                "        tags of --locales (ko-KR,en-US): first the locale it reads them in, then\n"
                "        a line for each resource, with the configuration of its value. Without a\n"
-               "        version (v34) among the qualifiers, the device is of API %d\n",
+               "        version (v34) among the qualifiers, the device is of API %d; with one,\n"
+               "        of that one, even where a folder so named is of a later (night-v4)\n",
                res::kEmulatedSdkVersion);
   return 2;
 }
@@ -64,28 +65,33 @@ int dump(const fs::path& folder, const std::string& package) {
   return 0;
 }
 
-// Whether one of the '-' parts of a folder name is a version, as v21 or v36.1 are.
-bool namesVersion(std::string_view qualifiers) {
+// The '-' part of a folder name that is its version, as v21 or v36.1 are, or "" for none.
+std::string_view versionPart(std::string_view qualifiers) {
   while (true) {
     const size_t dash = qualifiers.find('-');
     const std::string_view part = qualifiers.substr(0, dash);
     if (part.size() > 1 && (part[0] == 'v' || part[0] == 'V') && part[1] >= '0' && part[1] <= '9') {
-      return true;
+      return part;
     }
-    if (dash == std::string_view::npos) return false;
+    if (dash == std::string_view::npos) return {};
     qualifiers.remove_prefix(dash + 1);
   }
 }
 
 // The device of `qualifiers`, as parseConfig reads a folder name, but for the version that it
-// raises to the first that knows a qualifier (night is night-v8): a device is of the version it
-// says, and of kEmulatedSdkVersion, through setConfiguration, if it says none.
+// raises to the first that knows a qualifier (night is night-v8, and night-v4 too): a device is
+// of the version it says, and of kEmulatedSdkVersion, through setConfiguration, if it says none.
+// nullopt for a version no device has, which a folder may name only as it is raised:
+// anydpi-v4.1 is anydpi-v21, but a minor version needs v36 or later.
 std::optional<res::Config> deviceOf(const std::string& qualifiers) {
   std::optional<res::Config> device = res::parseConfig(qualifiers);
-  if (device && !namesVersion(qualifiers)) {
-    device->sdkVersion = 0;
-    device->minorVersion = 0;
-  }
+  if (!device) return std::nullopt;
+  std::optional<res::Config> version = res::Config();  // version 0, for none
+  const std::string_view part = versionPart(qualifiers);
+  if (!part.empty()) version = res::parseConfig(part);
+  if (!version) return std::nullopt;
+  device->sdkVersion = version->sdkVersion;
+  device->minorVersion = version->minorVersion;
   return device;
 }
 
@@ -103,9 +109,9 @@ std::optional<std::vector<res::Config>> localesOf(std::string_view tags) {
 }
 
 // What the device of `device` and `locales` picks of the table: the locale it chose, as
-// "locale (ko-rKR)", then for each resource of the folder its line of `dump`, followed by the
-// configuration and the value it picked, or by "no value" if none matches. The lines that follow
-// a style, array, plurals or attribute are indented under it.
+// "locale (ko-rKR)", then for each resource of the folder its line of `dump`, PUBLIC and all,
+// followed by the configuration and the value it picked, or by "no value" if none matches. The
+// lines that follow a style, array, plurals or attribute are indented under it.
 int pick(const fs::path& folder, const std::string& package, const res::Config& device,
          const std::vector<res::Config>& locales) {
   const std::optional<res::ResourceTable> table = load(folder, package);
@@ -126,7 +132,8 @@ int pick(const fs::path& folder, const std::string& package, const res::Config& 
         const res::ResId id = res::makeResId(p.id, type.id, entry.id);
         char hex[16];
         std::snprintf(hex, sizeof hex, "0x%08x", static_cast<unsigned>(id));
-        std::cout << "resource " << hex << ' ' << res::toString(type.type) << '/' << entry.name;
+        std::cout << "resource " << hex << ' ' << res::toString(type.type) << '/' << entry.name
+                  << (entry.isPublic ? " PUBLIC" : "");
         const res::Candidate* candidate = resources.candidate(id);
         if (candidate == nullptr) {
           std::cout << " no value\n";
