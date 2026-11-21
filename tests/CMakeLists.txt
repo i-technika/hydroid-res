@@ -4,6 +4,7 @@ add_executable(hydroid-res-tests
   Aapt2ConfigTest.cpp
   Aapt2TableTest.cpp
   Aapt2ValueTest.cpp
+  CApiTest.cpp
   ComplexTest.cpp
   ConfigMatchTest.cpp
   ConfigParserTest.cpp
@@ -52,6 +53,15 @@ endif()
 hydroid_set_warnings(hydroid-res-tests)
 
 gtest_discover_tests(hydroid-res-tests DISCOVERY_MODE PRE_TEST)
+
+# The C API from a C program, which hydroid_res.h must compile in as C99 (#203).
+add_executable(hydroid-res-capi-c-test CApiCTest.c)
+target_link_libraries(hydroid-res-capi-c-test PRIVATE hydroid::res)
+set_target_properties(hydroid-res-capi-c-test PROPERTIES
+  C_STANDARD 99 C_STANDARD_REQUIRED ON C_EXTENSIONS OFF)
+hydroid_set_warnings(hydroid-res-capi-c-test)
+add_test(NAME CApi.WorksFromC
+  COMMAND hydroid-res-capi-c-test ${PROJECT_SOURCE_DIR}/golden/table/res)
 
 # What Resources allocates, counted by an operator new of the program's own (#240), so in a
 # program of its own: hydroid-res-tests keeps the sanitizers' operator new, which checks that each
