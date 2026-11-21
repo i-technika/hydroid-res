@@ -528,6 +528,46 @@ TEST(ResourcesLocale, TheSystemsLocalesWhereTheAppHasNone) {
   EXPECT_EQ(chosen(resources), "ko-rKR");
 }
 
+// The locale is chosen once for the locales and the table, and kept while the rest of the device
+// changes (#206); chosen again when the locales are others, or the table is.
+TEST(ResourcesLocale, KeepsTheChoiceUntilTheLocalesOrTheTableChange) {
+  TempDir dir;
+  ResourceTable table;
+  addPackage(table, dir, {"ko", "ko-night", "night"});
+  Resources resources(table);
+  const std::vector<Config> frKo = tags({"fr-FR", "ko-KR"});
+
+  resources.setConfiguration(dev("night"), frKo);
+  EXPECT_EQ(chosen(resources), "ko-rKR-night");
+  EXPECT_EQ(where(resources, table), "ko-night");
+  const uint32_t night = resources.generation();
+  resources.setConfiguration(dev("night"), frKo);
+  EXPECT_EQ(resources.generation(), night);
+
+  // Only the device changes: the same locale, and the values of it.
+  resources.setConfiguration(dev("land-notnight"), frKo);
+  EXPECT_NE(resources.generation(), night);
+  EXPECT_EQ(chosen(resources), "ko-rKR-land-notnight");
+  EXPECT_EQ(where(resources, table), "ko");
+
+  // Other locales, of the same table.
+  resources.setConfiguration(dev("night"), tags({"fr-FR", "ja-JP"}));
+  EXPECT_EQ(chosen(resources), "fr-rFR-night");
+  EXPECT_EQ(where(resources, table), "night");
+  resources.setConfiguration(dev("ja-rJP-night"));
+  EXPECT_EQ(chosen(resources), "ja-rJP-night");
+  resources.setConfiguration(dev("night"), frKo);
+  EXPECT_EQ(chosen(resources), "ko-rKR-night");
+
+  // The same locales, of a table that has French now: setConfiguration sees it before anything
+  // else asks.
+  addPackage(table, dir, {"fr"}, "com.example.lib", 0x7e);
+  resources.setConfiguration(dev("night"), frKo);
+  EXPECT_EQ(chosen(resources), "fr-rFR-night");
+  EXPECT_EQ(where(resources, table), "night");
+  EXPECT_EQ(where(resources, table, "com.example.lib"), "fr");
+}
+
 TEST(ResourcesLocale, OldLanguageCodes) {
   TempDir dir;
   ResourceTable table;
