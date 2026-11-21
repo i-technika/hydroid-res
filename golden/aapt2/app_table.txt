@@ -209,6 +209,7 @@ Package name=com.itechnika.hydroid.golden id=7f
     resource 0x7f060022 string/pick_pixels
       () "default"
       (800x480) "800x480"
+      (1920x1080) "1920x1080"
       (4000x3000) "4000x3000"
     resource 0x7f060023 string/pick_precedence
       () "default"
