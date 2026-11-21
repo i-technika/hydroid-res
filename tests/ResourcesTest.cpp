@@ -255,7 +255,7 @@ TEST(Resources, AnswersFromSeveralThreads) {
     });
   }
   for (std::thread& thread : threads) thread.join();
-  EXPECT_EQ(wrong, 0);
+  EXPECT_EQ(wrong.load(), 0);
 }
 
 // ---- the locale of the device ----------------------------------------------------------------
@@ -383,13 +383,23 @@ TEST(ResourcesLocale, OldLanguageCodes) {
 }
 
 TEST(ResourcesLocale, TagalogIsFilipinoInAList) {
-  TempDir dir;
-  ResourceTable table;
-  addPackage(table, dir, {"tl", "ko"});
-  Resources resources(table);
-  resources.setConfiguration(Config{}, tags({"fr-FR", "fil-PH", "ko-KR"}));
-  EXPECT_EQ(chosen(resources), "fil-rPH");
-  EXPECT_EQ(where(resources, table), "tl");
+  for (const char* folder : {"tl", "tl-rPH"}) {
+    SCOPED_TRACE(folder);
+    TempDir dir;
+    ResourceTable table;
+    addPackage(table, dir, {folder, "ko"});
+    Resources resources(table);
+    // The table's Tagalog is Filipino to the list, which is how a device names it.
+    resources.setConfiguration(Config{}, tags({"fr-FR", "fil-PH", "ko-KR"}));
+    EXPECT_EQ(chosen(resources), "fil-rPH");
+    EXPECT_EQ(where(resources, table), folder);
+    // And tl in the list is then no language the table has, as on Android (golden/data,
+    // locales_ja-JP+tl-PH+ko-KR), though alone it takes the values of values-tl/.
+    resources.setConfiguration(Config{}, tags({"fr-FR", "tl-PH", "ko-KR"}));
+    EXPECT_EQ(chosen(resources), "ko-rKR");
+    resources.setConfiguration(Config{}, tags({"tl-PH"}));
+    EXPECT_EQ(where(resources, table), folder);
+  }
 }
 
 TEST(ResourcesLocale, ALanguageWithoutAKnownScriptGoesByRegion) {

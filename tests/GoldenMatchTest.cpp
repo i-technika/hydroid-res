@@ -33,14 +33,14 @@ constexpr int kTypeIntBoolean = 18;  // TypedValue.TYPE_INT_BOOLEAN
 
 // The golden app's res/, as hydroid loads it.
 const ResourceTable& table() {
-  static const ResourceTable* const t = [] {
-    auto* loaded = new ResourceTable;
+  static const ResourceTable t = [] {
+    ResourceTable loaded;
     std::vector<Diagnostic> errors;
-    EXPECT_TRUE(loaded->addPackage(HYDROID_TEST_RES_DIR, kPackage, kAppPackageId, &errors))
+    EXPECT_TRUE(loaded.addPackage(HYDROID_TEST_RES_DIR, kPackage, kAppPackageId, &errors))
         << (errors.empty() ? std::string() : errors[0].message);
     return loaded;
   }();
-  return *t;
+  return t;
 }
 
 // A value as TypedValue has it: its type and data, and the text of a string, whose data is only

@@ -115,7 +115,8 @@ size_t computeFirstMatchIndex(const std::vector<Locale>& desired,
 }
 
 // AssetManager2::GetResourceLocales, as AssetManager.getLocales and getNonSystemLocales have them:
-// the locales the values of the table are for, with Tagalog as Filipino.
+// the locales the values of the table are for, with Tagalog as Filipino
+// (ResTable_config::getBcp47Locale, canonicalizing).
 std::set<Locale> localesOf(const ResourceTable& table, bool excludeSystem) {
   std::set<Locale> locales;
   const Locale* last = nullptr;
@@ -126,7 +127,8 @@ std::set<Locale> localesOf(const ResourceTable& table, bool excludeSystem) {
         for (const Candidate& candidate : entry.candidates) {
           const Config& c = candidate.config;
           if (c.lang[0] == '\0') continue;
-          const Locale locale = javaLocaleOf(c);
+          Locale locale = javaLocaleOf(c);
+          if (locale.lang == kTl) locale.lang = kFil;
           // The values of a file follow each other, all of one locale.
           if (last != nullptr && *last == locale) continue;
           last = &*locales.insert(locale).first;
@@ -134,7 +136,6 @@ std::set<Locale> localesOf(const ResourceTable& table, bool excludeSystem) {
       }
     }
   }
-  if (locales.erase(Locale{kTl, {}, {}, {}}) != 0) locales.insert(Locale{kFil, {}, {}, {}});
   return locales;
 }
 
