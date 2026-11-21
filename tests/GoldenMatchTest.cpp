@@ -199,8 +199,9 @@ TEST(GoldenMatch, EveryFolderIsPickedSomewhere) {
       {"pick_id", {"id"}},
       // Android gives its resources no navigationHidden.
       {"pick_nav_hidden", {"navexposed", "navhidden"}},
-      // The emulator's display is larger than 800x480, and smaller than 4000x3000.
-      {"pick_pixels", {"4000x3000", "default"}},
+      // The emulator's display is 2400x1080 with its longer side first, in either orientation:
+      // larger than 1920x1080, which is better than 800x480, and smaller than 4000x3000.
+      {"pick_pixels", {"4000x3000", "800x480", "default"}},
       // Every condition is of API 37: v30 and v37 always match, v38 never does. The app is built
       // for API 24 and up, so aapt2 leaves out what v21 replaces there, the value of values/.
       {"pick_precedence", {"default"}},
