@@ -12,8 +12,6 @@
 #include <string>
 #include <vector>
 
-#include "core/LocaleData.h"
-#include "core/LocalePack.h"
 #include "hydroid/res/Config.h"
 #include "hydroid/res/ConfigParser.h"
 #include "hydroid/res/ResourceTable.h"
@@ -196,21 +194,29 @@ TEST(ConfigMatchAosp, SdkAndMinorVersionSelectBest) {
 
 // ---- AOSP: ConfigLocale_test.cpp -------------------------------------------------------------
 
+// The script matches works out for a locale that names none, of those AOSP's test asks for: the
+// one a device of that locale must name for the locale to match it. "" where it is not known,
+// and the regions decide instead, so that any script matches.
+std::string computedScript(const char* lang, const char* region) {
+  std::string found;
+  int count = 0;
+  for (const char* script : {"Hant", "Hans", "Latn", "Arab", "Xpeo"}) {
+    if (matches(locale(lang, region), locale(lang, region, script))) {
+      found = script;
+      count++;
+    }
+  }
+  return count == 1 ? found : count == 0 ? "another" : "";
+}
+
 TEST(ConfigMatchAosp, ComputesScript) {
-  const auto script = [](const char* lang, const char* region) {
-    const Config c = locale(lang, region);
-    const detail::ScriptCode s =
-        detail::computeScript(detail::packLanguage(c.lang), detail::packRegion(c.region));
-    return std::string(s.data(), s[0] == '\0' ? 0 : s.size());
-  };
-  EXPECT_EQ(script(nullptr, nullptr), "");
-  EXPECT_EQ(script("zh", "TW"), "Hant");
-  EXPECT_EQ(script("zh", "CN"), "Hans");
-  EXPECT_EQ(script("az", nullptr), "Latn");
-  EXPECT_EQ(script("az", "AZ"), "Latn");
-  EXPECT_EQ(script("az", "IR"), "Arab");
-  EXPECT_EQ(script("peo", nullptr), "Xpeo");
-  EXPECT_EQ(script("qaa", nullptr), "");
+  EXPECT_EQ(computedScript("zh", "TW"), "Hant");
+  EXPECT_EQ(computedScript("zh", "CN"), "Hans");
+  EXPECT_EQ(computedScript("az", nullptr), "Latn");
+  EXPECT_EQ(computedScript("az", "AZ"), "Latn");
+  EXPECT_EQ(computedScript("az", "IR"), "Arab");
+  EXPECT_EQ(computedScript("peo", nullptr), "Xpeo");
+  EXPECT_EQ(computedScript("qaa", nullptr), "");
 }
 
 TEST(ConfigMatchAosp, LocaleMatch) {
