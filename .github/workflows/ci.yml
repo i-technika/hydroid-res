@@ -15,8 +15,9 @@ on:
 # Two scopes. A pull request into a milestone's step<k>/ branch, which /fix-issue makes for each
 # sub-issue, runs the quick one, all on Linux: GCC, static and shared; Clang with the sanitizers;
 # and clang-format. Pushes to main, pull requests into main (a milestone's own, from /open-ms) and
-# a dispatch with scope=full (/close-ms) run every job. Each job left out of the quick scope, or
-# its matrix, repeats the test below, as `if:` and `strategy:` cannot read `env`:
+# a dispatch with scope=full (/close-ms) run every job. Each job the quick scope leaves out repeats
+# the test below in its `if:`, and core and shared, which it narrows to Linux, in their matrix, as
+# `if:` and `strategy:` cannot read `env`:
 #   github.event_name == 'push' || github.base_ref == 'main' || inputs.scope == 'full'
 
 # A new push to a pull request makes the run still going for the old head pointless.
