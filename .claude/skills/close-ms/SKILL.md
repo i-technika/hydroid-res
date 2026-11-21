@@ -1,6 +1,6 @@
 ---
 name: close-ms
-description: 마일스톤 메인 이슈 하나로 단계를 닫는다. 단계 브랜치에 full CI(14개 러너)를 돌리고, 이상이 없으면 단계 PR을 main에 머지해 메인 이슈와 마일스톤을 닫는다. CI가 오류로 실패하면 닫지 않고 서브이슈를 등록해 처리 순서를 보여 주고, 지연 등 오류가 아닌 실패면 실패한 job만 다시 돌린다. 메인 이슈 전용.
+description: 마일스톤 메인 이슈 하나로 단계를 닫는다. 단계 브랜치에 full CI(15개 러너)를 돌리고, 이상이 없으면 단계 PR을 main에 머지해 메인 이슈와 마일스톤을 닫는다. CI가 오류로 실패하면 닫지 않고 서브이슈를 등록해 처리 순서를 보여 주고, 지연 등 오류가 아닌 실패면 실패한 job만 다시 돌린다. 메인 이슈 전용.
 argument-hint: "[메인 이슈 번호]"
 disable-model-invocation: true
 ---
@@ -55,7 +55,7 @@ gh workflow run ci.yml --ref <branch> -f scope=full
   찾는다. `headSha`가 `git rev-parse HEAD`와 같은 실행이 나올 때까지 확인한다.
 - `gh workflow run`이 "workflow_dispatch 트리거가 없다"고 실패하면(main의 ci.yml이 아직 옛것), 단계 PR의
   최신 `pull_request` 실행을 다시 돌린다: `gh run rerun <id>`. base가 main이라 그 실행도 full이다.
-- 공용 절차 **CI 범위**대로 백그라운드로 기다리고, **14개 job 이름이 모두 있고 모두 `success`**인지 확인한다.
+- 공용 절차 **CI 범위**대로 백그라운드로 기다리고, **15개 job 이름이 모두 있고 모두 `success`**인지 확인한다.
   단계 PR 자체의 체크(`gh pr checks <M>`)도 모두 통과해야 한다.
 
 ### CI가 실패하면
@@ -72,7 +72,7 @@ step)를 보고 **오류**인지 **오류가 아닌 실패**인지 가린다.
 
 **오류가 아닌 실패** — **질문 지점**: 실패한 job 이름과 근거(로그 한 줄)를 보여 주고 묻는다.
 - `실패한 job만 다시 실행 (권장)` — `gh run rerun <id> --failed`. 통과한 job은 다시 돌지 않는다. 다시 돈 job을
-  백그라운드로 기다린 뒤, 14개 job이 모두 `success`인지 처음부터 다시 확인한다. 다시 돌린 job이 또
+  백그라운드로 기다린 뒤, 15개 job이 모두 `success`인지 처음부터 다시 확인한다. 다시 돌린 job이 또
   실패하면 이 절을 처음부터 다시 적용한다(같은 job이 두 번째로 같은 이유로 실패하면 오류일 수 있다고 보고에 적는다).
 - `중단` — 머지하지 않고 멈춘다. 다음에 `/close-ms <N>`을 다시 부르면 된다.
 
@@ -96,7 +96,7 @@ step)를 보고 **오류**인지 **오류가 아닌 실패**인지 가린다.
    `mergeStateStatus`가 `CLEAN` 또는 `HAS_HOOKS`인지 다시 본다. 다르면 3단계부터 다시 한다.
 2. `gh pr merge <M> --merge` (기존 단계 PR과 같은 merge commit). 단계 브랜치는 지우지 않는다.
 3. 메인 이슈: `gh issue view <N> --json state`. `Closes #<N>`으로 닫혔으면 그대로 두고, 열려 있으면
-   `gh issue close <N> --comment "#<M>을 main에 머지해 R<k>를 마칩니다. full CI(14개 러너): <run URL>"`.
+   `gh issue close <N> --comment "#<M>을 main에 머지해 R<k>를 마칩니다. full CI(15개 러너): <run URL>"`.
 4. 마일스톤: 열린 이슈가 0이면 닫는다:
    `gh api -X PATCH repos/<o>/<r>/milestones/<마일스톤 번호> -f state=closed`.
    2단계에서 `그대로 진행`을 골라 열린 이슈가 남았으면 닫지 않고 보고에 적는다.
@@ -104,6 +104,6 @@ step)를 보고 **오류**인지 **오류가 아닌 실패**인지 가린다.
 
 ## 5. 마무리
 
-1. 보고: 단계 PR, 머지 커밋, full CI 실행 링크와 14개 job 결과 표, 닫은 메인 이슈와 마일스톤, 옮기거나 남긴 서브이슈.
+1. 보고: 단계 PR, 머지 커밋, full CI 실행 링크와 15개 job 결과 표, 닫은 메인 이슈와 마일스톤, 옮기거나 남긴 서브이슈.
 2. 다음 마일스톤의 메인 이슈를 찾아 "다음: `/open-ms <번호>`"를 적는다.
 3. PushNotification으로 한 줄 알린다. 예: `R4 완료: PR #77 main 머지, #96·마일스톤 닫음`.
