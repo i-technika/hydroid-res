@@ -10,6 +10,7 @@
 #include <tuple>
 
 #include "core/FieldCount.h"
+#include "core/LocalePack.h"
 #include "core/QualifierNames.h"
 #include "hydroid/res/ConfigParser.h"
 
@@ -290,22 +291,10 @@ struct Packed {
 static_assert(detail::fieldCount<Config>() == 29,
               "a field added to Config goes in pack() too, and then this count");
 
-// ResTable_config::packLanguageOrRegion: two characters as they are, three packed in 5 bits each
-// above `base` ('a' for a language, '0' for a region) with the high bit set.
-uint32_t packLanguageOrRegion(const std::array<char, 4>& in, char base) {
-  uint8_t out0;
-  uint8_t out1;
-  if (in[2] == '\0') {
-    out0 = static_cast<uint8_t>(in[0]);
-    out1 = static_cast<uint8_t>(in[1]);
-  } else {
-    const auto first = static_cast<uint8_t>((in[0] - base) & 0x7f);
-    const auto second = static_cast<uint8_t>((in[1] - base) & 0x7f);
-    const auto third = static_cast<uint8_t>((in[2] - base) & 0x7f);
-    out0 = static_cast<uint8_t>(0x80 | (third << 2) | (second >> 3));
-    out1 = static_cast<uint8_t>((second << 5) | first);
-  }
-  return uint32_t{out0} | uint32_t{out1} << 8;
+// A language or region as the 16 bits Android compares: its two bytes (LocalePack.h), the first
+// the lower.
+uint32_t packed(const std::array<char, 2>& bytes) {
+  return uint32_t{static_cast<uint8_t>(bytes[0])} | uint32_t{static_cast<uint8_t>(bytes[1])} << 8;
 }
 
 template <typename E>
@@ -316,7 +305,7 @@ uint32_t u(E e) {
 Packed pack(const Config& c) {
   Packed p{};
   p.imsi = c.mcc | uint32_t{c.mnc} << 16;
-  p.locale = packLanguageOrRegion(c.lang, 'a') | packLanguageOrRegion(c.region, '0') << 16;
+  p.locale = packed(detail::packLanguage(c.lang)) | packed(detail::packRegion(c.region)) << 16;
   p.script = c.script;
   p.variant = c.variant;
   p.grammaticalInflection = u(c.grammaticalGender);
