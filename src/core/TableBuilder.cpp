@@ -740,37 +740,51 @@ std::optional<Package> buildPackage(ParsedFolder folder, const std::string& name
     }
   }
 
-  // ProductFilter with no product asked for: of each configuration, the value with no product
-  // or "default".
-  std::map<Key, std::vector<PendingValue>> kept;
+  // Every value of each entry, in the order of configuration, then product, that aapt2's
+  // ResourceEntry keeps them in, and link and ProductFilter go through them in.
+  std::map<Key, std::vector<PendingValue>> all;
   for (auto& [key, entry] : entries) {
-    std::vector<PendingValue>& values = kept[key];
-    std::vector<Config> done;
-    for (const PendingValue& v : entry.values) {
-      if (std::find(done.begin(), done.end(), v.config) != done.end()) continue;
-      done.push_back(v.config);
-      PendingValue* chosen = nullptr;
-      int defaults = 0;
-      for (PendingValue& w : entry.values) {
-        if (w.config == v.config && (w.product.empty() || w.product == "default")) {
-          chosen = &w;
-          defaults++;
-        }
-      }
-      if (defaults != 1) {
-        diag.error(v.source,
-                   std::string(defaults == 0 ? "no default product" : "multiple default products") +
-                       " defined for resource " + nameOf(key.first, key.second));
-        continue;
-      }
-      values.push_back(std::move(*chosen));
-    }
+    std::vector<PendingValue>& values = all[key] = std::move(entry.values);
     std::stable_sort(values.begin(), values.end(),
                      [](const PendingValue& a, const PendingValue& b) {
-                       return compareConfigs(a.config, b.config) < 0;
+                       const int c = compareConfigs(a.config, b.config);
+                       return c != 0 ? c < 0 : a.product < b.product;
                      });
   }
-  if (!diag.empty()) return std::nullopt;
+
+  // ProductFilter with no product asked for: of each configuration, the value with no product
+  // or "default". aapt2 runs it after link, which links every value, those it leaves out too, so
+  // that the errors of a reference come first (#180). Its own errors wait here till then. Of two
+  // defaults, the error is of the second; of none, aapt2's has no file or line, and hydroid's is of
+  // the first value.
+  std::map<Key, std::vector<bool>> keep;
+  Diagnostics products;
+  for (const auto& [key, values] : all) {
+    std::vector<bool>& kept = keep[key];
+    kept.assign(values.size(), false);
+    for (size_t begin = 0, end; begin < values.size(); begin = end) {
+      for (end = begin + 1; end < values.size() && values[end].config == values[begin].config;) {
+        end++;
+      }
+      std::optional<size_t> chosen;
+      bool twice = false;
+      for (size_t i = begin; i < end && !twice; i++) {
+        if (!values[i].product.empty() && values[i].product != "default") continue;
+        twice = chosen.has_value();
+        if (twice) {
+          products.error(values[i].source, "multiple default products defined for resource " +
+                                               nameOf(key.first, key.second));
+        }
+        chosen = i;
+      }
+      if (!chosen) {
+        products.error(values[begin].source,
+                       "no default product defined for resource " + nameOf(key.first, key.second));
+      } else if (!twice) {
+        kept[*chosen] = true;
+      }
+    }
+  }
 
   // Ids, as aapt2's IdAssigner gives them (#154). First those a <public id=""> gives, in the order
   // of type and name: each must be of this package, of a type id no other type has and the one of
@@ -781,7 +795,7 @@ std::optional<Package> buildPackage(ParsedFolder folder, const std::string& name
   std::map<ResType, uint8_t> typeIds;
   std::map<uint8_t, ResType> typeOfId;
   std::map<ResId, const Key*> given;
-  for (const auto& [key, values] : kept) {
+  for (const auto& [key, values] : all) {
     const PendingEntry& entry = entries[key];
     if (!entry.id) continue;
     const ResId resId = *entry.id;
@@ -814,14 +828,14 @@ std::optional<Package> buildPackage(ParsedFolder folder, const std::string& name
     return std::nullopt;
   }
   uint8_t nextType = 1;  // fewer types than 255 take less than all ids
-  for (const auto& [key, values] : kept) {
+  for (const auto& [key, values] : all) {
     if (typeIds.count(key.first)) continue;
     while (typeOfId.count(nextType)) nextType++;
     typeIds[key.first] = nextType;
     typeOfId[nextType] = key.first;
   }
   std::map<ResType, uint32_t> nextEntry;
-  for (const auto& [key, values] : kept) {
+  for (const auto& [key, values] : all) {
     if (ids.count(key)) continue;
     const uint8_t type = typeIds[key.first];
     uint32_t& next = nextEntry[key.first];
@@ -852,19 +866,31 @@ std::optional<Package> buildPackage(ParsedFolder folder, const std::string& name
               [](const Entry& a, const Entry& b) { return a.id < b.id; });
   }
 
-  Linker linker(package, kept, ids, deps, diag);
-  for (const auto& [key, values] : kept) {
+  Linker linker(package, all, ids, deps, diag);
+  // What ProductFilter leaves out is linked into a package of its own, for its errors only: aapt2
+  // flattens only what is kept, so none of it is in the table, nor its strings in the pool.
+  Package left;
+  left.id = id;
+  left.name = name;
+  Linker leftLinker(left, all, ids, deps, diag);
+  for (const auto& [key, values] : all) {
     // The package is not const, only the lookup.
     Entry& entry = const_cast<Entry&>(*std::as_const(package).entry(ids[key]));
-    for (const PendingValue& v : values) {
-      if (std::optional<Value> value = linker.link(v.value, v.source)) {
+    const std::vector<bool>& kept = keep[key];
+    for (size_t i = 0; i < values.size(); i++) {
+      const PendingValue& v = values[i];
+      if (!kept[i]) {
+        leftLinker.link(v.value, v.source);
+      } else if (std::optional<Value> value = linker.link(v.value, v.source)) {
         entry.candidates.push_back({v.config, *value});
       }
     }
   }
   // aapt2 link stops on "failed linking references." once the table has linked with errors, before
-  // it links any XML file (#165). Every stage before has returned on its errors, so these are the
-  // table's.
+  // ProductFilter (#180) and before it links any XML file (#165). Every stage before has returned
+  // on its errors, so these are the table's.
+  if (!diag.empty()) return std::nullopt;
+  for (const Diagnostic& d : products.errors()) diag.error({d.file, d.line}, d.message);
   if (!diag.empty()) return std::nullopt;
   for (const ParsedXmlAttribute& attribute : folder.xmlAttributes) {
     linker.linkXmlAttribute(attribute);

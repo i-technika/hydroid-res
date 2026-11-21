@@ -1345,6 +1345,49 @@ TEST(ResourceTable, AttrItemIsNotFoundAsAnAttr) {
   }
 }
 
+// aapt2 37.0.0 links every value, in the order of configuration and product, before ProductFilter
+// leaves some out (#180), which the golden cases see only as the first error. What it leaves out
+// is not in the pools; of two defaults, the error is of the second, here the one of 'default', a
+// product after none. aapt2 gives the error of no default with no line; hydroid gives the first
+// value's.
+TEST(ResourceTable, ProductFilterComesAfterLink) {
+  TempDir dir;
+  ResourceTable table;
+  std::vector<Diagnostic> errors;
+  ASSERT_TRUE(load(table, dir,
+                   {{"values/v.xml",
+                     "<resources><string name='p' product='tablet'>left out</string>"
+                     "<string name='p'>kept</string>"
+                     "<style name='S' product='tablet'/><style name='S'/></resources>"}},
+                   "com.example", 0x7f, &errors))
+      << errorsOf(errors);
+  const Package& p = *table.package("com.example");
+  EXPECT_EQ(p.strings, std::vector<std::string>{"kept"});
+  EXPECT_EQ(p.styles.size(), 1u);
+
+  const std::vector<std::pair<std::string, std::vector<std::pair<int, std::string>>>> cases = {
+      {"<string name='p' product='tablet'>@string/n1</string>\n<string name='p'>@string/n2</string>",
+       {{3, "resource string/n2 not found"}, {2, "resource string/n1 not found"}}},
+      {"<string name='p' product='default'>a</string>\n<string name='p'>b</string>",
+       {{2, "multiple default products defined for resource string/p"}}},
+      {"<string name='p'>b</string>\n<string name='p' product='default'>a</string>",
+       {{3, "multiple default products defined for resource string/p"}}},
+      {"<string name='p' product='tablet'>a</string>\n<string name='p' product='phone'>b</string>",
+       {{3, "no default product defined for resource string/p"}}},
+  };
+  uint8_t id = 0x7e;
+  for (const auto& [values, expected] : cases) {
+    SCOPED_TRACE(values);
+    errors.clear();
+    EXPECT_FALSE(load(table, dir, {{"values/v.xml", "<resources>\n" + values + "\n</resources>"}},
+                      "com.probe" + std::to_string(id), id, &errors));
+    id--;
+    std::vector<std::pair<int, std::string>> got;
+    for (const Diagnostic& d : errors) got.emplace_back(d.line, d.message);
+    EXPECT_EQ(got, expected) << errorsOf(errors);
+  }
+}
+
 // What an XML file names in android is linked once a package android is loaded, as aapt2 links
 // it against android.jar, and left alone while none is, as hydroid cannot read android.jar yet
 // (#132). The golden cases load no android, so the cases that need one are here.
