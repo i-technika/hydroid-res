@@ -279,8 +279,9 @@ class Linker {
 
   // An attr found where a style item or an XML attribute names an <attr>, which is not one (#166).
   // resolve() has not found any other: this one is of this package, with no value of the default
-  // configuration and no product, as one in values-land/ only or of product='default', an <attr>
-  // or not (#178).
+  // configuration and no product: an <item type='attr'> in values-land/ only, or an attr of
+  // product='default', an <attr> or not (#178). An <attr> in values-land/ is of the default
+  // configuration, where compile puts it.
   void notAnAttr(const ResName& name, const Source& source, Naming naming) {
     diag_.error(source, described(name, naming) + " is not an attribute");
   }
