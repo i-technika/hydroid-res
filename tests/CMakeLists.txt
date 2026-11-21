@@ -53,6 +53,19 @@ hydroid_set_warnings(hydroid-res-tests)
 
 gtest_discover_tests(hydroid-res-tests DISCOVERY_MODE PRE_TEST)
 
+# What Resources allocates, counted by an operator new of the program's own (#240), so in a
+# program of its own: hydroid-res-tests keeps the sanitizers' operator new, which checks that each
+# delete is of a new. Not in the sanitizers' builds, as theirs would be replaced.
+if(NOT CMAKE_CXX_FLAGS MATCHES "-fsanitize=")
+  add_executable(hydroid-res-alloc-tests ResourcesAllocTest.cpp)
+  target_link_libraries(hydroid-res-alloc-tests PRIVATE hydroid::res GTest::gtest_main)
+  # A DLL has its own operator new, so the tests skip what they cannot count there.
+  target_compile_definitions(hydroid-res-alloc-tests PRIVATE
+    "HYDROID_SHARED_LIBRARY=$<STREQUAL:$<TARGET_PROPERTY:hydroid-res,TYPE>,SHARED_LIBRARY>")
+  hydroid_set_warnings(hydroid-res-alloc-tests)
+  gtest_discover_tests(hydroid-res-alloc-tests DISCOVERY_MODE PRE_TEST)
+endif()
+
 # pugixml and expat are implementation details of hydroid::res, so its consumers must not see
 # them (#10).
 add_test(NAME CMake.DependenciesStayPrivate
