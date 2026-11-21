@@ -273,6 +273,10 @@ struct Resources::Impl {
       for (const size_t i : c) spareConfigs.push_back(effectiveConfig(d, &l[i]));
     }
     for (const Config& config : spareConfigs) spareMatchConfigs.push_back(withScript(config));
+    // The room the configurations before need to become the spare ones, which reserve() makes
+    // without changing what they hold, if it throws.
+    configs.reserve(spareConfigs.size());
+    matchConfigs.reserve(spareMatchConfigs.size());
   }
 
   // Makes those prepare() made what the values are picked for, and `newChosen`, if given, the
@@ -292,11 +296,13 @@ struct Resources::Impl {
   }
 
   // The indexes of those of `of` the resources are read in, for the table at `revision` and the
-  // LocaleConfig `app`, in their order: none if `of` is empty. It changes nothing but the
-  // locales of the table it keeps, so the choice and what it was made of are left as they were
-  // if it throws.
+  // LocaleConfig `app`, in their order: none if `of` is empty. `*widen` is set if, as one locale
+  // was chosen for the whole table though the app has a default, the next call that leaves the
+  // locales as they are reads in all of them (widened). It changes nothing but the locales of the
+  // table it keeps, so the choice and what it was made of are left as they were if it throws.
   std::vector<size_t> chooseLocales(const std::vector<Config>& of, uint64_t revision,
-                                    const LocaleConfig& app) {
+                                    const LocaleConfig& app, bool* widen) {
+    *widen = false;
     if (of.empty()) return {};
     if (of.size() > 1) {
       if (app.defaultLocale) {
@@ -308,7 +314,10 @@ struct Resources::Impl {
         tableLocalesRevision = revision;
       }
       const size_t index = chooseLocaleIndex(of, *tableLocales);
-      if (index != kNoMatch) return {index};
+      if (index != kNoMatch) {
+        *widen = app.defaultLocale.has_value();
+        return {index};
+      }
     }
     // One locale, or no locales in the table to choose by: with a default locale, all of them.
     if (!app.defaultLocale) return {0};
@@ -317,15 +326,31 @@ struct Resources::Impl {
     return all;
   }
 
+  // ResourcesImpl.updateConfiguration, which, having chosen one locale for the whole table
+  // though the app has a default, put it first in the configuration's locales; a call after it
+  // that leaves them as they are reads in all of them, the chosen first, the others in their
+  // order.
+  std::vector<size_t> widened() const {
+    std::vector<size_t> all;
+    all.reserve(locales.size());
+    all.push_back(chosen.front());
+    for (size_t i = 0; i < locales.size(); i++) {
+      if (i != chosen.front()) all.push_back(i);
+    }
+    return all;
+  }
+
   // Takes in what the table has changed since the last call, as the packages it has added: what
   // was picked from it is gone, and the locales may be others.
   void syncWithTable() {
     const uint64_t revision = table.revision();
     if (revision == tableRevision) return;
-    std::vector<size_t> c = chooseLocales(locales, revision, localeConfig);
+    bool widen = false;
+    std::vector<size_t> c = chooseLocales(locales, revision, localeConfig, &widen);
     prepare(c, device, locales);
     const std::optional<Config> same = defaultLocale;
     commit(&c, same, revision);
+    widenNext = widen;
   }
 
   void clearCaches() {
@@ -384,6 +409,7 @@ struct Resources::Impl {
   LocaleConfig localeConfig;    // as setLocaleConfig was given it
   std::optional<Config> defaultLocale;    // defaultLocaleOf(localeConfig)
   std::vector<size_t> chosen;             // in `locales`, of those the resources are read in
+  bool widenNext = false;                 // whether the next call reads in widened()
   std::vector<Config> configs;            // effectiveConfig of those, one at least
   std::vector<Config> matchConfigs;       // withScript of each, which the values are picked by
   std::vector<Config> spareConfigs;       // as prepare() made them, or those before `configs`
@@ -410,6 +436,14 @@ void Resources::setConfiguration(const Config& device, const std::vector<Config>
   // the user's have changed: the locales are chosen again only when they, or the table, have.
   const bool localesChanged = locales != impl_->locales;
   if (!localesChanged && tableRevision == impl_->tableRevision) {
+    if (impl_->widenNext) {
+      std::vector<size_t> all = impl_->widened();
+      impl_->prepare(all, device, locales);
+      impl_->device = device;
+      impl_->commit(&all, impl_->defaultLocale, tableRevision);
+      impl_->widenNext = false;
+      return;
+    }
     // The device alone: nothing is chosen again, and nothing allocated (#240). No vector is so
     // much as made here, as an empty one allocates in MSVC's Debug library.
     impl_->prepare(impl_->chosen, device, locales);
@@ -417,13 +451,16 @@ void Resources::setConfiguration(const Config& device, const std::vector<Config>
     impl_->commit(nullptr, impl_->defaultLocale, tableRevision);
     return;
   }
-  std::vector<size_t> chosen = impl_->chooseLocales(locales, tableRevision, impl_->localeConfig);
+  bool widen = false;
+  std::vector<size_t> chosen =
+      impl_->chooseLocales(locales, tableRevision, impl_->localeConfig, &widen);
   std::vector<Config> copy;
   if (localesChanged) copy = locales;
   impl_->prepare(chosen, device, locales);
   if (localesChanged) impl_->locales.swap(copy);
   impl_->device = device;
   impl_->commit(&chosen, impl_->defaultLocale, tableRevision);
+  impl_->widenNext = widen;
 }
 
 void Resources::setLocaleConfig(const LocaleConfig& config) {
@@ -431,11 +468,13 @@ void Resources::setLocaleConfig(const LocaleConfig& config) {
   const uint64_t tableRevision = impl_->table.revision();
   LocaleConfig copy = config;
   const std::optional<Config> defaultLocale = defaultLocaleOf(config);
-  std::vector<size_t> chosen = impl_->chooseLocales(impl_->locales, tableRevision, config);
+  bool widen = false;
+  std::vector<size_t> chosen = impl_->chooseLocales(impl_->locales, tableRevision, config, &widen);
   impl_->prepare(chosen, impl_->device, impl_->locales);
   impl_->localeConfig.supported.swap(copy.supported);
   impl_->localeConfig.defaultLocale = copy.defaultLocale;
   impl_->commit(&chosen, defaultLocale, tableRevision);
+  impl_->widenNext = widen;
 }
 
 Config Resources::configuration() const {

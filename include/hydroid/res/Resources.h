@@ -35,10 +35,11 @@ struct LocaleConfig {
 
 // LocaleConfig.parseLocaleConfig: the LocaleConfig of a file such as res/xml/locales_config.xml:
 // a root <locale-config>, with android:defaultLocale perhaps, holding a <locale> for each locale,
-// which android:name gives. Anything else in the root is passed over. nullopt, with what and
-// where in `errors` if given, if the file cannot be read, is no XML, has another root, a <locale>
-// without a name or one that is no language tag, or a default that is not, as written, one of
-// the names: Android has no default for an app then, and the locales without one change nothing.
+// which android:name gives. Anything else in the root is passed over, and so is a <locale>
+// without a name, or with one that is no language tag, which Android would make a locale of
+// all the same. nullopt, with what and where in `errors` if given, if the file cannot be read, is
+// no XML, has another root, or has a default that is not, as written, one of the names (Android
+// has no default for an app then, and the locales without one change nothing), or is no tag.
 HYDROID_RES_API std::optional<LocaleConfig> parseLocaleConfig(
     const std::filesystem::path& file, std::vector<Diagnostic>* errors = nullptr);
 
@@ -80,7 +81,10 @@ class Resources {
   //     has comes before one that is not, whatever its locale (isBetterThanBeforeLocale). A
   //     resource that has no value for one of those locales has none at all, as on Android. If
   //     the app supports none of the locales, or the table has none but pseudo-locales, the
-  //     choice is as without a default; in the latter, every locale is read in as above.
+  //     choice is as without a default; in the latter, every locale is read in as above. In the
+  //     former, Android puts the one chosen first in the configuration's locales, and reads in
+  //     those at the next update that leaves them as they are: so the next call that gives the
+  //     same `locales` reads in all of them, the one chosen first, then the others in order.
   //   - A language that has an old code is given that code, which is the one Android's resources
   //     go by: he is iw, id is in, yi is ji. So values-iw/ is Hebrew, and values-he/ is not
   //     picked for it.
@@ -89,8 +93,8 @@ class Resources {
   //   - The longer side of the screen in pixels is its width, so a phone held upright, of
   //     1080x2400, is 2400x1080 and takes values-2000x1000/, not values-800x480/.
   //   - navHidden is Any, as Android tells its resources nothing of it.
-  // The generation goes up if that changes the configuration. Each Resources looks for the
-  // locales of the table in all its values once for each revision of it, and chooses the locale
+  // The generation goes up if that changes what is picked (generation()). Each Resources looks for
+  // the locales of the table in all its values once for each revision of it, and chooses the locale
   // again only when `locales` or the table have changed, so a call that changes the rest of the
   // device, as a window is resized, costs little however many values the table has.
   HYDROID_RES_API void setConfiguration(const Config& device,
@@ -100,16 +104,18 @@ class Resources {
   // the LocaleConfig of the app's manifest (parseLocaleConfig reads its file): its default
   // locale, if it has one, has the resources picked for each of the user's locales it supports,
   // as setConfiguration says. The locales are chosen again for the locales setConfiguration was
-  // last given, and the generation goes up if that changes the configuration. An empty
-  // LocaleConfig, which a Resources starts with, is an app without one.
+  // last given, and the generation goes up if that changes what is picked (generation()). An
+  // empty LocaleConfig, which a Resources starts with, is an app without one.
   HYDROID_RES_API void setLocaleConfig(const LocaleConfig& config);
 
   // The configuration the values are picked for: the device's as setConfiguration made it, with
   // the locale it chose, or the first of those it reads in, with a default locale.
   HYDROID_RES_API Config configuration() const;
 
-  // A number that changes whenever what `candidate` returns may: when setConfiguration changes
-  // the configuration, and when the table has changed. What is derived from the values can be
+  // A number that changes whenever what `candidate` returns may: when setConfiguration or
+  // setLocaleConfig changes the configurations the values are picked for, or, of more than one,
+  // the default locale they are read with, and when the table has changed. What is derived from
+  // the values can be
   // kept by it: by the one `candidate` gives with them, or by one read before them, which at
   // worst is older than they are, and has them thrown away at the next look. Not by one read
   // after them: setConfiguration may have been called in between, on another thread, and the

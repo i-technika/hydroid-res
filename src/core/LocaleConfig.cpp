@@ -57,12 +57,11 @@ std::optional<LocaleConfig> parseLocaleConfig(const std::filesystem::path& file,
     if (child.type() != pugi::node_element || detail::localName(child.name()) != "locale") {
       continue;
     }
+    // LocaleConfig takes a <locale> without a name, and Locale.forLanguageTag makes a locale of
+    // any name; those it makes of what is no language tag are left out, as no Config holds them.
     const char* name = androidAttribute(child, "name");
-    if (name == nullptr) return fail(doc.line(child), "<locale> has no android:name");
-    if (!names.insert(name).second) continue;
-    std::optional<Config> locale = parseLanguageTag(name);
-    if (!locale) return fail(doc.line(child), "'" + std::string(name) + "' is no language tag");
-    config.supported.push_back(*locale);
+    if (name == nullptr || !names.insert(name).second) continue;
+    if (std::optional<Config> locale = parseLanguageTag(name)) config.supported.push_back(*locale);
   }
 
   if (const char* defaultLocale = androidAttribute(root, "defaultLocale")) {
@@ -72,6 +71,10 @@ std::optional<LocaleConfig> parseLocaleConfig(const std::filesystem::path& file,
                                       "' is not one of the <locale> names");
     }
     config.defaultLocale = parseLanguageTag(defaultLocale);
+    if (!config.defaultLocale) {
+      return fail(doc.line(root),
+                  "default locale '" + std::string(defaultLocale) + "' is no language tag");
+    }
   }
   return config;
 }

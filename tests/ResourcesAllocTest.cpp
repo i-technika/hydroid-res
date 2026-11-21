@@ -137,6 +137,28 @@ TEST(ResourcesAllocations, OnlyTheDeviceChangingAllocatesNothing) {
   EXPECT_EQ(chosen(resources), "ko-rKR-land-notnight");
 }
 
+// The same with the app's default locale, which has more than one locale read in (#199): the
+// first call after their number has grown has the room for them too.
+TEST(ResourcesAllocations, OnlyTheDeviceChangingAllocatesNothingForSeveralLocales) {
+  TempDir dir;
+  ResourceTable table;
+  REQUIRE_COUNTED(addPackage(table, dir, {"ko", "ja", "night"}));
+  Resources resources(table);
+  LocaleConfig app;
+  app.supported = tags({"fr", "ko", "ja"});
+  app.defaultLocale = app.supported[0];
+  resources.setLocaleConfig(app);
+  const std::vector<Config> frKoJa = tags({"fr-FR", "ko-KR", "ja-JP"});
+  const Config night = dev("night");
+  const Config day = dev("land-notnight");
+
+  EXPECT_GT(allocationsOf([&] { resources.setConfiguration(night, frKoJa); }), 0);
+  EXPECT_EQ(chosen(resources), "fr-rFR-night");
+  EXPECT_EQ(allocationsOf([&] { resources.setConfiguration(day, frKoJa); }), 0);
+  EXPECT_EQ(allocationsOf([&] { resources.setConfiguration(night, frKoJa); }), 0);
+  EXPECT_EQ(chosen(resources), "fr-rFR-night");
+}
+
 // For each allocation of a setConfiguration that chooses a locale, a call in which it fails:
 // what Resources answers is as before, it keeps not the device of the call, and the same call
 // again chooses.
