@@ -684,7 +684,8 @@ TEST(ConfigIsBetterThan, Locale) {
   EXPECT_TRUE(isBetterThan(cfg("b+es+419"), cfg("es"), device));
   EXPECT_TRUE(isBetterThan(cfg("es-rMX"), cfg("b+es+419"), device));
   EXPECT_TRUE(isBetterThan(cfg("b+es+419"), cfg("es-rES"), device));
-  // And not the other way: a table puts b+es+419 first, but either can come first here.
+  // And not the other way: a table meets each pair in one order only, but isBetterThan takes
+  // either.
   EXPECT_FALSE(isBetterThan(cfg("es"), cfg("b+es+419"), device));
   EXPECT_FALSE(isBetterThan(cfg("b+es+419"), cfg("es-rMX"), device));
   EXPECT_FALSE(isBetterThan(cfg("es-rES"), cfg("b+es+419"), device));
