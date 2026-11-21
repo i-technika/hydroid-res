@@ -268,9 +268,10 @@ std::string write(const Config& c, bool all) {
 
 // ResTable_config's fields as the integers ResTable_config::compare compares, in its order: each
 // union of a little-endian ResTable_config read as one uint32_t, so the field declared last in a
-// union is its high bits. The locale is followed by the script and the variant, which compare as
-// bytes. Every field of Config is in one of them; one added to Config fails the assert below
-// until it is.
+// union is its high bits. The version is the one exception: Android compares sdkVersion before
+// minorVersion, though minorVersion is declared last, so sdkVersion is the high half here. The
+// locale is followed by the script and the variant, which compare as bytes. Every field of Config
+// is in one of them; one added to Config fails the assert below until it is.
 struct Packed {
   uint32_t imsi;    // mcc | mnc << 16
   uint32_t locale;  // language[2] | country[2] << 16, each packed by packLanguageOrRegion
@@ -280,7 +281,7 @@ struct Packed {
   uint32_t screenType;     // orientation | touchscreen << 8 | density << 16
   uint32_t input;          // keyboard | navigation << 8 | (keysHidden | navHidden << 2) << 16
   uint32_t screenSize;     // screenWidth | screenHeight << 16
-  uint32_t version;        // sdkVersion | minorVersion << 16
+  uint32_t version;        // minorVersion | sdkVersion << 16
   uint32_t screenLayout;   // screenSize | screenLong << 4 | layoutDir << 6
   uint32_t screenLayout2;  // screenRound
   uint32_t colorMode;      // wideColorGamut | hdr << 2
@@ -312,7 +313,8 @@ Packed pack(const Config& c) {
   p.screenType = u(c.orientation) | u(c.touchscreen) << 8 | uint32_t{c.density} << 16;
   p.input = u(c.keyboard) | u(c.navigation) << 8 | (u(c.keysHidden) | u(c.navHidden) << 2) << 16;
   p.screenSize = c.screenWidth | uint32_t{c.screenHeight} << 16;
-  p.version = c.sdkVersion | uint32_t{c.minorVersion} << 16;
+  // Not in declaration order: see Packed.
+  p.version = c.minorVersion | uint32_t{c.sdkVersion} << 16;
   p.screenLayout = u(c.screenSize) | u(c.screenLong) << 4 | u(c.layoutDir) << 6;
   p.screenLayout2 = u(c.screenRound);
   p.colorMode = u(c.wideColorGamut) | u(c.hdr) << 2;

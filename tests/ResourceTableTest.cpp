@@ -96,6 +96,10 @@ TEST(ConfigOrder, ComparesPackedFields) {
   EXPECT_LT(compareConfigs(c("land"), c("ldpi")), 0);
   // The version comes before the screen layout: ldrtl (no version) before small-v4.
   EXPECT_LT(compareConfigs(c("ldrtl"), c("small")), 0);
+  // The version before the minor version, though Android packs the two in one union (#213).
+  EXPECT_LT(compareConfigs(c("v36"), c("v36.1")), 0);
+  EXPECT_LT(compareConfigs(c("v36.1"), c("v37")), 0);
+  EXPECT_LT(compareConfigs(c("v36.2"), c("v37.1")), 0);
 }
 
 TEST(ConfigOrder, IsATotalOrder) {
