@@ -103,7 +103,9 @@ change one thing the matrix leaves alone, such as a locale of another region or 
 of languages, the screen's size or shape, the UI mode, the input devices or the mcc, and one for
 each grammatical gender. The SDK sets that only for a whole app, with
 `GrammaticalInflectionManager`, so the test sets it for the golden app, dumps, and sets it back
-to none. Each file
+to none. aapt2 makes the gender folders `-v34`, so against `values/` the version alone would pick
+them; `pick_gender` is in `values-ldltr/` too, of the qualifier that comes after the gender,
+which only the gender beats. Each file
 records the `Configuration` the resources were resolved for and the value of every resource.
 `GoldenMatchTest` builds the same device from it and checks that hydroid picks the same values.
 To see by hand what hydroid picks for one device,

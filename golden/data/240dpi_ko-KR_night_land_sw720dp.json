@@ -151,8 +151,8 @@
     "string\/pick_gender": {
       "id": "0x7f060012",
       "type": 3,
-      "data": 2,
-      "string": "default"
+      "data": 29,
+      "string": "ldltr"
     },
     "string\/pick_hdr": {
       "id": "0x7f060013",

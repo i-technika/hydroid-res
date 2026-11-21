@@ -143,6 +143,7 @@ Package name=com.itechnika.hydroid.golden id=7f
       (widecg-v26) "widecg"
     resource 0x7f060012 string/pick_gender
       () "default"
+      (ldltr) "ldltr"
       (neuter-v34) "neuter"
       (feminine-v34) "feminine"
       (masculine-v34) "masculine"
