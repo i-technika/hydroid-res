@@ -521,8 +521,10 @@ TEST(ResourceTable, RevisionChangesWithWhatItHolds) {
   ResourceTable other;
   ASSERT_TRUE(load(other, dir, {}, "com.c", 0x7e));
   ASSERT_TRUE(load(other, dir, {}, "com.d", 0x7f));
+  const uint64_t otherRevision = other.revision();
   table = std::move(other);
   EXPECT_TRUE(changed());
+  EXPECT_NE(other.revision(), otherRevision);  // moved from
   EXPECT_EQ(table.packages()[0].name, "com.c");
 
   // Moved from, it may have lost what it held.

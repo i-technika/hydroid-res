@@ -285,9 +285,11 @@ class ResourceTable {
     }
   };
 
+  // First, so that the implicit assignments change it before what it holds: one that throws
+  // part of the way has changed it all the same.
+  Revision revision_;
   std::vector<Package> packages_;
   std::unordered_map<std::string, ResId> byName_;  // "package:type/name"
-  Revision revision_;
 };
 
 // The table as `aapt2 dump resources` prints an APK, from its "Package name=" line on: what aapt2

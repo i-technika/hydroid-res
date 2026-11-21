@@ -224,7 +224,7 @@ struct Resources::Impl {
   }
 
   const ResourceTable& table;
-  std::mutex mutex;  // guards all that follows
+  std::mutex mutex;             // guards all that follows
   uint64_t tableRevision;       // of the table as `config` and `cache` were made of it
   Config device;                // as setConfiguration was given it
   std::vector<Config> locales;  // as setConfiguration was given them

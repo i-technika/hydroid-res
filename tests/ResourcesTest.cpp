@@ -73,6 +73,17 @@ std::string where(const Resources& resources, const ResourceTable& table,
   return table.package(package)->strings.at(c->value.index());
 }
 
+// Whether `candidate` is one of the values `table` holds now for `id`, and not one of a table that
+// is gone, which may read as one of these when its memory has not been taken again.
+bool isOfTheTable(const Candidate* candidate, const ResourceTable& table, ResId id) {
+  const Entry* entry = table.entry(id);
+  if (entry == nullptr) return false;
+  for (const Candidate& c : entry->candidates) {
+    if (&c == candidate) return true;
+  }
+  return false;
+}
+
 // The locale Resources chose, as a folder would name it.
 std::string chosen(const Resources& resources) {
   Config c = resources.configuration();
@@ -234,8 +245,10 @@ TEST(Resources, SeesATableAssignedToIt) {
     addPackage(other, otherDir, {"ko"});
     table = std::move(other);
   }
+  const ResId id = *table.find("com.example", ResType::String, "where");
   EXPECT_NE(resources.generation(), before);
   EXPECT_EQ(chosen(resources), "ko-rKR-night");
+  EXPECT_TRUE(isOfTheTable(resources.candidate(id), table, id));
   EXPECT_EQ(where(resources, table), "ko");
 
   // Assigned a copy of what it holds, it holds it at another place.
@@ -243,6 +256,7 @@ TEST(Resources, SeesATableAssignedToIt) {
   const ResourceTable copy = table;
   table = copy;
   EXPECT_NE(resources.generation(), before);
+  EXPECT_TRUE(isOfTheTable(resources.candidate(id), table, id));
   EXPECT_EQ(where(resources, table), "ko");
 }
 
