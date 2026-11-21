@@ -122,7 +122,7 @@ struct TableLocales {
   std::set<Locale> system;  // of the package android
 };
 
-// Goes through every value of the table, so is made once for each revision of it.
+// Goes through every value of the table, so each Resources makes it once for each revision of it.
 TableLocales localesOf(const ResourceTable& table) {
   TableLocales locales;
   for (const Package& package : table.packages()) {
@@ -221,15 +221,16 @@ struct Resources::Impl {
     matchConfig = withScript(c);
   }
 
-  // Chooses the one of `locales` the resources are read in, for the table at `revision`.
-  void chooseLocale(uint64_t revision) {
-    localeIndex = 0;
-    if (locales.size() <= 1) return;
+  // The index of the one of `of` the resources are read in, for the table at `revision`. It
+  // changes nothing but the locales of the table it keeps, so the choice and what it was made
+  // of are left as they were if it throws.
+  size_t chooseLocale(const std::vector<Config>& of, uint64_t revision) {
+    if (of.size() <= 1) return 0;
     if (!tableLocales || tableLocalesRevision != revision) {
       tableLocales = localesOf(table);
       tableLocalesRevision = revision;
     }
-    localeIndex = chooseLocaleIndex(locales, *tableLocales);
+    return chooseLocaleIndex(of, *tableLocales);
   }
 
   // effectiveConfig of `device` and the locale chosen of `locales`.
@@ -241,8 +242,8 @@ struct Resources::Impl {
   // was picked from it is gone, and the locale may be another.
   void syncWithTable() {
     if (table.revision() == tableRevision) return;
+    localeIndex = chooseLocale(locales, table.revision());
     tableRevision = table.revision();
-    chooseLocale(tableRevision);
     setConfig(effective());
     cache.clear();
     generation++;
@@ -274,8 +275,11 @@ void Resources::setConfiguration(const Config& device, const std::vector<Config>
   // As ResourcesImpl.updateConfigurationImpl, which asks for the locales of the table only when
   // the user's have changed: the locale is chosen again only when they, or the table, have.
   if (locales != impl_->locales || tableRevision != impl_->tableRevision) {
-    impl_->locales = locales;
-    impl_->chooseLocale(tableRevision);
+    // Made before anything is changed, so that a call that throws leaves all as it was.
+    const size_t localeIndex = impl_->chooseLocale(locales, tableRevision);
+    std::vector<Config> copy = locales;
+    impl_->locales.swap(copy);
+    impl_->localeIndex = localeIndex;
   }
   impl_->device = device;
   const Config config = impl_->effective();
