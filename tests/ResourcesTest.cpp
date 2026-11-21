@@ -523,14 +523,17 @@ TEST(ResourcesLocale, ATableWithoutLocalesChoosesNothing) {
     EXPECT_EQ(chosen(resources), "fr-rFR");
   }
 
-  // en-XA in a script is no pseudo-locale but English, so the table has a locale and English
-  // counts.
-  TempDir dir;
-  ResourceTable table;
-  addPackage(table, dir, {"night", "b+en+Latn+XA"});
-  Resources resources(table);
-  resources.setConfiguration(Config{}, tags({"fr-FR", "en-US"}));
-  EXPECT_EQ(chosen(resources), "en-rUS");
+  // en-XA in a script or of a variant is no pseudo-locale but English, so the table has a locale
+  // and English counts.
+  for (const char* english : {"b+en+Latn+XA", "b+en+XA+posix"}) {
+    SCOPED_TRACE(english);
+    TempDir dir;
+    ResourceTable table;
+    addPackage(table, dir, {"night", english});
+    Resources resources(table);
+    resources.setConfiguration(Config{}, tags({"fr-FR", "en-US"}));
+    EXPECT_EQ(chosen(resources), "en-rUS");
+  }
 }
 
 TEST(ResourcesLocale, TheSystemsLocalesWhereTheAppHasNone) {
