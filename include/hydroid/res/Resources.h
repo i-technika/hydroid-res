@@ -52,6 +52,9 @@ class Resources {
   //     go by: he is iw, id is in, yi is ji. So values-iw/ is Hebrew, and values-he/ is not
   //     picked for it.
   //   - A version of 0 is kEmulatedSdkVersion.
+  //   - The longer side of the screen in pixels is its width, so a phone held upright, of
+  //     1080x2400, is 2400x1080 and takes values-2000x1000/, not values-800x480/.
+  //   - navHidden is Any, as Android tells its resources nothing of it.
   // The generation goes up if that changes the configuration.
   HYDROID_RES_API void setConfiguration(const Config& device,
                                         const std::vector<Config>& locales = {});

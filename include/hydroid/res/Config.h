@@ -21,9 +21,10 @@ namespace hydroid::res {
 // old code where it has one (iw, in, ji, not he, id, yi), and the script only where the tag
 // names one ("sr-Latn"); matching works out the script of the others. Its sdkVersion is
 // kEmulatedSdkVersion (Version.h), its keysHidden is KeysHidden::Soft where the keyboard is the
-// soft one, and its navHidden is NavHidden::Any, as Android tells its resources nothing of it:
+// soft one, its screenWidth is the longer side of the screen in pixels, however the device is
+// held, and its navHidden is NavHidden::Any, as Android tells its resources nothing of it:
 // values-navexposed/ and values-navhidden/ are of no Android device.
-// Resources::setConfiguration sees to the language and the version.
+// Resources::setConfiguration sees to the language, the version, the pixels and navHidden.
 //
 // The numbering system of a device's locale (the nu-latn of ar-EG-u-nu-latn), which
 // ResTable_config keeps, has no field here (#51). A folder cannot name one, as aapt2 link

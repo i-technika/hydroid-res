@@ -71,11 +71,12 @@ inline GoldenDevice goldenDevice(const nlohmann::json& condition) {
                           ? KeysHidden::Soft
                           : static_cast<KeysHidden>(at("keyboardHidden"));
   config.keyboard = static_cast<Keyboard>(at("keyboard"));
-  // Android gives its resources no navigationHidden: navHidden stays Any.
   config.navigation = static_cast<Navigation>(at("navigation"));
-  // The display in pixels, its longer side as the width.
-  config.screenWidth = static_cast<uint16_t>(std::max(at("widthPixels"), at("heightPixels")));
-  config.screenHeight = static_cast<uint16_t>(std::min(at("widthPixels"), at("heightPixels")));
+  // These two as the device has them, which Resources::setConfiguration must take as Android does:
+  // navHidden it drops, and of the display in pixels, it makes the longer side the width.
+  config.navHidden = static_cast<NavHidden>(at("navigationHidden"));
+  config.screenWidth = static_cast<uint16_t>(at("widthPixels"));
+  config.screenHeight = static_cast<uint16_t>(at("heightPixels"));
   const int sdkIntFull = condition.at("sdkIntFull").get<int>();
   config.sdkVersion = static_cast<uint16_t>(sdkIntFull / 100000);
   config.minorVersion = static_cast<uint16_t>(sdkIntFull % 100000);

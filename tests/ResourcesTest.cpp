@@ -161,6 +161,45 @@ TEST(Resources, VersionOfTheDevice) {
   EXPECT_EQ(where(resources, table), "v38");
 }
 
+TEST(Resources, TheLongerSideOfTheScreenIsItsWidth) {
+  TempDir dir;
+  ResourceTable table;
+  addPackage(table, dir, {"800x480", "2000x1000"});
+  Resources resources(table);
+
+  // A phone held upright: 1080 wide is more than 1000, but 2400 is not more than 800.
+  Config upright;
+  upright.screenWidth = 1080;
+  upright.screenHeight = 2400;
+  resources.setConfiguration(upright);
+  EXPECT_EQ(resources.configuration().screenWidth, 2400);
+  EXPECT_EQ(resources.configuration().screenHeight, 1080);
+  EXPECT_EQ(where(resources, table), "2000x1000");
+
+  // Turned on its side it is the same configuration, and nothing changes.
+  const uint32_t generation = resources.generation();
+  Config onItsSide;
+  onItsSide.screenWidth = 2400;
+  onItsSide.screenHeight = 1080;
+  resources.setConfiguration(onItsSide);
+  EXPECT_EQ(resources.generation(), generation);
+  EXPECT_EQ(where(resources, table), "2000x1000");
+}
+
+TEST(Resources, NavHiddenIsNotTheDevices) {
+  TempDir dir;
+  ResourceTable table;
+  addPackage(table, dir, {"navexposed", "navhidden"});
+  Resources resources(table);
+  for (const NavHidden navHidden : {NavHidden::No, NavHidden::Yes}) {
+    Config device;
+    device.navHidden = navHidden;
+    resources.setConfiguration(device);
+    EXPECT_EQ(resources.configuration().navHidden, NavHidden::Any);
+    EXPECT_EQ(where(resources, table), "default");
+  }
+}
+
 TEST(Resources, GenerationChangesWithTheConfiguration) {
   TempDir dir;
   ResourceTable table;
