@@ -252,14 +252,20 @@ TEST(Resources, GivesTheGenerationOfACandidateAsTheConfigurationChanges) {
   // ones, and those of the default configuration and of notnight the even ones.
   const Config night = dev("night");
   const Config notnight = dev("notnight");
-  // The configuration is set only once all the readers are up, so that they read as it changes.
+  // The configuration is set, from when all the readers are up, until they have read a good many
+  // times as it changes, however the threads are given their turns.
   constexpr int kReaders = 3;
+  constexpr int kReads = 1000;
   std::atomic<int> started{0};
+  std::atomic<int> reads{0};
   std::atomic<int> wrong{0};
   std::atomic<bool> done{false};
+  uint32_t sets = 0;
   std::thread setter([&] {
     while (started < kReaders) std::this_thread::yield();
-    for (int i = 0; i < 2000; i++) resources.setConfiguration(i % 2 == 0 ? night : notnight);
+    for (; sets < 2000 || reads < kReads; sets++) {
+      resources.setConfiguration(sets % 2 == 0 ? night : notnight);
+    }
     done = true;
   });
   std::vector<std::thread> readers;
@@ -271,13 +277,15 @@ TEST(Resources, GivesTheGenerationOfACandidateAsTheConfigurationChanges) {
         const Candidate* c = resources.candidate(id, &generation);
         const bool ofNight = c != nullptr && toString(c->config) == "night-v8";
         if (ofNight != (generation % 2 == 1)) wrong++;
+        reads++;
       }
     });
   }
   setter.join();
   for (std::thread& reader : readers) reader.join();
   EXPECT_EQ(wrong.load(), 0);
-  EXPECT_EQ(resources.generation(), 2000u);
+  EXPECT_GE(reads.load(), kReads);
+  EXPECT_EQ(resources.generation(), sets);
 }
 
 TEST(Resources, SeesAPackageTheTableAdds) {
