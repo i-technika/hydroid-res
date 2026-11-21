@@ -672,6 +672,9 @@ TEST(ConfigIsBetterThan, ScreenInPixelsByItsSum) {
   EXPECT_TRUE(isBetterThan(cfg("800x480"), cfg("640x480"), device));
   EXPECT_FALSE(isBetterThan(cfg("640x480"), cfg("800x480"), device));
   EXPECT_TRUE(isBetterThan(cfg("640x480"), Config{}, device));
+  // The same width, so only the height tells them apart.
+  EXPECT_TRUE(isBetterThan(cfg("800x480"), cfg("800x300"), device));
+  EXPECT_FALSE(isBetterThan(cfg("800x300"), cfg("800x480"), device));
 }
 
 TEST(ConfigIsBetterThan, Locale) {
@@ -681,6 +684,10 @@ TEST(ConfigIsBetterThan, Locale) {
   EXPECT_TRUE(isBetterThan(cfg("b+es+419"), cfg("es"), device));
   EXPECT_TRUE(isBetterThan(cfg("es-rMX"), cfg("b+es+419"), device));
   EXPECT_TRUE(isBetterThan(cfg("b+es+419"), cfg("es-rES"), device));
+  // And not the other way: a table puts b+es+419 first, but either can come first here.
+  EXPECT_FALSE(isBetterThan(cfg("es"), cfg("b+es+419"), device));
+  EXPECT_FALSE(isBetterThan(cfg("b+es+419"), cfg("es-rMX"), device));
+  EXPECT_FALSE(isBetterThan(cfg("es-rES"), cfg("b+es+419"), device));
   // Without a locale, a device takes none for better.
   EXPECT_FALSE(isBetterThan(cfg("es"), Config{}, Config{}));
   EXPECT_FALSE(isBetterThan(Config{}, cfg("es"), Config{}));
