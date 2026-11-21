@@ -121,7 +121,7 @@
     "string\/pick_es_mx": {
       "id": "0x7f06000d",
       "type": 3,
-      "data": 108,
+      "data": 110,
       "string": "es-rMX"
     },
     "string\/pick_fil": {
@@ -217,7 +217,7 @@
     "string\/pick_mcc": {
       "id": "0x7f06001d",
       "type": 3,
-      "data": 111,
+      "data": 113,
       "string": "mcc310-mnc260"
     },
     "string\/pick_nav_hidden": {

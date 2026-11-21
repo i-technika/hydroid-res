@@ -58,8 +58,13 @@ ctest --preset debug
 ```
 
 With GCC or Clang, the `sanitize` preset does the same under AddressSanitizer and
-UndefinedBehaviorSanitizer, and stops at the first error; CI runs it with Clang on Linux. It is
-not offered on Windows, where MSVC would ignore its flags.
+UndefinedBehaviorSanitizer, and stops at the first error; CI runs it with Clang on Linux. The
+`tsan` preset does it under ThreadSanitizer, which finds the data races of code that several
+threads call, as `Resources` is (#236); CI runs it with Clang on Linux in its full scope. On a
+kernel that randomizes mmap with more bits than 28, as CI's runners do, the ThreadSanitizer of
+some compiler releases stops every test with "unexpected memory mapping"; CI first runs
+`sudo sysctl vm.mmap_rnd_bits=28`, which does for a local run too. Neither preset is offered on
+Windows, where MSVC would ignore their flags.
 
 With an Android NDK and Python at hand, `ctest` also runs `AConfiguration.MatchesNdk`, which
 checks the values of `Config.h` against the NDK's `android/configuration.h`. It finds the NDK in
@@ -92,8 +97,8 @@ Open `golden/` in Android Studio, or build it with `golden/gradlew`. Then:
 python scripts/golden/pull_golden.py
 ```
 
-This runs `GoldenDumpTest` over 375 conditions and writes `golden/data/*.json`: a matrix of 252
-(7 densities × 3 languages × night × orientation × 3 smallest widths), and 123 more that each
+This runs `GoldenDumpTest` over 377 conditions and writes `golden/data/*.json`: a matrix of 252
+(7 densities × 3 languages × night × orientation × 3 smallest widths), and 125 more that each
 change one thing the matrix leaves alone, such as a locale of another region or script, a list
 of languages, the screen's size or shape, the UI mode, the input devices or the mcc. Each file
 records the `Configuration` the resources were resolved for and the value of every resource.
@@ -119,7 +124,11 @@ which folder Android took it from. A folder added for one needs a condition that
 line in `GoldenMatch.EveryFolderIsPickedSomewhere` saying why none does. Two things have no
 folder there, because the app is built by the Android Gradle plugin and dumped through the SDK:
 a locale with a variant and no script, and the grammatical gender (the SDK only sets it for a
-whole app).
+whole app). A variant with a script the plugin keeps, so `values-b+sr+Latn+RS+ekavsk/` and
+`values-b+sr+Latn+RS/`, of the same region, are there for it: `sr-Latn-RS-ekavsk` takes the
+first, only because its variant matches. `sr-Latn-RS` and `sr-Latn-RS-ijekavsk` take the
+second, which they would take anyway as the first of two equal folders in the table, so that a
+device with no variant prefers a folder with none only `ConfigMatchTest` checks.
 
 The plugin (9.5.1) compiles values and most files (raw, layout, xml) with a compiler of its own,
 not aapt2, and that writes the variant of a locale with no script as empty (#198). An app it
@@ -130,7 +139,8 @@ follows aapt2, which keeps the variant, so from such a folder it can pick anothe
 an app built by the plugin does. (aapt2 drops variants only after a region in a `b+` name of
 four subtags, and hydroid with it: `values-b+de+DE+1901+1996` is `de-rDE`, #225.) The
 `folder-locale-variant` case of `table_cases.json` checks what aapt2 makes of them, and
-`ConfigMatchTest` the rules for variants, from AOSP's tests.
+`ConfigMatchTest` the rules for variants, from AOSP's tests; the golden app checks only that a
+matching variant wins, and only with a script.
 
 The aapt2 files need only the SDK (build-tools 37.0.0 and platform android-37.0), no device, but
 they must be made on Windows: aapt2 writes some rows otherwise on Linux and macOS (#62).

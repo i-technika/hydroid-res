@@ -1,6 +1,6 @@
 ---
 name: open-ms
-description: 마일스톤 메인 이슈 하나로 단계를 연다. main에서 단계 브랜치를 만들어 마일스톤 전체를 구현하고 main으로 가는 PR을 만들어 full CI(15개 job)를 통과시킨 뒤, 별도 리뷰어 에이전트의 적대적 리뷰로 나온 문제를 서브이슈로 등록하고 처리 순서를 보여 준다. 메인 이슈 전용.
+description: 마일스톤 메인 이슈 하나로 단계를 연다. main에서 단계 브랜치를 만들어 마일스톤 전체를 구현하고 main으로 가는 PR을 만들어 full CI(16개 job)를 통과시킨 뒤, 별도 리뷰어 에이전트의 적대적 리뷰로 나온 문제를 서브이슈로 등록하고 처리 순서를 보여 준다. 메인 이슈 전용.
 argument-hint: "[메인 이슈 번호]"
 disable-model-invocation: true
 ---
@@ -92,7 +92,7 @@ gh pr create --base main --head step<k>/<slug> --title "<k>단계: <내용>" --b
   그리고 `Closes #<N>` 줄(base가 main이라 머지하면 메인 이슈가 닫힌다). PR attribution 줄로 끝낸다.
 - `hgh copy-fields <N> <M>`, `hgh links <M>`에 `<N>`이 있는지 확인. 없으면 `/fix-issue` 4단계처럼 알린다.
 
-base가 main이므로 CI는 **full 범위(15개 job)**로 돈다. 공용 절차 **CI 범위**대로 백그라운드로 기다리고,
+base가 main이므로 CI는 **full 범위(16개 job)**로 돈다. 공용 절차 **CI 범위**대로 백그라운드로 기다리고,
 job 이름과 수가 목록과 맞는지 확인한다. 실패하면 원인을 고쳐 push하고 다시 확인한다. 러너·네트워크 같은
 외부 원인이면 **질문 지점**: 다시 돌릴지(`gh run rerun --failed`), 중단할지.
 
@@ -140,5 +140,5 @@ PR에 코멘트를 하나 단다(`gh pr comment <M>`): `## 리뷰 → 서브이�
 ## 8. 처리 순서와 마무리
 
 1. 공용 절차 **처리 순서**로 메인 이슈 `<N>`의 열린 서브이슈 전체(새로 등록한 것 포함) 순서를 표로 보여 준다.
-2. 보고: 단계 브랜치, PR 링크, full CI 결과(15개), 등록한 서브이슈 표, 중복으로 넘긴 지적, Development 연결 여부.
+2. 보고: 단계 브랜치, PR 링크, full CI 결과(16개), 등록한 서브이슈 표, 중복으로 넘긴 지적, Development 연결 여부.
 3. PushNotification으로 한 줄 알린다. 예: `R5 열림 (PR #120), 서브이슈 9개 등록`.

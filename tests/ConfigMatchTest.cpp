@@ -694,6 +694,18 @@ TEST(ConfigIsBetterThan, Locale) {
   EXPECT_FALSE(isBetterThan(Config{}, cfg("es"), Config{}));
 }
 
+TEST(ConfigIsBetterThan, UsEnglishTakesItsOwnOverNone) {
+  // On a US English device, none is better than the Englishes away from it (UsEnglishIsSpecial),
+  // but values-en-rUS/ is still better than values/; AOSP's cases have no en-US candidate.
+  const Config device = cfg("en-rUS");
+  EXPECT_TRUE(isBetterThan(cfg("en-rUS"), Config{}, device));
+  EXPECT_FALSE(isBetterThan(Config{}, cfg("en-rUS"), device));
+  // So too for an English close to US English, with its own region.
+  const Config puertoRico = cfg("en-rPR");
+  EXPECT_TRUE(isBetterThan(cfg("en-rPR"), Config{}, puertoRico));
+  EXPECT_FALSE(isBetterThan(Config{}, cfg("en-rPR"), puertoRico));
+}
+
 // ---- bestCandidate ---------------------------------------------------------------------------
 
 // An entry with a value for each of `qualifiers`, in the order of a table.
