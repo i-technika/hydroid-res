@@ -102,6 +102,37 @@ TEST(Resources, DefaultConfigurationTakesTheDefaultValues) {
   EXPECT_EQ(where(resources, table), "v21");
 }
 
+// A density never keeps a value from matching (ResTable_config::match has no test of it), and the
+// default configuration asks for none, which isBetterThan takes as medium.
+TEST(Resources, DefaultConfigurationTakesValuesOfADensity) {
+  const auto pick = [](const std::vector<const char*>& folders, bool withDefault) {
+    TempDir dir;
+    ResourceTable table;
+    const std::filesystem::path res = dir.path() / "res";
+    const auto write = [&](const std::string& folder, const std::string& text) {
+      std::filesystem::create_directories(res / folder);
+      std::ofstream(res / folder / "strings.xml", std::ios::binary)
+          << "<resources><string name=\"where\">" << text << "</string></resources>";
+    };
+    if (withDefault) write("values", "default");
+    for (const char* folder : folders) write(std::string("values-") + folder, folder);
+    EXPECT_TRUE(table.addPackage(res, "com.example", kAppPackageId));
+    const Resources resources(table);
+    return where(resources, table);
+  };
+  // anydpi before all, and none before another density, as medium is asked for.
+  EXPECT_EQ(pick({"anydpi", "hdpi"}, true), "anydpi");
+  EXPECT_EQ(pick({"hdpi", "ldpi"}, true), "default");
+  // And where there is no value without one, a value of a density all the same.
+  for (const char* density : {"ldpi", "hdpi", "xxhdpi", "nodpi"}) {
+    SCOPED_TRACE(density);
+    EXPECT_EQ(pick({density}, false), density);
+  }
+  // Not so the qualifiers of the screen, which the default configuration has none of.
+  EXPECT_EQ(pick({"sw1dp"}, false), "none");
+  EXPECT_EQ(pick({"small"}, false), "none");
+}
+
 TEST(Resources, PicksForTheConfiguration) {
   TempDir dir;
   ResourceTable table;
