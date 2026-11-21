@@ -138,8 +138,8 @@ TEST(ResourcesAllocations, OnlyTheDeviceChangingAllocatesNothing) {
 }
 
 // For each allocation of a setConfiguration that chooses a locale, a call in which it fails:
-// what Resources answers is as before, it keeps nothing of the call, and the same call again
-// chooses.
+// what Resources answers is as before, it keeps not the device of the call, and the same call
+// again chooses.
 TEST(ResourcesAllocations, AFailedChoiceLeavesAllAsItWas) {
 #if HYDROID_NOEXCEPT_ALLOCATES
   GTEST_SKIP() << "the checked iterators allocate where they cannot throw";
@@ -177,6 +177,42 @@ TEST(ResourcesAllocations, AFailedChoiceLeavesAllAsItWas) {
     EXPECT_EQ(chosen(resources), "fr-rFR-night");
     resources.setConfiguration(day, frKo);
     EXPECT_EQ(chosen(resources), "ko-rKR-land-notnight");
+  }
+#endif
+}
+
+// The same after a choice, which the table's locales are gathered for: a call in which an
+// allocation fails keeps nothing of its choice, so the locales before, given again, are of the
+// choice before.
+TEST(ResourcesAllocations, AFailedChoiceKeepsTheChoiceBefore) {
+#if HYDROID_NOEXCEPT_ALLOCATES
+  GTEST_SKIP() << "the checked iterators allocate where they cannot throw";
+#else
+  TempDir dir;
+  ResourceTable table;
+  REQUIRE_COUNTED(addPackage(table, dir, {"ko"}));
+  const Config night = dev("night");
+  const std::vector<Config> deFr = tags({"de-DE", "fr-FR"});  // de-DE, as the table has neither
+  const std::vector<Config> deKo = tags({"de-DE", "ko-KR"});  // ko-KR
+  for (long failAt = 0;; failAt++) {
+    SCOPED_TRACE(failAt);
+    Resources resources(table);
+    resources.setConfiguration(night, deFr);
+    EXPECT_EQ(chosen(resources), "de-rDE-night");
+
+    bool threw = false;
+    try {
+      allocationsOf([&] { resources.setConfiguration(night, deKo); }, failAt);
+    } catch (const std::bad_alloc&) {
+      threw = true;
+    }
+    if (!threw) {
+      EXPECT_GT(failAt, 0) << "the call allocates nothing";
+      EXPECT_EQ(chosen(resources), "ko-rKR-night");
+      break;
+    }
+    resources.setConfiguration(night, deFr);
+    EXPECT_EQ(chosen(resources), "de-rDE-night");
   }
 #endif
 }
