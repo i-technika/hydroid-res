@@ -870,8 +870,9 @@ std::optional<Package> buildPackage(ParsedFolder folder, const std::string& name
     entry.id = entryId(resId);
     entry.name = key.second;
     entry.isPublic = entries[key].visibility == Visibility::Public;
-    const auto type = std::find_if(package.types.begin(), package.types.end(),
-                                   [&](const TypeTable& t) { return t.id == typeId(resId); });
+    const auto type =
+        std::find_if(package.types.begin(), package.types.end(),
+                     [wanted = typeId(resId)](const TypeTable& t) { return t.id == wanted; });
     type->entries.push_back(std::move(entry));
   }
   for (TypeTable& type : package.types) {
