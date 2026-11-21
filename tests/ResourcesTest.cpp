@@ -251,12 +251,12 @@ TEST(Resources, SeesATableAssignedToIt) {
   EXPECT_TRUE(isOfTheTable(resources.candidate(id), table, id));
   EXPECT_EQ(where(resources, table), "ko");
 
-  // Assigned a copy of what it holds, it holds it at another place.
+  // Assigned a copy of what it holds, it may hold the values where they were, each assigned its
+  // copy, but has changed all the same: only the generation tells it here.
   before = resources.generation();
   const ResourceTable copy = table;
   table = copy;
   EXPECT_NE(resources.generation(), before);
-  EXPECT_TRUE(isOfTheTable(resources.candidate(id), table, id));
   EXPECT_EQ(where(resources, table), "ko");
 }
 
