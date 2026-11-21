@@ -494,10 +494,16 @@ TEST(ResourcesDensity, KeepsTheAnswersOfEachDensityUntilTheConfigurationChanges)
   resources.setConfiguration(dev("port-xhdpi"));
   EXPECT_EQ(whereFor(resources, table, kDensityXxhdpi), "xxhdpi");
 
-  // The table moves its packages as it adds one: what was picked for a density is gone too.
-  addPackage(table, dir, {"ko"}, "com.example.lib", 0x7e);
+  // A table assigned another, of the same resource but other folders: what was picked for a
+  // density was of the one that is gone.
+  {
+    const TempDir otherDir;
+    ResourceTable other;
+    addPackage(other, otherDir, {"hdpi", "xhdpi"});
+    table = std::move(other);
+  }
   EXPECT_TRUE(isOfTheTable(resources.candidateForDensity(id, kDensityXxhdpi), table, id));
-  EXPECT_EQ(whereFor(resources, table, kDensityXxhdpi), "xxhdpi");
+  EXPECT_EQ(whereFor(resources, table, kDensityXxhdpi), "xhdpi");
 }
 
 // ---- the locale of the device ----------------------------------------------------------------
