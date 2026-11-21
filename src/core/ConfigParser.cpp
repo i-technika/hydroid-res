@@ -155,9 +155,15 @@ bool parseBcp47(std::string_view tag, Config& c) {
       (subtags[2].size() >= 4 ? variant : region) = subtags[2];
       break;
     case 4:
-      script = subtags[1];
-      region = subtags[2];
-      variant = subtags[3];
+      // A short second subtag is the region, and the two after it go, however long:
+      // b+de+DE+1901+1996 is de-rDE.
+      if (subtags[1].size() == 2 || subtags[1].size() == 3) {
+        region = subtags[1];
+      } else {
+        script = subtags[1];
+        region = subtags[2];
+        variant = subtags[3];
+      }
       break;
     default: return false;
   }

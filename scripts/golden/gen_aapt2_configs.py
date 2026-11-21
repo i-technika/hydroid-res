@@ -105,11 +105,16 @@ EDGE_CASES = [
     "b+de+CH+19011901x", "b+en+Latn+US+posix", "b+ar+u+nu+latn", "b+en-rUS", "b+en+US-ldrtl",
     "b+zh+Hant", "b+zh+hant+hk", "b+es+419+valencia", "b+ca+ES+valencia", "en+US",
     "b+en++US", "b++en", "b+en+",
+    # Four subtags with a short second one: aapt2 keeps the region and drops the two after it.
+    "b+de+DE+1901+1996", "b+ca+ES+valencia+1996", "b+es+419+1901+1996", "b+de+DE+x+abcdefghi",
+    # Beside them: three subtags, whose 4-character second one aapt2 reads as a script even with
+    # a digit, and so keeps both; and five subtags, which fail.
+    "b+de+1901+1996", "b+sr+Latn+RS+ekavsk+1996", "b+de+DE+1901+1996+abcde",
     # Subtags BCP 47 does not allow, which aapt2 cuts short, packs wrongly or moves about.
     "b+e1", "b+e1+US", "en-r+x", "b+en+abcd", "b+en+xyz", "b+en+aaa", "b+sr+Latn+RS+",
     "b+sr+Latn++x", "b+sr+Latnx+RS+x", "b+sr+Lat+RS+x", "b+sr+Latn+R+x", "b+sr+Latn+abc+x",
     "b+sr+Latn+419+x", "b+sr+Latn+RS+abcdefghi", "b+de+CH+abcdefghi", "b+abc+Latn",
-    "b+zh+Hant+TW+", "b+zh+Hant++", "b+fil+PH+1901",
+    "b+zh+Hant+TW+", "b+zh+Hant++", "b+fil+PH+1901", "b+de+abc+x+y", "b+de+DE+1901+",
     "v0.0", "v0.1", "v35.0", "v36.0-hdpi", "anydpi-v4", "anydpi-v21", "anydpi-v22",
     # aapt2 checks the minor version after it raises the version for a qualifier.
     "anydpi-v4.1", "feminine-v33.1", "feminine-v35.1", "watch-v7.3", "round-v36.1",
