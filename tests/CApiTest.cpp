@@ -276,8 +276,10 @@ TEST(CApi, GivesTheValuesTheCppApiPicks) {
       {"mcc310-mnc260-en-rUS-port-v21", {"de-CH"}},
       {kEveryField, {}},
   };
-  // And one of each values-<qualifiers>/, which then decide config_order: a field the
-  // conversions lose, or two they swap, picks another (w720dp/ for w720dp, h480dp/ if swapped).
+  // And one of each values-<qualifiers>/, which then decide config_order where they come before
+  // the density: a field the conversions lose, or two they swap, picks another (w720dp/ for
+  // w720dp, h480dp/ if swapped). values-anydpi/ is picked before those after the density, which
+  // PicksByEachFieldAfterTheDensity has a table of their own for.
   for (const auto& folder : std::filesystem::directory_iterator(HYDROID_TABLE_RES_DIR)) {
     const std::string name = folder.path().filename().string();
     if (name.rfind("values-", 0) == 0) devices.push_back({name.substr(7), {}});
@@ -317,6 +319,35 @@ TEST(CApi, GivesTheValuesTheCppApiPicks) {
   }
   for (size_t kind = 0; kind < kinds.size(); kind++) {
     EXPECT_GT(kinds[kind], 0) << "no value of kind " << kind;
+  }
+}
+
+// The fields after the density, in a table with no density folder, so that each folder's device
+// picks that folder: two of them the conversions swap pick another (qwerty/ for dpad, if the
+// keyboard and the navigation were swapped).
+TEST(CApi, PicksByEachFieldAfterTheDensity) {
+  const std::vector<std::string> folders = {
+      "notouch", "stylus", "finger", "keysexposed", "keyshidden", "keyssoft", "nokeys",
+      "qwerty",  "12key",  "nonav",  "dpad",        "trackball",  "wheel"};
+  TempDir dir;
+  dir.write("values/strings.xml", "<resources><string name=\"where\">default</string></resources>");
+  for (const std::string& folder : folders) {
+    dir.write("values-" + folder + "/strings.xml",
+              "<resources><string name=\"where\">" + folder + "</string></resources>");
+  }
+  CTable c;
+  ASSERT_EQ(
+      hydroid_res_table_add_package(c.table, dir.path().u8string().c_str(), "com.example", 0x7f), 1)
+      << hydroid_res_table_error(c.table);
+  CResources r(c.table);
+  const uint32_t where = hydroid_res_table_find(c.table, "com.example:string/where", nullptr);
+  for (const std::string& folder : folders) {
+    SCOPED_TRACE(folder);
+    const hydroid_res_config device = toC(cfg(folder));
+    ASSERT_EQ(hydroid_res_resources_set_configuration(r.resources, &device, nullptr, 0), 1);
+    hydroid_res_value v{};
+    ASSERT_EQ(hydroid_res_resources_value(r.resources, where, &v, nullptr), 1);
+    EXPECT_EQ(text(v), folder);
   }
 }
 
