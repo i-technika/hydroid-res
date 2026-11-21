@@ -92,8 +92,8 @@ Open `golden/` in Android Studio, or build it with `golden/gradlew`. Then:
 python scripts/golden/pull_golden.py
 ```
 
-This runs `GoldenDumpTest` over 375 conditions and writes `golden/data/*.json`: a matrix of 252
-(7 densities × 3 languages × night × orientation × 3 smallest widths), and 123 more that each
+This runs `GoldenDumpTest` over 377 conditions and writes `golden/data/*.json`: a matrix of 252
+(7 densities × 3 languages × night × orientation × 3 smallest widths), and 125 more that each
 change one thing the matrix leaves alone, such as a locale of another region or script, a list
 of languages, the screen's size or shape, the UI mode, the input devices or the mcc. Each file
 records the `Configuration` the resources were resolved for and the value of every resource.
@@ -105,7 +105,9 @@ which folder Android took it from. A folder added for one needs a condition that
 line in `GoldenMatch.EveryFolderIsPickedSomewhere` saying why none does. Two things have no
 folder there, because the app is built by the Android Gradle plugin and dumped through the SDK:
 a locale with a variant and no script, and the grammatical gender (the SDK only sets it for a
-whole app).
+whole app). A variant with a script the plugin keeps, so `values-b+sr+Latn+RS+ekavsk/` and
+`values-b+sr+Latn+RS/` check the variant, of two folders of the same region: `sr-Latn-RS-ekavsk`
+takes the first, and `sr-Latn-RS` and `sr-Latn-RS-ijekavsk` the second.
 
 The plugin (9.5.1) compiles values and most files (raw, layout, xml) with a compiler of its own,
 not aapt2, and that writes the variant of a locale with no script as empty (#198). An app it
@@ -114,7 +116,8 @@ builds has `values-b+de+DE+1901` as `values-de`, `values-b+ca+ES+valencia` as `v
 `values-b+sr+Latn+RS+ekavsk` keeps its variant. No option turns that compiler off. hydroid
 follows aapt2, which keeps every variant, so from such a folder it can pick another value than
 an app built by the plugin does. The `folder-locale-variant` case of `table_cases.json` checks
-what aapt2 makes of them, and `ConfigMatchTest` the rules for variants, from AOSP's tests.
+what aapt2 makes of them, and `ConfigMatchTest` the rules for variants, from AOSP's tests; the
+golden app checks them only with a script.
 
 The aapt2 files need only the SDK (build-tools 37.0.0 and platform android-37.0), no device, but
 they must be made on Windows: aapt2 writes some rows otherwise on Linux and macOS (#62).
