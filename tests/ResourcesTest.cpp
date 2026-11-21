@@ -229,6 +229,14 @@ TEST(Resources, GivesTheGenerationOfACandidate) {
   uint32_t none = generation;
   EXPECT_EQ(resources.candidate(makeResId(0x7f, 0x7f, 0), &none), nullptr);
   EXPECT_EQ(none, after);
+
+  // And of the table as it is: one that has added a package since gives a value of it with the
+  // generation that came of that, and not the one before.
+  addPackage(table, dir, {"ko"}, "com.example.lib", 0x7e);
+  uint32_t ofTheTable = after;
+  EXPECT_TRUE(isOfTheTable(resources.candidate(id, &ofTheTable), table, id));
+  EXPECT_NE(ofTheTable, after);
+  EXPECT_EQ(ofTheTable, resources.generation());
 }
 
 // The generation a candidate is given with is the one it was picked in (#207), as another thread
@@ -244,15 +252,20 @@ TEST(Resources, GivesTheGenerationOfACandidateAsTheConfigurationChanges) {
   // ones, and those of the default configuration and of notnight the even ones.
   const Config night = dev("night");
   const Config notnight = dev("notnight");
+  // The configuration is set only once all the readers are up, so that they read as it changes.
+  constexpr int kReaders = 3;
+  std::atomic<int> started{0};
   std::atomic<int> wrong{0};
   std::atomic<bool> done{false};
   std::thread setter([&] {
+    while (started < kReaders) std::this_thread::yield();
     for (int i = 0; i < 2000; i++) resources.setConfiguration(i % 2 == 0 ? night : notnight);
     done = true;
   });
   std::vector<std::thread> readers;
-  for (int t = 0; t < 3; t++) {
+  for (int t = 0; t < kReaders; t++) {
     readers.emplace_back([&] {
+      started++;
       while (!done) {
         uint32_t generation = 0;
         const Candidate* c = resources.candidate(id, &generation);
