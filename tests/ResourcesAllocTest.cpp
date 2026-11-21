@@ -138,38 +138,45 @@ TEST(ResourcesAllocations, OnlyTheDeviceChangingAllocatesNothing) {
 }
 
 // For each allocation of a setConfiguration that chooses a locale, a call in which it fails:
-// what Resources answers is as before, and the same call again chooses.
+// what Resources answers is as before, it keeps nothing of the call, and the same call again
+// chooses.
 TEST(ResourcesAllocations, AFailedChoiceLeavesAllAsItWas) {
 #if HYDROID_NOEXCEPT_ALLOCATES
   GTEST_SKIP() << "the checked iterators allocate where they cannot throw";
 #else
   TempDir dir;
-  ResourceTable table;
-  REQUIRE_COUNTED(addPackage(table, dir, {"ko"}));
+  const Config night = dev("night");
+  const Config day = dev("land-notnight");
+  const std::vector<Config> fr = tags({"fr-FR"});
   const std::vector<Config> frKo = tags({"fr-FR", "ko-KR"});
   for (long failAt = 0;; failAt++) {
     SCOPED_TRACE(failAt);
+    ResourceTable table;
+    REQUIRE_COUNTED(addPackage(table, dir, {"ko"}));
     Resources resources(table);
     // One locale, which is not chosen: the table's are not gathered yet.
-    resources.setConfiguration(dev("night"), tags({"fr-FR"}));
+    resources.setConfiguration(night, fr);
     const Config before = resources.configuration();
     const uint32_t generation = resources.generation();
 
     bool threw = false;
     try {
-      allocationsOf([&] { resources.setConfiguration(dev("night"), frKo); }, failAt);
+      allocationsOf([&] { resources.setConfiguration(day, frKo); }, failAt);
     } catch (const std::bad_alloc&) {
       threw = true;
     }
     if (!threw) {
       EXPECT_GT(failAt, 0) << "the call allocates nothing";
-      EXPECT_EQ(chosen(resources), "ko-rKR-night");
+      EXPECT_EQ(chosen(resources), "ko-rKR-land-notnight");
       break;
     }
     EXPECT_EQ(resources.configuration(), before);
     EXPECT_EQ(resources.generation(), generation);
-    resources.setConfiguration(dev("night"), frKo);
-    EXPECT_EQ(chosen(resources), "ko-rKR-night");
+    // Nor the device of the call, which a table that changes would be taken in for.
+    addPackage(table, dir, {"night"}, "com.example.lib", 0x7e);
+    EXPECT_EQ(chosen(resources), "fr-rFR-night");
+    resources.setConfiguration(day, frKo);
+    EXPECT_EQ(chosen(resources), "ko-rKR-land-notnight");
   }
 #endif
 }
@@ -181,14 +188,16 @@ TEST(ResourcesAllocations, AFailedChoiceForAChangedTableLeavesItToTheNextCall) {
   GTEST_SKIP() << "the checked iterators allocate where they cannot throw";
 #else
   TempDir dir;
+  const Config night = dev("night");
   const std::vector<Config> frKo = tags({"fr-FR", "ko-KR"});
   for (long failAt = 0;; failAt++) {
     SCOPED_TRACE(failAt);
     ResourceTable table;
     REQUIRE_COUNTED(addPackage(table, dir, {"night"}));
     Resources resources(table);
-    resources.setConfiguration(dev("night"), frKo);
+    resources.setConfiguration(night, frKo);
     EXPECT_EQ(chosen(resources), "fr-rFR-night");
+    const uint32_t generation = resources.generation();
     addPackage(table, dir, {"ko"}, "com.example.lib", 0x7e);
 
     bool threw = false;
@@ -197,6 +206,8 @@ TEST(ResourcesAllocations, AFailedChoiceForAChangedTableLeavesItToTheNextCall) {
     } catch (const std::bad_alloc&) {
       threw = true;
     }
+    // Taken in once, by the call or the one after it.
+    EXPECT_EQ(resources.generation(), generation + 1);
     EXPECT_EQ(chosen(resources), "ko-rKR-night");
     if (!threw) {
       EXPECT_GT(failAt, 0) << "taking in the table allocates nothing";
