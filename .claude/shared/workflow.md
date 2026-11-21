@@ -23,12 +23,12 @@
 | 범위 | 언제 | job |
 | --- | --- | --- |
 | quick (4) | `main`이 아닌 브랜치로 가는 PR (서브이슈 PR) | `core (ubuntu-24.04)`, `core (ubuntu-24.04, shared)`, `core (Clang, ASan and UBSan)`, `clang-format` |
-| full (14) | `main`으로 가는 PR, `main` push, `gh workflow run ci.yml -f scope=full` | 아래 전부 |
+| full (15) | `main`으로 가는 PR, `main` push, `gh workflow run ci.yml -f scope=full` | 아래 전부 |
 
-full의 14개: 기존 11개 — `core (ubuntu-24.04 / macos-15 / windows-2022)`, 같은 세 OS의 `, shared`,
+full의 15개: 기존 11개 — `core (ubuntu-24.04 / macos-15 / windows-2022)`, 같은 세 OS의 `, shared`,
 `core (CMake 3.24)`, `core (installed dependencies)`, `core (Clang, ASan and UBSan)`, `clang-format`,
 `golden app builds` — 에 더해 `core (ubuntu-24.04, release)`, `core (windows-2022, release)`(최적화가 내는
-경고와 NDEBUG), `core (ubuntu-24.04-arm)`(char가 unsigned인 유일한 러너).
+경고와 NDEBUG), `core (ubuntu-24.04-arm)`(char가 unsigned인 유일한 러너), `core (Clang, TSan)`(데이터 경합).
 
 full 실행 결과를 확인할 때는 job 이름과 수가 위 목록과 맞는지 본다(빠진 job이 있으면 범위가 quick으로
 돈 것이다):

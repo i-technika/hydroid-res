@@ -13,7 +13,7 @@ on:
         default: full
 
 # Two scopes. A pull request into a milestone's step<k>/ branch, which /fix-issue makes for each
-# sub-issue, runs the quick one, all on Linux: GCC, static and shared; Clang with the sanitizers;
+# sub-issue, runs the quick one, all on Linux: GCC, static and shared; Clang with ASan and UBSan;
 # and clang-format. Pushes to main, pull requests into main (a milestone's own, from /open-ms) and
 # a dispatch with scope=full (/close-ms) run every job. Each job the quick scope leaves out repeats
 # the test below in its `if:`, and core and shared, which it narrows to Linux, in their matrix, as
@@ -295,7 +295,7 @@ jobs:
         working-directory: golden
         run: ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest
 
-  # The two below come on top of the 11 runners above, to look where none of those does.
+  # The three below come on top of the 11 runners above, to look where none of those does.
 
   release:
     name: core (${{ matrix.os }}, release)
@@ -366,3 +366,44 @@ jobs:
         run: cmake --build --preset debug --parallel
       - name: Test
         run: ctest --preset debug
+
+  tsan:
+    name: core (Clang, TSan)
+    if: github.event_name == 'push' || github.base_ref == 'main' || inputs.scope == 'full'
+    # Resources answers several threads under one mutex (#236). A lock left out is a data race that
+    # no other job sees: the tests count the answers, and a race seldom changes one.
+    runs-on: ubuntu-24.04
+    env:
+      CC: clang
+      CXX: clang++
+    steps:
+      - uses: actions/checkout@v5
+      - name: Name the dependency cache after the runner image and CMake
+        id: deps
+        shell: bash
+        run: echo "key=deps-${ImageOS:?}-${{ github.job }}-$(cmake --version | awk 'NR == 1 { print $3 }')" >> "$GITHUB_OUTPUT"
+      - name: Cache the fetched dependencies
+        uses: actions/cache@v6
+        with:
+          path: |
+            build/tsan/_deps/*-src
+            build/tsan/_deps/*-subbuild
+          key: ${{ steps.deps.outputs.key }}-${{ hashFiles('cmake/Dependencies.cmake') }}
+      - name: Install a decimal-comma locale
+        run: sudo locale-gen de_DE.UTF-8
+      - name: Leave ThreadSanitizer the address space it expects
+        # The image's kernel spreads mmap over more random bits than the ThreadSanitizer of some
+        # Clang releases allows, which then stops every test with "unexpected memory mapping".
+        run: sudo sysctl vm.mmap_rnd_bits=28
+      - name: Configure
+        run: cmake --preset tsan -DHYDROID_RES_REQUIRE_LOCALE_TESTS=ON -DHYDROID_RES_REQUIRE_NDK_TESTS=ON
+      - name: Build
+        run: cmake --build --preset tsan --parallel
+      - name: Check that the tests are built by Clang with ThreadSanitizer
+        run: |
+          # Flags that never reached the build would let the tests below pass vacuously.
+          grep -E '^CMAKE_CXX_COMPILER:FILEPATH=.*clang\+\+' build/tsan/CMakeCache.txt
+          nm build/tsan/bin/hydroid-res-tests > symbols.txt
+          grep -q __tsan_init symbols.txt
+      - name: Test
+        run: ctest --preset tsan
