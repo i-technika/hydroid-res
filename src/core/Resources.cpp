@@ -178,6 +178,10 @@ Config effectiveConfig(const Config& device, const std::vector<Config>& locales,
   if (config.sdkVersion == 0 && config.minorVersion == 0) {
     config.sdkVersion = static_cast<uint16_t>(kEmulatedSdkVersion);
   }
+  // ResourcesImpl.updateConfiguration gives the display its longer side as the width, however the
+  // device is held, and AssetManager.setConfiguration takes no navigationHidden.
+  if (config.screenWidth < config.screenHeight) std::swap(config.screenWidth, config.screenHeight);
+  config.navHidden = NavHidden::Any;
   return config;
 }
 
