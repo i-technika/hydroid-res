@@ -246,8 +246,33 @@ struct Resources::Impl {
     localeIndex = chooseLocale(locales, table.revision());
     tableRevision = table.revision();
     setConfig(effective());
-    cache.clear();
+    clearCaches();
     generation++;
+  }
+
+  void clearCaches() {
+    cache.clear();
+    densityCaches.clear();
+  }
+
+  // The value of `id` for `matchConfig` with the density `density`, 0 being its own, from the
+  // cache of that density, where it is put the first time.
+  const Candidate* pick(ResId id, uint16_t density) {
+    const bool own = density == 0 || density == matchConfig.density;
+    std::unordered_map<ResId, const Candidate*>& kept = own ? cache : densityCaches[density];
+    if (const auto it = kept.find(id); it != kept.end()) return it->second;
+    const Entry* entry = table.entry(id);
+    if (entry == nullptr) return nullptr;
+    const Candidate* best;
+    if (own) {
+      best = bestCandidate(*entry, matchConfig);
+    } else {
+      Config overridden = matchConfig;
+      overridden.density = density;
+      best = bestCandidate(*entry, overridden);
+    }
+    kept.emplace(id, best);
+    return best;
   }
 
   const ResourceTable& table;
@@ -260,6 +285,8 @@ struct Resources::Impl {
   Config matchConfig;           // withScript(config), which the values are picked by
   uint32_t generation = 0;
   std::unordered_map<ResId, const Candidate*> cache;  // of `config`, in the table as it is
+  // As `cache`, of `config` with another density, by the density.
+  std::unordered_map<uint16_t, std::unordered_map<ResId, const Candidate*>> densityCaches;
   // The locales of the table at `tableLocalesRevision`, made when a choice first needs them.
   std::optional<TableLocales> tableLocales;
   uint64_t tableLocalesRevision = 0;
@@ -287,7 +314,7 @@ void Resources::setConfiguration(const Config& device, const std::vector<Config>
   if (config == impl_->config && tableRevision == impl_->tableRevision) return;
   impl_->tableRevision = tableRevision;
   impl_->setConfig(config);
-  impl_->cache.clear();
+  impl_->clearCaches();
   impl_->generation++;
 }
 
@@ -304,15 +331,15 @@ uint32_t Resources::generation() const {
 }
 
 const Candidate* Resources::candidate(ResId id, uint32_t* generation) const {
+  return candidateForDensity(id, 0, generation);
+}
+
+const Candidate* Resources::candidateForDensity(ResId id, uint16_t density,
+                                                uint32_t* generation) const {
   const std::lock_guard<std::mutex> lock(impl_->mutex);
   impl_->syncWithTable();
   if (generation != nullptr) *generation = impl_->generation;
-  if (const auto it = impl_->cache.find(id); it != impl_->cache.end()) return it->second;
-  const Entry* entry = impl_->table.entry(id);
-  if (entry == nullptr) return nullptr;
-  const Candidate* best = bestCandidate(*entry, impl_->matchConfig);
-  impl_->cache.emplace(id, best);
-  return best;
+  return impl_->pick(id, density);
 }
 
 }  // namespace hydroid::res
