@@ -9,22 +9,15 @@
 #include <utility>
 #include <vector>
 
+#include "core/Whitespace.h"
 #include "hydroid/res/Complex.h"
 
 namespace hydroid::res {
 namespace {
 
-bool isSpace(char c) {
-  return c == ' ' || c == '\t' || c == '\n' || c == '\v' || c == '\f' || c == '\r';
-}
+using detail::trim;
 
 bool isDigit(char c) { return c >= '0' && c <= '9'; }
-
-std::string_view trim(std::string_view s) {
-  while (!s.empty() && isSpace(s.front())) s.remove_prefix(1);
-  while (!s.empty() && isSpace(s.back())) s.remove_suffix(1);
-  return s;
-}
 
 int hexDigit(char c) {
   if (c >= '0' && c <= '9') return c - '0';
@@ -278,6 +271,7 @@ uint32_t formatOf(ValueKind kind) {
     case ValueKind::Fraction: return kFormatFraction;
     case ValueKind::Null:
     case ValueKind::Empty:
+    case ValueKind::Id:
     case ValueKind::Reference:
     case ValueKind::AttrRef:
     case ValueKind::String:

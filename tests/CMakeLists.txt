@@ -2,16 +2,21 @@ include(GoogleTest)
 
 add_executable(hydroid-res-tests
   Aapt2ConfigTest.cpp
+  Aapt2TableTest.cpp
   Aapt2ValueTest.cpp
   ComplexTest.cpp
   ConfigParserTest.cpp
   GoldenColorTest.cpp
   GoldenComplexTest.cpp
+  PathUtf8Test.cpp
   PublicHeaderTest.cpp
+  ResourceTableTest.cpp
   SdkBaselineTest.cpp
   SmokeTest.cpp
+  Utf8Test.cpp
   ValueParserTest.cpp
-  ValueTest.cpp)
+  ValueTest.cpp
+  WhitespaceTest.cpp)
 # src/ for the internal headers some tests use, as core/FieldCount.h.
 target_include_directories(hydroid-res-tests PRIVATE ${PROJECT_SOURCE_DIR}/src)
 target_link_libraries(hydroid-res-tests PRIVATE
@@ -19,8 +24,12 @@ target_link_libraries(hydroid-res-tests PRIVATE
 # Every directory a consumer of hydroid::res includes from, for PublicHeaders.AreAscii.
 set(public_include_dirs "$<JOIN:$<TARGET_PROPERTY:hydroid-res,INTERFACE_INCLUDE_DIRECTORIES>,|>")
 target_compile_definitions(hydroid-res-tests PRIVATE
+  HYDROID_AAPT2_APP_TABLE="${PROJECT_SOURCE_DIR}/golden/aapt2/app_table.txt"
   HYDROID_AAPT2_CONFIGS="${PROJECT_SOURCE_DIR}/golden/aapt2/configs.tsv"
   HYDROID_AAPT2_SCRIPT="${PROJECT_SOURCE_DIR}/scripts/golden/gen_aapt2_values.py"
+  HYDROID_AAPT2_STRINGS="${PROJECT_SOURCE_DIR}/golden/aapt2/strings.json"
+  HYDROID_AAPT2_TABLE="${PROJECT_SOURCE_DIR}/golden/aapt2/table.txt"
+  HYDROID_AAPT2_TABLE_CASES="${PROJECT_SOURCE_DIR}/golden/aapt2/table_cases.json"
   HYDROID_AAPT2_VALUES="${PROJECT_SOURCE_DIR}/golden/aapt2/values.tsv"
   HYDROID_AOSP_RES_DIRS="${PROJECT_SOURCE_DIR}/golden/aosp/framework_res_dirs.txt"
   HYDROID_GOLDEN_APP_GRADLE="${PROJECT_SOURCE_DIR}/golden/app/build.gradle.kts"
@@ -29,6 +38,7 @@ target_compile_definitions(hydroid-res-tests PRIVATE
   HYDROID_PROJECT_VERSION="${PROJECT_VERSION}"
   HYDROID_PUBLIC_INCLUDE_DIRS="${public_include_dirs}"
   HYDROID_README="${PROJECT_SOURCE_DIR}/README.md"
+  HYDROID_TABLE_RES_DIR="${PROJECT_SOURCE_DIR}/golden/table/res"
   HYDROID_TEST_RES_DIR="${PROJECT_SOURCE_DIR}/golden/app/src/main/res"
   HYDROID_VERSION_HEADER="${PROJECT_SOURCE_DIR}/include/hydroid/res/Version.h")
 if(HYDROID_RES_REQUIRE_LOCALE_TESTS)
@@ -38,11 +48,13 @@ hydroid_set_warnings(hydroid-res-tests)
 
 gtest_discover_tests(hydroid-res-tests DISCOVERY_MODE PRE_TEST)
 
-# pugixml is an implementation detail of hydroid::res, so its consumers must not see it (#10).
-add_test(NAME CMake.PugixmlStaysPrivate
+# pugixml and expat are implementation details of hydroid::res, so its consumers must not see
+# them (#10).
+add_test(NAME CMake.DependenciesStayPrivate
   COMMAND ${CMAKE_COMMAND}
     "-DCONSUMER_INCLUDES=$<JOIN:$<TARGET_PROPERTY:hydroid-res,INTERFACE_INCLUDE_DIRECTORIES>,|>"
     "-DPUGIXML_INCLUDES=$<JOIN:$<TARGET_PROPERTY:pugixml::pugixml,INTERFACE_INCLUDE_DIRECTORIES>,|>"
+    "-DEXPAT_INCLUDES=$<JOIN:$<TARGET_PROPERTY:expat::expat,INTERFACE_INCLUDE_DIRECTORIES>,|>"
     -P ${CMAKE_CURRENT_SOURCE_DIR}/CheckPrivateDeps.cmake)
 
 # BUILD_SHARED_LIBS as hydroid-res was asked for it before the dependencies, so one that
@@ -52,12 +64,19 @@ if(hydroid_res_fetched_pugixml)
 else()
   set(pugixml_links "")
 endif()
+if(hydroid_res_fetched_expat)
+  set(expat_type "$<TARGET_PROPERTY:expat::expat,TYPE>")
+else()
+  set(expat_type "")
+endif()
 add_test(NAME CMake.LibraryTypes
   COMMAND ${CMAKE_COMMAND}
     "-DSHARED=${hydroid_res_shared_requested}"
     "-DFETCHED_PUGIXML=${hydroid_res_fetched_pugixml}"
     "-DHYDROID_RES_TYPE=$<TARGET_PROPERTY:hydroid-res,TYPE>"
     "-DPUGIXML_LINKS=${pugixml_links}"
+    "-DFETCHED_EXPAT=${hydroid_res_fetched_expat}"
+    "-DEXPAT_TYPE=${expat_type}"
     -P ${CMAKE_CURRENT_SOURCE_DIR}/CheckLibraryTypes.cmake)
 
 # The shared library's file and soname versions come from project() too (#13).
@@ -71,7 +90,7 @@ add_test(NAME CMake.LibraryVersion
 # The dependencies come from where HYDROID_RES_USE_SYSTEM_DEPS says, never silently from the
 # system (#11).
 set(dependency_sources "")
-foreach(dep IN ITEMS pugixml::pugixml GTest::gtest_main nlohmann_json::nlohmann_json)
+foreach(dep IN ITEMS pugixml::pugixml expat::expat GTest::gtest_main nlohmann_json::nlohmann_json)
   get_target_property(imported ${dep} IMPORTED)
   list(APPEND dependency_sources "${dep}=${imported}")
 endforeach()
@@ -81,6 +100,21 @@ add_test(NAME CMake.DependenciesFollowOption
     -DUSE_SYSTEM_DEPS=${HYDROID_RES_USE_SYSTEM_DEPS}
     "-DDEPENDENCIES=${dependency_sources}"
     -P ${CMAKE_CURRENT_SOURCE_DIR}/CheckDependencySource.cmake)
+
+# hydroid-rc opens a res/ folder whose path has characters outside the ANSI code page (#87).
+if(TARGET hydroid-rc)
+  add_test(NAME HydroidRc.DumpsUnicodePath
+    COMMAND ${CMAKE_COMMAND}
+      "-DRC=$<TARGET_FILE:hydroid-rc>"
+      "-DDIR=${CMAKE_CURRENT_BINARY_DIR}/rc-unicode-path"
+      -P ${CMAKE_CURRENT_SOURCE_DIR}/CheckRcUnicodePath.cmake)
+  # And ends with an error, not an abort, on an argument with no UTF-8, which only Windows passes.
+  if(WIN32)
+    add_test(NAME HydroidRc.FailsOnNonUnicodeArgument
+      COMMAND powershell -NoProfile -ExecutionPolicy Bypass
+        -File ${CMAKE_CURRENT_SOURCE_DIR}/CheckRcNotUnicode.ps1 -Rc $<TARGET_FILE:hydroid-rc>)
+  endif()
+endif()
 
 # Config.cpp's numbers are the NDK's AConfiguration, and every value of Config.h has one (#53).
 # It needs an NDK: HYDROID_RES_ANDROID_NDK, which must hold one, else ANDROID_NDK_HOME,

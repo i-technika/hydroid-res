@@ -19,6 +19,7 @@ const char* kindName(ValueKind kind) {
   switch (kind) {
     case ValueKind::Null: return "Null";
     case ValueKind::Empty: return "Empty";
+    case ValueKind::Id: return "Id";
     case ValueKind::Reference: return "Reference";
     case ValueKind::AttrRef: return "AttrRef";
     case ValueKind::String: return "String";

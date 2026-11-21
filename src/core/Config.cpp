@@ -1,5 +1,8 @@
 #include "hydroid/res/Config.h"
 
+#include <array>
+#include <cstdint>
+#include <cstring>
 #include <optional>
 #include <ostream>
 #include <string>
@@ -262,9 +265,98 @@ std::string write(const Config& c, bool all) {
   return out;
 }
 
+// ResTable_config's fields as the integers ResTable_config::compare compares, in its order: each
+// union of a little-endian ResTable_config read as one uint32_t, so the field declared last in a
+// union is its high bits. The locale is followed by the script and the variant, which compare as
+// bytes. Every field of Config is in one of them; one added to Config fails the assert below
+// until it is.
+struct Packed {
+  uint32_t imsi;    // mcc | mnc << 16
+  uint32_t locale;  // language[2] | country[2] << 16, each packed by packLanguageOrRegion
+  std::array<char, 4> script;
+  std::array<char, 8> variant;
+  uint32_t grammaticalInflection;
+  uint32_t screenType;     // orientation | touchscreen << 8 | density << 16
+  uint32_t input;          // keyboard | navigation << 8 | (keysHidden | navHidden << 2) << 16
+  uint32_t screenSize;     // screenWidth | screenHeight << 16
+  uint32_t version;        // sdkVersion | minorVersion << 16
+  uint32_t screenLayout;   // screenSize | screenLong << 4 | layoutDir << 6
+  uint32_t screenLayout2;  // screenRound
+  uint32_t colorMode;      // wideColorGamut | hdr << 2
+  uint32_t uiMode;         // uiModeType | uiModeNight << 4
+  uint32_t smallestScreenWidthDp;
+  uint32_t screenSizeDp;  // widthDp | heightDp << 16
+};
+static_assert(detail::fieldCount<Config>() == 29,
+              "a field added to Config goes in pack() too, and then this count");
+
+// ResTable_config::packLanguageOrRegion: two characters as they are, three packed in 5 bits each
+// above `base` ('a' for a language, '0' for a region) with the high bit set.
+uint32_t packLanguageOrRegion(const std::array<char, 4>& in, char base) {
+  uint8_t out0;
+  uint8_t out1;
+  if (in[2] == '\0') {
+    out0 = static_cast<uint8_t>(in[0]);
+    out1 = static_cast<uint8_t>(in[1]);
+  } else {
+    const auto first = static_cast<uint8_t>((in[0] - base) & 0x7f);
+    const auto second = static_cast<uint8_t>((in[1] - base) & 0x7f);
+    const auto third = static_cast<uint8_t>((in[2] - base) & 0x7f);
+    out0 = static_cast<uint8_t>(0x80 | (third << 2) | (second >> 3));
+    out1 = static_cast<uint8_t>((second << 5) | first);
+  }
+  return uint32_t{out0} | uint32_t{out1} << 8;
+}
+
+template <typename E>
+uint32_t u(E e) {
+  return static_cast<uint32_t>(e);
+}
+
+Packed pack(const Config& c) {
+  Packed p{};
+  p.imsi = c.mcc | uint32_t{c.mnc} << 16;
+  p.locale = packLanguageOrRegion(c.lang, 'a') | packLanguageOrRegion(c.region, '0') << 16;
+  p.script = c.script;
+  p.variant = c.variant;
+  p.grammaticalInflection = u(c.grammaticalGender);
+  p.screenType = u(c.orientation) | u(c.touchscreen) << 8 | uint32_t{c.density} << 16;
+  p.input = u(c.keyboard) | u(c.navigation) << 8 | (u(c.keysHidden) | u(c.navHidden) << 2) << 16;
+  p.screenSize = c.screenWidth | uint32_t{c.screenHeight} << 16;
+  p.version = c.sdkVersion | uint32_t{c.minorVersion} << 16;
+  p.screenLayout = u(c.screenSize) | u(c.screenLong) << 4 | u(c.layoutDir) << 6;
+  p.screenLayout2 = u(c.screenRound);
+  p.colorMode = u(c.wideColorGamut) | u(c.hdr) << 2;
+  p.uiMode = u(c.uiModeType) | u(c.uiModeNight) << 4;
+  p.smallestScreenWidthDp = c.smallestWidthDp;
+  p.screenSizeDp = c.widthDp | uint32_t{c.heightDp} << 16;
+  return p;
+}
+
+int compareInts(uint32_t a, uint32_t b) { return a < b ? -1 : a > b ? 1 : 0; }
+
 }  // namespace
 
 bool operator==(const Config& a, const Config& b) { return fields(a) == fields(b); }
+
+int compareConfigs(const Config& a, const Config& b) {
+  const Packed x = pack(a);
+  const Packed y = pack(b);
+  if (int c = compareInts(x.imsi, y.imsi)) return c;
+  if (int c = compareInts(x.locale, y.locale)) return c;
+  // memcmp, as Android does: bytes compare unsigned.
+  if (int c = std::memcmp(x.script.data(), y.script.data(), x.script.size())) return c < 0 ? -1 : 1;
+  if (int c = std::memcmp(x.variant.data(), y.variant.data(), x.variant.size())) {
+    return c < 0 ? -1 : 1;
+  }
+  for (auto field :
+       {&Packed::grammaticalInflection, &Packed::screenType, &Packed::input, &Packed::screenSize,
+        &Packed::version, &Packed::screenLayout, &Packed::screenLayout2, &Packed::colorMode,
+        &Packed::uiMode, &Packed::smallestScreenWidthDp, &Packed::screenSizeDp}) {
+    if (int c = compareInts(x.*field, y.*field)) return c;
+  }
+  return 0;
+}
 
 std::string toString(const Config& c) { return write(c, /*all=*/false); }
 

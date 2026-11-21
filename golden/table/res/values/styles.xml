@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Styles: explicit, inferred and no parents, and items read against the format of their
+     attribute. -->
+<resources xmlns:app="http://schemas.android.com/apk/res-auto">
+    <style name="Base">
+        <item name="colorAttr">#ff00ff00</item>
+        <item name="limited">3</item>
+    </style>
+    <style name="Base.Child">
+        <item name="mode">five</item>
+        <item name="gravityFlags">top|center</item>
+        <item name="stringAttr">  hello   world  </item>
+    </style>
+    <style name="Base.Child.Grand" parent="Base"/>
+    <style name="Explicit" parent="@style/Base.Child">
+        <item name="refAttr">@color/rgb8</item>
+        <item name="colorAttr">?attr/colorAttr</item>
+    </style>
+    <style name="Orphan.Dotted" parent=""/>
+    <style name="Coerced">
+        <item name="anyAttr">a\'b</item>
+        <item name="stringOrInt">abc</item>
+        <item name="boolAttr">TRUE</item>
+        <item name="sizeAttr">50%</item>
+        <item name="intOrEnum">auto</item>
+        <item name="every">@null</item>
+        <item name="styleableOwn">0x10</item>
+        <item name="twice">@empty</item>
+        <item name="app:limited">5</item>
+    </style>
+    <style name="Coerced2">
+        <item name="mode">hexed</item>
+        <item name="gravityFlags"></item>
+        <item name="stringAttr"><b>styled</b></item>
+        <item name="stringOrInt">12</item>
+        <item name="anyAttr">16dp</item>
+        <item name="every">minus</item>
+        <item name="styleableEnum">first</item>
+    </style>
+    <style name="Coerced3">
+        <item name="mode">minus</item>
+        <item name="gravityFlags"> bottom | top </item>
+        <item name="anyAttr">#fff</item>
+        <item name="intOrEnum">3</item>
+        <item name="stringOrInt">"quoted  text"</item>
+        <item name="sizeAttr">1.5</item>
+        <item name="stringAttr">it\'s escaped</item>
+    </style>
+    <style name="Twice">
+        <item name="limited">1</item>
+        <item name="limited">2</item>
+    </style>
+    <style name="Self" parent="Self"/>
+</resources>

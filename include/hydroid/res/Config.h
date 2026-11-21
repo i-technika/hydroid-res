@@ -93,6 +93,14 @@ struct Config {
 HYDROID_RES_API bool operator==(const Config& a, const Config& b);
 inline bool operator!=(const Config& a, const Config& b) { return !(a == b); }
 
+// < 0 if `a` comes before `b`, 0 if they are equal, > 0 if after: the order of
+// ResTable_config::compare, in which aapt2 keeps the values of a resource and
+// `aapt2 dump resources` lists them. It compares Android's packed fields as integers, so it is
+// not the order of the qualifiers in a folder name: the mnc before the mcc, the region before the
+// language and the second letter of each before the first, the density before the touchscreen
+// before the orientation, and the minor version before the version.
+HYDROID_RES_API int compareConfigs(const Config& a, const Config& b);
+
 // The qualifiers as aapt2 writes them, which is how `aapt2 dump resources` prints a configuration:
 // "en-rUS-sw600dp-v13", "b+sr+Latn", "" for the default Config. Every field with a folder name
 // is written, in folder order, under that name: mnc as a number (kMncZero is "mnc65535"), a

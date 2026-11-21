@@ -4,7 +4,7 @@ include(FetchContent)
 # changes the build (#11). HYDROID_RES_USE_SYSTEM_DEPS uses installed packages instead, but only
 # at exactly those versions, and fails rather than falling back to a fetch.
 option(HYDROID_RES_USE_SYSTEM_DEPS
-  "Use installed pugixml, GoogleTest and nlohmann/json, at exactly the pinned versions" OFF)
+  "Use installed pugixml, expat, GoogleTest and nlohmann/json, at exactly the pinned versions" OFF)
 
 if(NOT HYDROID_RES_USE_SYSTEM_DEPS)
   # FETCHCONTENT_TRY_FIND_PACKAGE_MODE=ALWAYS would otherwise find_package() any version.
@@ -16,7 +16,7 @@ endif()
 # which pugixml's cmake_minimum_required(VERSION 3.5) leaves unset.
 set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 
-# pugixml: the only runtime dependency of the core (values, layout, drawable XML).
+# pugixml: the tree the core keeps of what expat reads of an XML file (#104).
 if(HYDROID_RES_USE_SYSTEM_DEPS)
   find_package(pugixml 1.14 EXACT REQUIRED CONFIG)
   set(hydroid_res_fetched_pugixml OFF)
@@ -46,6 +46,36 @@ else()
     set_target_properties(pugixml-static PROPERTIES
       CXX_VISIBILITY_PRESET hidden
       VISIBILITY_INLINES_HIDDEN ON)
+  endif()
+endif()
+
+# expat: aapt2's XML parser, which decides what is well-formed XML (#78) and reads it (#104).
+if(HYDROID_RES_USE_SYSTEM_DEPS)
+  find_package(expat 2.7.1 EXACT REQUIRED CONFIG)
+  set(hydroid_res_fetched_expat OFF)
+else()
+  # Static whatever BUILD_SHARED_LIBS says, as pugixml (#12): expat has an option of its own for
+  # that, and builds a static library with hidden visibility, so a shared hydroid-res does not
+  # export it either.
+  set(EXPAT_SHARED_LIBS OFF)
+  set(EXPAT_BUILD_TOOLS OFF)
+  set(EXPAT_BUILD_EXAMPLES OFF)
+  set(EXPAT_BUILD_TESTS OFF)
+  set(EXPAT_BUILD_DOCS OFF)
+  set(EXPAT_BUILD_PKGCONFIG OFF)
+  set(EXPAT_ENABLE_INSTALL OFF)
+  FetchContent_Declare(expat
+    URL      https://github.com/libexpat/libexpat/releases/download/R_2_7_1/expat-2.7.1.tar.xz
+    URL_HASH SHA256=354552544b8f99012e5062f7d570ec77f14b412a3ff5c7d8d0dae62c0d217c30
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
+  FetchContent_GetProperties(expat)
+  if(expat_POPULATED)
+    set(hydroid_res_fetched_expat OFF)
+  else()
+    set(hydroid_res_fetched_expat ON)
+    FetchContent_MakeAvailable(expat)
+    # Which a shared hydroid-res needs to link it in, and expat, unlike pugixml, does not set.
+    set_target_properties(expat PROPERTIES POSITION_INDEPENDENT_CODE ON)
   endif()
 endif()
 

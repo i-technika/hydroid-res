@@ -86,7 +86,8 @@ TEST(SdkBaseline, Aapt2ScriptPinsEmulatedLevel) {
 }
 
 // The first line of each file names what made it: "... with build-tools 37.0.0 and android-37.0
-// on Windows (AMD64). ...". All three must be what the script pins, so that changing a pin without
+// on Windows (AMD64). ...", after "# " in a text file and in the "generated" field, first, of a
+// JSON one. All three must be what the script pins, so that changing a pin without
 // making the files again fails too (#64). The OS is GOLDEN_HOST (#62): on Linux or macOS, aapt2
 // 37.0.0 wraps sw2147483648dp to the default Config rather than stop it at sw65535dp, and writes
 // other NaN bits. The aapt2 tests fail on those, as they pin what aapt2 makes of each deliberate
@@ -98,7 +99,9 @@ TEST(SdkBaseline, Aapt2GoldenComesFromScriptPins) {
     ASSERT_NO_FATAL_FAILURE(readAapt2ScriptPin(name, &pins[name]));
   }
   const std::regex made(R"(build-tools (\S+) and (\S+) on (\w+) \(\w+\)\.)");
-  for (const char* path : {HYDROID_AAPT2_VALUES, HYDROID_AAPT2_CONFIGS}) {
+  for (const char* path :
+       {HYDROID_AAPT2_VALUES, HYDROID_AAPT2_CONFIGS, HYDROID_AAPT2_TABLE, HYDROID_AAPT2_APP_TABLE,
+        HYDROID_AAPT2_TABLE_CASES, HYDROID_AAPT2_STRINGS}) {
     std::ifstream in(path);
     ASSERT_TRUE(in) << "cannot open " << path;
     std::string header;

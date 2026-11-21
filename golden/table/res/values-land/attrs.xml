@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- An attribute and a styleable here go in the default configuration. -->
+<resources>
+    <attr name="landAttr" format="integer"/>
+    <declare-styleable name="LandStyleable"><attr name="landAttr"/></declare-styleable>
+    <dimen name="dp">24dp</dimen>
+</resources>

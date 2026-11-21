@@ -40,6 +40,7 @@ std::optional<Value> sample(ValueKind kind, uint32_t data) {
   switch (kind) {
     case ValueKind::Null: return Value::null();
     case ValueKind::Empty: return Value::empty();
+    case ValueKind::Id: return Value::id();
     case ValueKind::Reference: return Value::reference(data);
     case ValueKind::AttrRef: return Value::attrRef(data);
     case ValueKind::Color: return Value::color(data, ColorFormat::Argb8);
@@ -199,14 +200,14 @@ TEST(ValueEquality, EveryKindComparesItsData) {
   for (ValueKind kind : everyKind()) {
     SCOPED_TRACE(testing::PrintToString(*sample(kind, 1)));
     EXPECT_EQ(sample(kind, 1), sample(kind, 1));
-    if (kind != ValueKind::Null && kind != ValueKind::Empty) {
+    if (kind != ValueKind::Null && kind != ValueKind::Empty && kind != ValueKind::Id) {
       EXPECT_NE(sample(kind, 1), sample(kind, 2));
     }
   }
 }
 
-// Every kind but Null and Empty holds data 1 in the same union bits, so only the kind tells them
-// apart.
+// Every kind but Null, Empty and Id holds data 1 in the same union bits, so only the kind tells
+// them apart.
 TEST(ValueEquality, SameDataDifferentKindDiffers) {
   const std::vector<ValueKind> kinds = everyKind();
   for (ValueKind a : kinds) {
@@ -228,11 +229,15 @@ TEST(ValueEquality, ReferenceAndNull) {
   EXPECT_EQ(Value(), Value());
 }
 
-// @null and @empty both hold no data, but mean different things at runtime (#18).
+// @null and @empty both hold no data, but mean different things at runtime (#18). Nor does the
+// value of an id resource, which is neither.
 TEST(ValueEquality, NullIsNotEmpty) {
   EXPECT_EQ(Value(), Value::null());
   EXPECT_EQ(Value::empty(), Value::empty());
   EXPECT_NE(Value::null(), Value::empty());
+  EXPECT_EQ(Value::id(), Value::id());
+  EXPECT_NE(Value::id(), Value::null());
+  EXPECT_NE(Value::id(), Value::empty());
 }
 
 TEST(ValueEquality, FloatComparesBits) {
@@ -281,6 +286,7 @@ TEST(PrintValue, EveryKindShowsItsData) {
   EXPECT_EQ(print(Value::attrRef(0x01010000)), "AttrRef(0x01010000)");
   EXPECT_EQ(print(Value()), "Null()");
   EXPECT_EQ(print(Value::empty()), "Empty()");
+  EXPECT_EQ(print(Value::id()), "Id()");
   EXPECT_EQ(print(Value::string(3)), "String(index 3)");
   EXPECT_EQ(print(Value::styleableDecl(7)), "StyleableDecl(index 7)");
 }

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- config_order is also in a folder of each of many qualifiers, so the dump pins
+     the order aapt2 keeps configurations in. -->
+<resources>
+    <string name="config_order">default</string>
+</resources>

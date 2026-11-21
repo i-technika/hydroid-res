@@ -10,30 +10,31 @@ resolves values exactly as Android does, for UIKit, GTK4 and WinUI 3. Design and
 | --- | --- |
 | `include/hydroid/res/` | Public C++ headers |
 | `include/hydroid_res.h` | Stable C API, used by the Swift adapter |
-| `src/core/` | Shared core: parser, ResourceTable, Config matching, Theme/Style |
+| `src/core/` | Shared core: parsers, ResourceTable, Config matching, Theme/Style |
 | `src/capi/` | C API implementation |
-| `tools/hydroid-rc/` | `res/` → `.hrt` binary table compiler |
+| `tools/hydroid-rc/` | `res/` → `.hrt` binary table compiler; for now `hydroid-rc dump <res>` |
 | `tests/` | GoogleTest unit and golden tests |
 | `golden/` | Android test app + instrumentation test that dumps Android's answers |
 | `golden/data/` | The dumped golden JSON the C++ tests compare against |
-| `golden/aapt2/` | What the SDK's aapt2 makes of literal values and resource folder names |
+| `golden/table/res/` | A `res/` folder with every kind of value and file, for the table tests |
+| `golden/aapt2/` | What the SDK's aapt2 makes of literal values, resource folder names, strings and whole `res/` folders |
 | `golden/aosp/` | The folder names of AOSP's framework `res/`, which must all parse |
 | `scripts/golden/` | Runs the dump on a device and pulls the JSON; runs aapt2 for `golden/aapt2/` |
 
 ## Build and test
 
-Needs CMake 3.24+ and a C++17 compiler. pugixml 1.14, plus GoogleTest 1.15.2 and nlohmann/json
-3.11.3 for the tests, are fetched at configure time, even when they are installed. To use
-installed packages instead, configure with `-DHYDROID_RES_USE_SYSTEM_DEPS=ON`: they must be
-exactly those versions, built with their default options (pugixml's `PUGIXML_WCHAR_MODE`, for
-one, changes its API), and found through their CMake package configs (point
-`CMAKE_PREFIX_PATH` at them if needed). On MSVC they must also be built against the shared CRT,
-in the configuration you build (Debug or Release).
+Needs CMake 3.24+, a C compiler and a C++17 compiler. pugixml 1.14 and expat 2.7.1, plus
+GoogleTest 1.15.2 and nlohmann/json 3.11.3 for the tests, are fetched at configure time, even when
+they are installed. To use installed packages instead, configure with `-DHYDROID_RES_USE_SYSTEM_DEPS=ON`: they must be
+exactly those versions, built with their default options (pugixml's `PUGIXML_WCHAR_MODE`, for one,
+changes its API), and found through their CMake package configs (point `CMAKE_PREFIX_PATH` at them
+if needed). On MSVC they must also be built against the shared CRT, in the configuration you build
+(Debug or Release).
 
 hydroid-res is a static library unless `BUILD_SHARED_LIBS` is on. A shared build exports only the
-public API, links the fetched pugixml statically without exporting it, and, as the top-level
-project, puts its DLL next to the executables in `build/<preset>/bin` (`bin/<config>` with a
-multi-config generator such as Visual Studio). A project that uses the shared library without
+public API, links the fetched pugixml and expat statically without exporting them, and, as the
+top-level project, puts its DLL next to the executables in `build/<preset>/bin` (`bin/<config>` with
+a multi-config generator such as Visual Studio). A project that uses the shared library without
 CMake must define `HYDROID_RES_SHARED` when it includes the headers.
 
 The version is `project()` in `CMakeLists.txt` and nowhere else. CMake generates
@@ -97,7 +98,15 @@ they must be made on Windows: aapt2 writes some rows otherwise on Linux and macO
 ```sh
 python scripts/golden/gen_aapt2_values.py    # golden/aapt2/values.tsv
 python scripts/golden/gen_aapt2_configs.py   # golden/aapt2/configs.tsv
+python scripts/golden/gen_aapt2_strings.py   # golden/aapt2/strings.json
+python scripts/golden/gen_aapt2_table.py     # golden/aapt2/table.txt, app_table.txt, table_cases.json
 ```
+
+The table files are what `aapt2 dump resources` prints of `golden/table/res`, of the golden app's
+`res/` and of some 300 small folders, linked with `--no-auto-version`, `--no-version-vectors`,
+`--no-version-transitions`, `--no-resource-removal` and `--no-resource-deduping`, which keep
+aapt2 from adding or dropping values the folder does not say. `hydroid-rc dump <res> [<package>]`
+prints a folder the same way, from hydroid's `ResourceTable`, to compare by hand.
 
 On another OS the scripts stop. With `--any-host` they run anyway and write
 `build/aapt2-<os>-<cpu>/` instead of `golden/aapt2/`, to compare with the golden files.

@@ -1,5 +1,6 @@
 // hydroid's literal parsers against aapt2 for thousands of inputs: golden/aapt2/values.tsv,
-// written by scripts/golden/gen_aapt2_values.py from the SDK's aapt2.
+// written by scripts/golden/gen_aapt2_values.py from the SDK's aapt2. Empty text, @null and
+// @empty, which are no literals, go through the values parser instead.
 
 #include <gtest/gtest.h>
 
@@ -7,20 +8,27 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <filesystem>
 #include <fstream>
 #include <map>
 #include <optional>
 #include <set>
+#include <sstream>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
+#include "TempDir.h"
+#include "hydroid/res/ResourceTable.h"
 #include "hydroid/res/ValueParser.h"
 
 namespace hydroid::res {
 namespace {
 
-// Res_value types.
+// Res_value types, and the data of @empty.
+constexpr int kTypeNull = 0x00;
+constexpr uint32_t kDataNullEmpty = 1;
 constexpr int kTypeReference = 0x01;
 constexpr int kTypeFloat = 0x04;
 constexpr int kTypeDimension = 0x05;
@@ -91,6 +99,9 @@ uint32_t formatsOf(const std::string& tag) {
 // The Res_value aapt2 would write for `v`.
 ResValue toResValue(const Value& v) {
   switch (v.kind()) {
+    case ValueKind::Null: return {kTypeReference, 0};
+    case ValueKind::Empty: return {kTypeNull, kDataNullEmpty};
+    case ValueKind::Id: return {kTypeIntBoolean, 0};
     case ValueKind::Color: return {static_cast<int>(v.colorFormat()), v.argb()};
     case ValueKind::Int:
       return {static_cast<int>(v.intFormat()), static_cast<uint32_t>(v.intValue())};
@@ -103,8 +114,74 @@ ResValue toResValue(const Value& v) {
       std::memcpy(&bits, &f, sizeof bits);
       return {kTypeFloat, bits};
     }
-    default: return {-1, 0};
+    // No element of the golden file makes these: a reference needs the id it resolves to, and a
+    // string under "any" is recorded as no literal.
+    case ValueKind::Reference:
+    case ValueKind::AttrRef:
+    case ValueKind::String:
+    case ValueKind::StyledString:
+    case ValueKind::File:
+    case ValueKind::Style:
+    case ValueKind::Array:
+    case ValueKind::Plurals:
+    case ValueKind::AttrDecl:
+    case ValueKind::StyleableDecl: return {-1, 0};
   }
+  return {-1, 0};
+}
+
+// The element gen_aapt2_values.py writes each tag as (its TAGS), and the type it makes.
+struct Element {
+  const char* open;
+  const char* close;
+  ResType type;
+};
+
+// What the values parser makes of `text` as the one resource of a values file under `tag`:
+// nullopt for a string under "any", which the golden file records as no literal. aapt2 compiles
+// every such file, so one that fails to load here is a failure, not "no literal".
+std::optional<Value> parseInValuesFile(const std::string& tag, const std::string& text) {
+  static const std::map<std::string, Element> kElements = {
+      {"color", {"<color", "</color>", ResType::Color}},
+      {"bool", {"<bool", "</bool>", ResType::Bool}},
+      {"integer", {"<integer", "</integer>", ResType::Integer}},
+      {"dimen", {"<dimen", "</dimen>", ResType::Dimen}},
+      {"fraction", {"<fraction", "</fraction>", ResType::Fraction}},
+      {"any", {"<item type=\"drawable\"", "</item>", ResType::Drawable}},
+  };
+  const Element& element = kElements.at(tag);
+  test::TempDir dir;
+  const std::filesystem::path res = dir.path() / "res";
+  std::filesystem::create_directories(res / "values");
+  std::ofstream(res / "values" / "v.xml", std::ios::binary)
+      << "<resources>" << element.open << " name=\"v\">" << text << element.close
+      << "</resources>\n";
+  ResourceTable table;
+  std::vector<Diagnostic> errors;
+  const std::string where = tag + " \"" + text + '"';
+  if (!table.addPackage(res, "com.probe", 0x7f, &errors)) {
+    std::ostringstream why;
+    for (const Diagnostic& d : errors) why << "\n  " << d;
+    ADD_FAILURE() << where << " fails to load:" << why.str();
+    return std::nullopt;
+  }
+  const std::optional<ResId> id = table.find("com.probe", element.type, "v");
+  if (!id) {
+    ADD_FAILURE() << where << " loads, but makes no resource v";
+    return std::nullopt;
+  }
+  const Value& v = table.entry(*id)->candidates.at(0).value;
+  if (tag == "any" && v.kind() == ValueKind::String) return std::nullopt;
+  return v;
+}
+
+// Whether the values parser, not parseLiteral, reads `text`: empty text, @null and @empty, with
+// whitespace around them or not.
+bool valuesParserReads(std::string_view text) {
+  const size_t first = text.find_first_not_of(' ');
+  if (first == std::string_view::npos) return true;
+  const std::string_view t = text.substr(first, text.find_last_not_of(' ') - first + 1);
+  return t == "@null" || t == "@empty";
 }
 
 std::string describe(const std::optional<ResValue>& v) {
@@ -156,17 +233,12 @@ TEST(Aapt2Value, ParsesLikeAapt2) {
     const uint32_t formats = formatsOf(row.tag);
     ASSERT_NE(formats, 0u) << "unknown tag " << row.tag;
     const std::string where = row.tag + " \"" + row.text + '"';
-    const std::optional<Value> v = parseLiteral(row.text, formats);
+    const std::optional<Value> v = valuesParserReads(row.text)
+                                       ? parseInValuesFile(row.tag, row.text)
+                                       : parseLiteral(row.text, formats);
     const std::optional<ResValue> hydroid =
         v ? std::optional<ResValue>(toResValue(*v)) : std::nullopt;
 
-    if (row.text.empty()) {
-      // aapt2 makes an empty element @null; that is the values parser's job (step 4).
-      const ResValue null(kTypeReference, 0);
-      EXPECT_TRUE(!row.aapt2 || *row.aapt2 == null) << where;
-      EXPECT_FALSE(hydroid) << where;
-      continue;
-    }
     const auto listed = kDeliberateRejects.find({row.tag, row.text});
     if (row.aapt2 && !hydroid && listed != kDeliberateRejects.end()) {
       deliberate.insert({row.tag, row.text});
@@ -187,16 +259,30 @@ TEST(Aapt2Value, CoversEveryTagAndOutcome) {
   std::map<std::string, std::set<int>> seen;  // tag -> types aapt2 wrote, -1 for none
   for (const Row& row : rows()) seen[row.tag].insert(row.aapt2 ? row.aapt2->first : -1);
   const std::map<std::string, std::set<int>> expected = {
-      {"color", {-1, kTypeReference, 0x1c, 0x1d, 0x1e, 0x1f}},
-      {"bool", {-1, kTypeReference, kTypeIntBoolean}},
-      {"integer", {-1, kTypeReference, kTypeIntDec, kTypeIntHex}},
-      {"dimen", {-1, kTypeReference, kTypeFloat, kTypeDimension, kTypeFraction}},
-      {"fraction", {kTypeFloat, kTypeDimension, kTypeFraction}},
+      // TYPE_NULL is @empty's; a reference @null's, and an empty element's but in fraction and
+      // any, so EveryTagHasNullAndEmpty checks those rows by name.
+      {"color", {-1, kTypeNull, kTypeReference, 0x1c, 0x1d, 0x1e, 0x1f}},
+      {"bool", {-1, kTypeNull, kTypeReference, kTypeIntBoolean}},
+      {"integer", {-1, kTypeNull, kTypeReference, kTypeIntDec, kTypeIntHex}},
+      {"dimen", {-1, kTypeNull, kTypeReference, kTypeFloat, kTypeDimension, kTypeFraction}},
+      {"fraction", {kTypeNull, kTypeReference, kTypeFloat, kTypeDimension, kTypeFraction}},
       {"any",
-       {-1, kTypeFloat, kTypeDimension, kTypeFraction, kTypeIntDec, kTypeIntHex, kTypeIntBoolean,
-        0x1c, 0x1d, 0x1e, 0x1f}},
+       {-1, kTypeNull, kTypeReference, kTypeFloat, kTypeDimension, kTypeFraction, kTypeIntDec,
+        kTypeIntHex, kTypeIntBoolean, 0x1c, 0x1d, 0x1e, 0x1f}},
   };
   EXPECT_EQ(seen, expected);
+}
+
+// @null and @empty, bare and with spaces around them, are in the golden file under every tag
+// (#36), so that ParsesLikeAapt2 reads each with the values parser.
+TEST(Aapt2Value, EveryTagHasNullAndEmpty) {
+  std::set<std::pair<std::string, std::string>> present;
+  for (const Row& row : rows()) present.insert({row.tag, row.text});
+  for (const char* tag : {"color", "bool", "integer", "dimen", "fraction", "any"}) {
+    for (const char* text : {"@null", "@empty", " @null ", " @empty "}) {
+      EXPECT_TRUE(present.count({tag, text})) << tag << " \"" << text << "\" is not in the file";
+    }
+  }
 }
 
 }  // namespace

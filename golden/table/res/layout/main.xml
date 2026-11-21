@@ -1,0 +1,9 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:id="@+id/root"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    note="@+id/plain_attribute">
+    <TextView android:id="@+id/title" android:text="@string/app_name"
+        android:layout_width="wrap_content" android:layout_height="wrap_content"/>
+    <View android:id="@id/root" android:tag="@+id/title" android:layout_width="1px"
+        android:layout_height="1px"/>
+    <!-- @+id/in_comment -->
+</LinearLayout>
