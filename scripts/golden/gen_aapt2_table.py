@@ -431,7 +431,7 @@ CASES = {
     "style-key-attr-item-default-product": values("<string name='s'>x</string>"
                                                   "<item type='attr' name='r' product='default'>@string/s</item>"
                                                   "<style name='S'><item name='r'>1</item></style>"),
-    "styleable-attr-item-not-an-attr":values("<string name='s'>x</string><item type='attr' name='r'>@string/s</item>"
+    "styleable-attr-item-not-an-attr": values("<string name='s'>x</string><item type='attr' name='r'>@string/s</item>"
                                               "<declare-styleable name='S'><attr name='r'/></declare-styleable>"),
 
     # Literals.
