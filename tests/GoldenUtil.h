@@ -36,10 +36,12 @@ struct GoldenDevice {
   std::vector<Config> locales;
 };
 
-// What Android makes of the android.content.res.Configuration a condition records, on its way to
-// the resource table: ResourcesImpl.updateConfiguration, then NativeSetConfiguration
-// (frameworks/base core/jni/android_util_AssetManager.cpp), which cuts the Java fields into
-// ResTable_config's.
+// The state of the device a condition records, as android.content.res.Configuration, cut into
+// ResTable_config's fields as NativeSetConfiguration (frameworks/base
+// core/jni/android_util_AssetManager.cpp) cuts them. Of what ResourcesImpl.updateConfiguration
+// does on the way, only the soft keyboard is done here; Resources::setConfiguration is left to
+// choose the locale and give it its old code, and to see to the version, the pixels and
+// navHidden (Config.h).
 inline GoldenDevice goldenDevice(const nlohmann::json& condition) {
   const nlohmann::json& c = condition.at("configuration");
   const auto at = [&](const char* key) { return c.at(key).get<int>(); };
@@ -73,7 +75,9 @@ inline GoldenDevice goldenDevice(const nlohmann::json& condition) {
   config.keyboard = static_cast<Keyboard>(at("keyboard"));
   config.navigation = static_cast<Navigation>(at("navigation"));
   // These two as the device has them, which Resources::setConfiguration must take as Android does:
-  // navHidden it drops, and of the display in pixels, it makes the longer side the width.
+  // navHidden it drops, and of the display in pixels, it makes the longer side the width. The
+  // golden conditions only check navHidden: every one is 1080x2400, which values-800x480/ and
+  // values-4000x3000/ take or leave the same either way round (#223).
   config.navHidden = static_cast<NavHidden>(at("navigationHidden"));
   config.screenWidth = static_cast<uint16_t>(at("widthPixels"));
   config.screenHeight = static_cast<uint16_t>(at("heightPixels"));

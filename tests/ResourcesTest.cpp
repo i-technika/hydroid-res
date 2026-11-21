@@ -167,7 +167,8 @@ TEST(Resources, TheLongerSideOfTheScreenIsItsWidth) {
   addPackage(table, dir, {"800x480", "2000x1000"});
   Resources resources(table);
 
-  // A phone held upright: 1080 wide is more than 1000, but 2400 is not more than 800.
+  // A phone held upright: as it is, 1080 wide is less than 2000 and only 800x480 matches; as
+  // 2400x1080, both do, and 2000x1000 is the closer.
   Config upright;
   upright.screenWidth = 1080;
   upright.screenHeight = 2400;
