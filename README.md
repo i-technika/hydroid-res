@@ -60,8 +60,11 @@ ctest --preset debug
 With GCC or Clang, the `sanitize` preset does the same under AddressSanitizer and
 UndefinedBehaviorSanitizer, and stops at the first error; CI runs it with Clang on Linux. The
 `tsan` preset does it under ThreadSanitizer, which finds the data races of code that several
-threads call, as `Resources` is (#236); CI runs it with Clang on Linux in its full scope. Neither
-is offered on Windows, where MSVC would ignore their flags.
+threads call, as `Resources` is (#236); CI runs it with Clang on Linux in its full scope. On a
+kernel that randomizes mmap with more bits than 28, as CI's runners do, the ThreadSanitizer of
+some compiler releases stops every test with "unexpected memory mapping"; CI first runs
+`sudo sysctl vm.mmap_rnd_bits=28`, which does for a local run too. Neither preset is offered on
+Windows, where MSVC would ignore their flags.
 
 With an Android NDK and Python at hand, `ctest` also runs `AConfiguration.MatchesNdk`, which
 checks the values of `Config.h` against the NDK's `android/configuration.h`. It finds the NDK in
