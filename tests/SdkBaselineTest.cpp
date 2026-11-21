@@ -1,7 +1,8 @@
 // Every reference hydroid is checked against comes from the API level of kEmulatedSdkVersion
 // (#14): the golden dump's emulator, the golden app's compileSdk and targetSdk, the build-tools
-// and platform the aapt2 golden files were made with, and the release the AOSP framework res/
-// folder list comes from. Raising one without the rest fails here.
+// and platform the aapt2 golden files were made with, the release the AOSP framework res/
+// folder list comes from, and the release and commit the matching code and locale tables come
+// from. Raising one without the rest fails here.
 
 #include <gtest/gtest.h>
 
@@ -21,6 +22,8 @@ namespace {
 using test::forEachGoldenCondition;
 
 const std::string kLevel = std::to_string(kEmulatedSdkVersion);
+// The AOSP branch of that level: API 37 is Android 17.
+const std::string kRelease = "android" + std::to_string(kEmulatedSdkVersion - 20) + "-release";
 
 TEST(SdkBaseline, GoldenDumpRanOnEmulatedLevel) {
   int conditions = 0;
@@ -49,14 +52,14 @@ TEST(SdkBaseline, GoldenAppBuildsForEmulatedLevel) {
   }
 }
 
-// The value gen_aapt2_values.py gives `name`, which it must set once, on a line of its own:
+// The value a generator script gives `name`, which it must set once, on a line of its own:
 // `NAME = "..."`. Python keeps the last of two, so any other line that starts with the name and
 // then =, :, +=, a comma or the like fails too, even below the first. One inside a block, or with
 // the name second in `A, NAME = ...`, is not seen. Read a line at a time, as
 // std::regex::multiline is not in every standard library.
-void readAapt2ScriptPin(const std::string& name, std::string* value) {
-  std::ifstream in(HYDROID_AAPT2_SCRIPT);
-  ASSERT_TRUE(in) << "cannot open " << HYDROID_AAPT2_SCRIPT;
+void readScriptPin(const char* script, const std::string& name, std::string* value) {
+  std::ifstream in(script);
+  ASSERT_TRUE(in) << "cannot open " << script;
   const std::regex assigns(name + R"(\s*[^\w\s.].*)");
   const std::regex pin(name + R"re(\s*=\s*"([^"]*)"\s*)re");
   int assignments = 0;
@@ -68,9 +71,12 @@ void readAapt2ScriptPin(const std::string& name, std::string* value) {
         << name << " must be set as " << name << " = \"...\" alone on its line, not: " << line;
     *value = m[1].str();
   }
-  ASSERT_NE(assignments, 0) << name << " not found in " << HYDROID_AAPT2_SCRIPT;
-  ASSERT_EQ(assignments, 1) << name << " is set " << assignments << " times in "
-                            << HYDROID_AAPT2_SCRIPT;
+  ASSERT_NE(assignments, 0) << name << " not found in " << script;
+  ASSERT_EQ(assignments, 1) << name << " is set " << assignments << " times in " << script;
+}
+
+void readAapt2ScriptPin(const std::string& name, std::string* value) {
+  readScriptPin(HYDROID_AAPT2_SCRIPT, name, value);
 }
 
 // gen_aapt2_values.py pins the build-tools, platform and OS of the aapt2 golden files (#64). The
@@ -150,15 +156,97 @@ TEST(SdkBaseline, DocsNameScriptPins) {
   }
 }
 
-// "... in AOSP, android17-release at <commit> ...": API 37 is Android 17.
-TEST(SdkBaseline, AospFolderListIsOfEmulatedLevel) {
+// The branch and commit golden/aosp lists the folders of: "... in AOSP, android17-release at" and
+// "# <commit> (...)" on the next line.
+void readAospFolderListRelease(std::string* branch, std::string* commit) {
   std::ifstream in(HYDROID_AOSP_RES_DIRS);
   ASSERT_TRUE(in) << "cannot open " << HYDROID_AOSP_RES_DIRS;
-  std::string header;
-  std::getline(in, header);
+  std::string first;
+  std::string second;
+  std::getline(in, first);
+  std::getline(in, second);
+  const std::string header = first + "\n" + second;
+  const std::regex release(R"((android\d+-release) at\n# ([0-9a-f]{40}) )");
   std::smatch m;
-  ASSERT_TRUE(std::regex_search(header, m, std::regex(R"(android(\d+)-release at)"))) << header;
-  EXPECT_EQ(std::stoi(m[1].str()) + 20, kEmulatedSdkVersion) << header;
+  ASSERT_TRUE(std::regex_search(header, m, release)) << header;
+  *branch = m[1].str();
+  *commit = m[2].str();
+}
+
+TEST(SdkBaseline, AospFolderListIsOfEmulatedLevel) {
+  std::string branch;
+  std::string commit;
+  ASSERT_NO_FATAL_FAILURE(readAospFolderListRelease(&branch, &commit));
+  EXPECT_EQ(branch, kRelease);
+}
+
+// gen_locale_data.py pins the android<N>-release that ConfigMatch.cpp and LocaleData.cpp were
+// ported from, and the commit of it that LocaleDataTables.inc is made from (#215). Both are the
+// release and commit golden/aosp lists the framework folders of, so that raising the level, or
+// moving golden/aosp to another commit, without raising BRANCH and COMMIT fails here.
+TEST(SdkBaseline, LocaleScriptPinsEmulatedRelease) {
+  std::string branch;
+  std::string commit;
+  ASSERT_NO_FATAL_FAILURE(readScriptPin(HYDROID_LOCALE_SCRIPT, "BRANCH", &branch));
+  ASSERT_NO_FATAL_FAILURE(readScriptPin(HYDROID_LOCALE_SCRIPT, "COMMIT", &commit));
+  EXPECT_EQ(branch, kRelease) << "BRANCH";
+  std::string aospBranch;
+  std::string aospCommit;
+  ASSERT_NO_FATAL_FAILURE(readAospFolderListRelease(&aospBranch, &aospCommit));
+  EXPECT_EQ(branch, aospBranch) << "BRANCH is not the release of " << HYDROID_AOSP_RES_DIRS;
+  EXPECT_EQ(commit, aospCommit) << "COMMIT is not the commit of " << HYDROID_AOSP_RES_DIRS;
+}
+
+// LocaleDataTables.inc names the release and commit it was made from, "// <branch> at <commit>,",
+// which must be what gen_locale_data.py pins: changing a pin without making the tables again
+// fails here (#215). Only the header is read: the tables themselves are not compared with what
+// the script makes of that commit (#228).
+TEST(SdkBaseline, LocaleTablesComeFromScriptPins) {
+  std::string branch;
+  std::string commit;
+  ASSERT_NO_FATAL_FAILURE(readScriptPin(HYDROID_LOCALE_SCRIPT, "BRANCH", &branch));
+  ASSERT_NO_FATAL_FAILURE(readScriptPin(HYDROID_LOCALE_SCRIPT, "COMMIT", &commit));
+  std::ifstream in(HYDROID_LOCALE_TABLES);
+  ASSERT_TRUE(in) << "cannot open " << HYDROID_LOCALE_TABLES;
+  const std::regex made(R"(// (android\d+-release) at ([0-9a-f]{40}),)");
+  int named = 0;
+  for (std::string line; std::getline(in, line) && line.rfind("//", 0) == 0;) {
+    std::smatch m;
+    if (!std::regex_match(line, m, made)) continue;
+    ++named;
+    EXPECT_EQ(m[1].str(), branch) << HYDROID_LOCALE_TABLES << ": BRANCH";
+    EXPECT_EQ(m[2].str(), commit) << HYDROID_LOCALE_TABLES << ": COMMIT";
+  }
+  EXPECT_EQ(named, 1) << HYDROID_LOCALE_TABLES
+                      << " does not name, once in its header, the release and commit it is of";
+}
+
+// The port itself is not read, only what each file says it was ported from: the code ported from
+// AOSP (ConfigMatch.cpp, LocaleData.h, ConfigParser.cpp) and the tests ported with it name the
+// release of BRANCH, as do README.md and Version.h, and any other android<N>-release they name is
+// held to it too. Raising BRANCH without them fails here (#215), so that a new release is not
+// taken without looking at the code that says it follows the old one.
+TEST(SdkBaseline, PortNamesScriptRelease) {
+  std::string branch;
+  ASSERT_NO_FATAL_FAILURE(readScriptPin(HYDROID_LOCALE_SCRIPT, "BRANCH", &branch));
+  const std::regex release(R"(android\d+-release)");
+  for (const char* relative :
+       {"src/core/ConfigMatch.cpp", "src/core/LocaleData.h", "src/core/ConfigParser.cpp",
+        "tests/ConfigMatchTest.cpp", "tests/ConfigParserTest.cpp", "README.md",
+        "include/hydroid/res/Version.h"}) {
+    const std::string path = std::string(HYDROID_SOURCE_DIR) + "/" + relative;
+    std::ifstream in(path);
+    ASSERT_TRUE(in) << "cannot open " << path;
+    std::stringstream file;
+    file << in.rdbuf();
+    const std::string text = file.str();
+    int named = 0;
+    for (std::sregex_iterator m(text.begin(), text.end(), release), end; m != end; ++m) {
+      ++named;
+      EXPECT_EQ(m->str(), branch) << path << ": " << m->str() << " is not BRANCH";
+    }
+    EXPECT_NE(named, 0) << path << " does not name the release it follows";
+  }
 }
 
 }  // namespace

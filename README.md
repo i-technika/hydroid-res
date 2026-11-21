@@ -77,8 +77,10 @@ git ls-files -z -- '*.h' '*.cpp' | xargs -0 clang-format -i
 ## Golden data
 
 All of it comes from one API level, `kEmulatedSdkVersion` in `include/hydroid/res/Version.h`
-(37): the emulator, the golden app's `compileSdk` and `targetSdk`, and the build-tools and
-platform the aapt2 scripts pin. `SdkBaseline` tests fail when one of them moves without the rest,
+(37): the emulator, the golden app's `compileSdk` and `targetSdk`, the build-tools and platform
+the aapt2 scripts pin, the AOSP release and commit `golden/aosp` lists the framework folders of,
+and the same release and commit `scripts/gen_locale_data.py` pins for the matching code and the
+locale tables. `SdkBaseline` tests fail when one of them moves without the rest,
 or when the aapt2 files were not made with the build-tools, platform and OS (`GOLDEN_HOST`,
 Windows) that `scripts/golden/gen_aapt2_values.py` pins, or when this README names others.
 
