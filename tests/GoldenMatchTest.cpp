@@ -149,9 +149,10 @@ const Stats& checkedGolden() {
 // The completion criterion of step 5: hydroid picks what Android picked, under every condition.
 TEST(GoldenMatch, PicksWhatAndroidPicked) {
   const Stats& stats = checkedGolden();
-  // The matrix of 7 densities x 3 languages x night x orientation x 3 smallest widths, and the
-  // extras of GoldenDumpTest.kt, one for each thing the matrix does not vary.
-  EXPECT_EQ(stats.conditions, 252u + 125u);
+  // The matrix of 7 densities x 3 languages x night x orientation x 3 smallest widths, the
+  // extras of GoldenDumpTest.kt, one for each thing the matrix does not vary, and the three
+  // grammatical genders, which it sets for the whole app.
+  EXPECT_EQ(stats.conditions, 252u + 125u + 3u);
   // Every resource of the app's values, under every condition.
   size_t resources = 0;
   for (const TypeTable& type : table().package(kPackage)->types) resources += type.entries.size();

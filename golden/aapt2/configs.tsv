@@ -2803,6 +2803,7 @@ desk	desk-v8
 dpad	dpad
 en-rIN-sw600dp	en-rIN-sw600dp-v13
 en-rXA	en-rXA
+feminine	feminine-v34
 fil	fil
 finger	finger
 h500dp	h500dp-v13
@@ -2817,8 +2818,10 @@ keyssoft	keyssoft
 ldltr	ldltr
 long	long-v4
 lowdr	lowdr-v26
+masculine	masculine-v34
 navexposed	navexposed
 navhidden	navhidden
+neuter	neuter-v34
 nokeys	nokeys
 nonav	nonav
 normal	normal-v4
@@ -2866,9 +2869,6 @@ b+de+CH+1901	b+de+CH+1901
 b+en+US+POSIX	b+en+US+posix
 b+sl+rozaj	b+sl+rozaj
 b+fil+PH	fil-rPH
-feminine	feminine-v34
-masculine	masculine-v34
-neuter	neuter-v34
 sw0dp	
 sw65535dp	sw65535dp-v13
 w0dp	

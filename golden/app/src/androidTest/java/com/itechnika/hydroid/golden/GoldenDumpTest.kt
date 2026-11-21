@@ -1,8 +1,11 @@
 package com.itechnika.hydroid.golden
 
+import android.app.GrammaticalInflectionManager
 import android.content.Context
 import android.content.res.Configuration
+import android.os.Build
 import android.os.LocaleList
+import android.os.SystemClock
 import android.util.TypedValue
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -33,6 +36,13 @@ class GoldenDumpTest {
     private val fractionBase = 360
     private val fractionParentBase = 1234
 
+    // The grammatical genders, each dumped on 320dpi_en-US_notnight_port_sw320dp as gender_<name>.
+    private val genders = listOf(
+        "feminine" to Configuration.GRAMMATICAL_GENDER_FEMININE,
+        "masculine" to Configuration.GRAMMATICAL_GENDER_MASCULINE,
+        "neuter" to Configuration.GRAMMATICAL_GENDER_NEUTRAL,
+    )
+
     @Test
     fun dumpAll() {
         val target = InstrumentationRegistry.getInstrumentation().targetContext
@@ -41,9 +51,35 @@ class GoldenDumpTest {
             mkdirs()
         }
         val conditions = matrix() + extras()
-        check(conditions.map { it.name }.toSet().size == conditions.size) { "a name is used twice" }
-        for (c in conditions) {
-            File(outDir, "${c.name}.json").writeText(dump(target, c).toString(2))
+        val names = conditions.map { it.name } + genders.map { "gender_${it.first}" }
+        check(names.toSet().size == names.size) { "a name is used twice" }
+        fun write(c: Condition) = File(outDir, "${c.name}.json").writeText(dump(target, c).toString(2))
+
+        // A Configuration the test makes cannot have a grammatical gender, as
+        // Configuration.setGrammaticalGender is hidden; the SDK only sets one for the whole app, and
+        // dump copies it from the app's own. It stays set for the app until it is set again, so a
+        // run that stopped half way has it set back first, and every run at the end.
+        check(Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) { "needs API 34" }
+        val inflection = target.getSystemService(GrammaticalInflectionManager::class.java)
+        try {
+            setGender(target, inflection, Configuration.GRAMMATICAL_GENDER_NOT_SPECIFIED)
+            for (c in conditions) write(c)
+            for ((name, gender) in genders) {
+                setGender(target, inflection, gender)
+                write(Condition("gender_$name") { set() })
+            }
+        } finally {
+            setGender(target, inflection, Configuration.GRAMMATICAL_GENDER_NOT_SPECIFIED)
+        }
+    }
+
+    /** Asks for `gender` for the whole app, and waits until the app's resources have it. */
+    private fun setGender(target: Context, inflection: GrammaticalInflectionManager, gender: Int) {
+        inflection.setRequestedApplicationGrammaticalGender(gender)
+        val deadline = SystemClock.uptimeMillis() + 10_000
+        while (target.resources.configuration.grammaticalGender != gender) {
+            check(SystemClock.uptimeMillis() < deadline) { "the app was not given gender $gender" }
+            Thread.sleep(50)
         }
     }
 
@@ -226,8 +262,7 @@ class GoldenDumpTest {
         }
         extra("mcc440") { mcc = 440 }
         extra("mcc450") { mcc = 450 }
-        // No condition sets the grammatical gender: the SDK only sets it for the whole app,
-        // through GrammaticalInflectionManager, and Configuration.setGrammaticalGender is hidden.
+        // The grammatical gender is not an extra: dumpAll sets it for the whole app (genders).
 
         // A better locale against a better width (pick_locale_or_width).
         for (tag in listOf("en-GB", "en-IN", "en-AU")) extra("locale_${tag}_sw600dp") {

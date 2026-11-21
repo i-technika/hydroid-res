@@ -97,10 +97,15 @@ Open `golden/` in Android Studio, or build it with `golden/gradlew`. Then:
 python scripts/golden/pull_golden.py
 ```
 
-This runs `GoldenDumpTest` over 377 conditions and writes `golden/data/*.json`: a matrix of 252
-(7 densities × 3 languages × night × orientation × 3 smallest widths), and 125 more that each
+This runs `GoldenDumpTest` over 380 conditions and writes `golden/data/*.json`: a matrix of 252
+(7 densities × 3 languages × night × orientation × 3 smallest widths), 125 more that each
 change one thing the matrix leaves alone, such as a locale of another region or script, a list
-of languages, the screen's size or shape, the UI mode, the input devices or the mcc. Each file
+of languages, the screen's size or shape, the UI mode, the input devices or the mcc, and one for
+each grammatical gender. The SDK sets that only for a whole app, with
+`GrammaticalInflectionManager`, so the test sets it for the golden app, dumps, and sets it back
+to none. aapt2 makes the gender folders `-v34`, so against `values/` the version alone would pick
+them; `pick_gender` is in `values-ldltr/` too, of the qualifier that comes after the gender,
+which only the gender beats. Each file
 records the `Configuration` the resources were resolved for and the value of every resource.
 `GoldenMatchTest` builds the same device from it and checks that hydroid picks the same values.
 To see by hand what hydroid picks for one device,
@@ -121,10 +126,9 @@ them of two languages.
 The `pick_` strings of the app's `values*/match.xml` are there for that: each has a value in
 `values/` and in some `values-<qualifiers>/`, which says the folder it is in, so the dump shows
 which folder Android took it from. A folder added for one needs a condition that picks it, or a
-line in `GoldenMatch.EveryFolderIsPickedSomewhere` saying why none does. Two things have no
-folder there, because the app is built by the Android Gradle plugin and dumped through the SDK:
-a locale with a variant and no script, and the grammatical gender (the SDK only sets it for a
-whole app). A variant with a script the plugin keeps, so `values-b+sr+Latn+RS+ekavsk/` and
+line in `GoldenMatch.EveryFolderIsPickedSomewhere` saying why none does. One thing has no
+folder there, because the app is built by the Android Gradle plugin: a locale with a variant
+and no script. A variant with a script the plugin keeps, so `values-b+sr+Latn+RS+ekavsk/` and
 `values-b+sr+Latn+RS/`, of the same region, are there for it: `sr-Latn-RS-ekavsk` takes the
 first, only because its variant matches. `sr-Latn-RS` and `sr-Latn-RS-ijekavsk` take the
 second, which they would take anyway as the first of two equal folders in the table, so that a

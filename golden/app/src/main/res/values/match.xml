@@ -32,6 +32,7 @@
     <string name="pick_mcc">default</string>
     <string name="pick_version">default</string>
     <string name="pick_minor_version">default</string>
+    <string name="pick_gender">default</string>
     <string name="pick_en">default</string>
     <string name="pick_en_lang">default</string>
     <string name="pick_en_pseudo">default</string>
