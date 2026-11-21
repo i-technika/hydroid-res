@@ -1,12 +1,13 @@
-# Fails unless hydroid-rc pick prints what Android picked of the golden app's res/ under two
+# Fails unless hydroid-rc pick prints what Android picked of the golden app's res/ under three
 # conditions of golden/data (#202): the locale it read them in, and of every resource the id and,
 # but for a reference or a dimension or fraction, the value; of a pick_ string, which says the
 # folder it is in, the configuration too. The qualifiers below are each condition's
 # Configuration, as goldenDevice (GoldenUtil.h) cuts it, written as a folder name, but for the
 # locale, which only --locales gives, as the condition asked Android for it. It also fails unless
 # a device is of kEmulatedSdkVersion when its qualifiers name no version, and of the one they
-# name, even below the one parseConfig raises them to (night-v4 is night-v8 as a folder). RC is
-# hydroid-rc, RES the app's res/ and GOLDEN golden/data, all from tests/CMakeLists.txt.
+# name, even below the one parseConfig raises them to (night-v4 is night-v8 as a folder), and
+# that a <public> resource is PUBLIC. RC is hydroid-rc, RES the app's res/, GOLDEN golden/data
+# and TABLE golden/table/res, all from tests/CMakeLists.txt.
 
 set(package com.itechnika.hydroid.golden)
 
@@ -68,10 +69,11 @@ function(check_golden name locale)
     string(JSON id GET "${values}" "${key}" id)
     string(JSON type GET "${values}" "${key}" type)
     string(JSON data GET "${values}" "${key}" data)
-    set(prefix "resource ${id} ${key} (")
+    set(prefix "resource ${id} ${key} ")
     line_of("${out}" "${prefix}" line)
     string(LENGTH "${prefix}" from)
-    string(SUBSTRING "${line}" ${from} -1 rest)  # the configuration, ") " and the value
+    string(SUBSTRING "${line}" ${from} -1 rest)  # PUBLIC, "(", the configuration, ") ", the value
+    string(REGEX REPLACE "^(PUBLIC )?\\(" "" rest "${rest}")
     string(FIND "${rest}" ") " close)
     string(SUBSTRING "${rest}" 0 ${close} config)
     math(EXPR close "${close} + 2")
@@ -149,6 +151,18 @@ check_golden(320dpi_ko-KR_night_land_sw600dp ko-rKR
 check_golden(locales_ja-JP+ko-KR ko-rKR
   mcc310-mnc260-ldltr-sw320dp-w320dp-h568dp-normal-long-notround-nowidecg-lowdr-port-notnight-xhdpi-finger-keysexposed-qwerty-nonav-2400x1080
   --locales ja-JP,ko-KR)
+# Two that the app has values for, of which the first is the one.
+check_golden(locales_en-US+ko-KR en-rUS
+  mcc310-mnc260-ldltr-sw320dp-w320dp-h568dp-normal-long-notround-nowidecg-lowdr-port-notnight-xhdpi-finger-keysexposed-qwerty-nonav-2400x1080
+  --locales en-US,ko-KR)
+
+# A resource that is <public> is PUBLIC, as dump prints it.
+execute_process(COMMAND "${RC}" pick "${TABLE}" ""
+  RESULT_VARIABLE result OUTPUT_VARIABLE out ERROR_VARIABLE err ENCODING UTF8)
+if(NOT result EQUAL 0 OR NOT out MATCHES "\nresource [^ ]+ string/app_name PUBLIC \\(\\) \"")
+  message(FATAL_ERROR "hydroid-rc pick of ${TABLE} (${result}) prints no PUBLIC app_name:\n"
+    "${out}${err}")
+endif()
 
 # values-v21/, values-v30/, values-v37/ and values-v38/ hold pick_version, and values-night/,
 # which aapt2 makes night-v8, pick_night.
@@ -160,6 +174,6 @@ expect_string(pick_night " (night-v8) \"night\"" night-v8)
 # anydpi-v4.1 is a folder, anydpi-v21, but v4.1 no version of a device.
 execute_process(COMMAND "${RC}" pick "${RES}" anydpi-v4.1 ${package}
   RESULT_VARIABLE result OUTPUT_QUIET ERROR_VARIABLE err)
-if(NOT result EQUAL 1 OR NOT err MATCHES "not the qualifiers")
+if(NOT result EQUAL 1 OR NOT err MATCHES "not the version of a device: v4\\.1")
   message(FATAL_ERROR "hydroid-rc pick anydpi-v4.1 ends with ${result}, not an error:\n${err}")
 endif()

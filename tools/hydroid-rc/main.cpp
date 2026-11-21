@@ -81,15 +81,23 @@ std::string_view versionPart(std::string_view qualifiers) {
 // The device of `qualifiers`, as parseConfig reads a folder name, but for the version that it
 // raises to the first that knows a qualifier (night is night-v8, and night-v4 too): a device is
 // of the version it says, and of kEmulatedSdkVersion, through setConfiguration, if it says none.
-// nullopt for a version no device has, which a folder may name only as it is raised:
-// anydpi-v4.1 is anydpi-v21, but a minor version needs v36 or later.
+// nullopt, said on stderr, for what is no folder name, and for a version no device has, which a
+// folder may name only as it is raised: anydpi-v4.1 is anydpi-v21, but a minor version needs v36
+// or later.
 std::optional<res::Config> deviceOf(const std::string& qualifiers) {
   std::optional<res::Config> device = res::parseConfig(qualifiers);
-  if (!device) return std::nullopt;
+  if (!device) {
+    std::cerr << "error: not the qualifiers of a folder name: " << qualifiers << '\n';
+    return std::nullopt;
+  }
   std::optional<res::Config> version = res::Config();  // version 0, for none
   const std::string_view part = versionPart(qualifiers);
   if (!part.empty()) version = res::parseConfig(part);
-  if (!version) return std::nullopt;
+  if (!version) {
+    std::cerr << "error: not the version of a device: " << part
+              << " (a minor version needs v36 or later)\n";
+    return std::nullopt;
+  }
   device->sdkVersion = version->sdkVersion;
   device->minorVersion = version->minorVersion;
   return device;
@@ -195,10 +203,7 @@ int run(const std::vector<fs::path>& args) {
       }
     }
     const std::optional<res::Config> device = deviceOf(rest[0]);
-    if (!device) {
-      std::cerr << "error: not the qualifiers of a folder name: " << rest[0] << '\n';
-      return 1;
-    }
+    if (!device) return 1;
     std::vector<res::Config> locales;
     if (tags) {
       std::optional<std::vector<res::Config>> parsed = localesOf(*tags);

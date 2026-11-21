@@ -116,6 +116,7 @@ if(TARGET hydroid-rc)
       "-DRC=$<TARGET_FILE:hydroid-rc>"
       "-DRES=${PROJECT_SOURCE_DIR}/golden/app/src/main/res"
       "-DGOLDEN=${PROJECT_SOURCE_DIR}/golden/data"
+      "-DTABLE=${PROJECT_SOURCE_DIR}/golden/table/res"
       -P ${CMAKE_CURRENT_SOURCE_DIR}/CheckRcPick.cmake)
   # And ends with an error, not an abort, on an argument with no UTF-8, which only Windows passes.
   if(WIN32)

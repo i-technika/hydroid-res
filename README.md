@@ -108,8 +108,8 @@ hydroid-rc pick golden/app/src/main/res ko-rKR-land-night-xhdpi --locales ko-KR 
 A device whose qualifiers name no version is of `kEmulatedSdkVersion`, not the one `parseConfig`
 raises them to (night is night-v8), and one whose qualifiers name a version is of that one, even
 below it (night-v4 is of API 4, where values-night/ is not picked).
-`HydroidRc.PicksWhatAndroidPicked` checks it against two conditions of `golden/data`, one of them
-of two languages.
+`HydroidRc.PicksWhatAndroidPicked` checks it against three conditions of `golden/data`, two of
+them of two languages.
 
 The `pick_` strings of the app's `values*/match.xml` are there for that: each has a value in
 `values/` and in some `values-<qualifiers>/`, which says the folder it is in, so the dump shows
