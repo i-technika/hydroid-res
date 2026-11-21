@@ -436,14 +436,25 @@ TEST(ParseLanguageTag, CaseIsThatOfAFolder) {
   EXPECT_EQ(localeOfTag("ca-es-VALENCIA"), "b+ca+ES+valencia");
 }
 
-TEST(ParseLanguageTag, LeavesOutExtensionsAndLaterVariants) {
+TEST(ParseLanguageTag, LeavesOutExtensions) {
   EXPECT_EQ(localeOfTag("ar-EG-u-nu-latn"), "ar-rEG");
   EXPECT_EQ(localeOfTag("en-US-u-ca-gregory-nu-latn"), "en-rUS");
   EXPECT_EQ(localeOfTag("de-x-private"), "de");
-  EXPECT_EQ(localeOfTag("sl-rozaj-biske"), "b+sl+rozaj");
+  EXPECT_EQ(localeOfTag("de-DE-1901-x-1996"), "b+de+DE+1901");
   // What follows the first subtag of one character is not looked at.
   EXPECT_EQ(localeOfTag("en-u-toolongsubtag"), "en");
   EXPECT_EQ(localeOfTag("ko-K"), "ko");
+}
+
+// What ResTable_config::setBcp47Locale (android17-release) gives: each variant is written over
+// the front of the one before.
+TEST(ParseLanguageTag, LaterVariantIsWrittenOverTheEarlier) {
+  EXPECT_EQ(localeOfTag("sl-rozaj-biske"), "b+sl+biske");
+  EXPECT_EQ(localeOfTag("de-DE-1901-1996"), "b+de+DE+1996");
+  EXPECT_EQ(localeOfTag("sl-Latn-IT-rozaj-nedis"), "b+sl+Latn+IT+nedis");
+  // A shorter variant leaves the tail of a longer one before it.
+  EXPECT_EQ(localeOfTag("ca-ES-valencia-1996"), "b+ca+ES+1996ncia");
+  EXPECT_EQ(localeOfTag("de-1996-1901"), "b+de+1901");
 }
 
 TEST(ParseLanguageTag, RejectsWhatIsNoLocale) {

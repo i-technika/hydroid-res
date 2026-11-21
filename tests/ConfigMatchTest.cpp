@@ -757,5 +757,21 @@ TEST(BestCandidate, FollowsTheOrderOfTheTable) {
   EXPECT_EQ(best({"ko", "sw600dp"}, "ko-rKR-sw600dp-v37"), "ko");
 }
 
+// A device whose language tag has two variants keeps the last, as setBcp47Locale does. What
+// AOSP's match and isBetterThan (android17-release) pick from the same candidates.
+TEST(BestCandidate, DeviceTagWithTwoVariants) {
+  const auto bestForTag = [](const std::vector<const char*>& qualifiers, const char* tag) {
+    const Entry entry = entryOf(qualifiers);
+    const std::optional<Config> device = parseLanguageTag(tag);
+    EXPECT_TRUE(device) << tag;
+    const Candidate* c = bestCandidate(entry, device.value_or(Config{}));
+    return c != nullptr ? toString(c->config) : "none";
+  };
+  EXPECT_EQ(bestForTag({"b+de+DE+1901", "b+de+DE+1996"}, "de-DE-1901-1996"), "b+de+DE+1996");
+  EXPECT_EQ(bestForTag({"b+sl+biske", "b+sl+rozaj"}, "sl-rozaj-biske"), "b+sl+biske");
+  // The device's variant is "1996ncia", which valencia is not.
+  EXPECT_EQ(bestForTag({"ca-rES", "b+ca+ES+valencia"}, "ca-ES-valencia-1996"), "ca-rES");
+}
+
 }  // namespace
 }  // namespace hydroid::res
