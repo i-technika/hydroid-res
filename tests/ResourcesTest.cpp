@@ -467,6 +467,79 @@ TEST(Resources, AnswersFromSeveralThreads) {
   EXPECT_EQ(wrong.load(), 0);
 }
 
+// ---- another density -------------------------------------------------------------------------
+
+// The folder Resources takes "where" from for the density `density`.
+std::string whereFor(const Resources& resources, const ResourceTable& table, uint16_t density) {
+  const std::optional<ResId> id = table.find("com.example", ResType::String, "where");
+  if (!id) return "no resource";
+  const Candidate* c = resources.candidateForDensity(*id, density);
+  if (c == nullptr) return "none";
+  return table.package("com.example")->strings.at(c->value.index());
+}
+
+// As getDrawableForDensity asks for one (#204): the configuration with only the density changed,
+// which neither the generation nor what candidate gives know anything of.
+TEST(ResourcesDensity, PicksForAnotherDensity) {
+  TempDir dir;
+  ResourceTable table;
+  addPackage(table, dir, {"hdpi", "xhdpi", "xxhdpi"});
+  Resources resources(table);
+  resources.setConfiguration(dev("xhdpi"));
+  const uint32_t generation = resources.generation();
+
+  EXPECT_EQ(whereFor(resources, table, 0), "xhdpi");
+  EXPECT_EQ(whereFor(resources, table, kDensityXhdpi), "xhdpi");
+  EXPECT_EQ(whereFor(resources, table, kDensityHdpi), "hdpi");
+  EXPECT_EQ(whereFor(resources, table, kDensityXxhdpi), "xxhdpi");
+  // Above all of them, the highest; below all, the lowest, which is values/, of mdpi.
+  EXPECT_EQ(whereFor(resources, table, kDensityXxxhdpi), "xxhdpi");
+  EXPECT_EQ(whereFor(resources, table, kDensityLdpi), "default");
+
+  EXPECT_EQ(resources.configuration().density, kDensityXhdpi);
+  EXPECT_EQ(where(resources, table), "xhdpi");
+  EXPECT_EQ(resources.generation(), generation);
+  uint32_t of = generation + 1;
+  resources.candidateForDensity(*table.find("com.example", ResType::String, "where"),
+                                kDensityXxhdpi, &of);
+  EXPECT_EQ(of, generation);
+}
+
+// What is picked for a density is kept apart from what is picked for the device's own, and both
+// are thrown away as the configuration or the table change.
+TEST(ResourcesDensity, KeepsTheAnswersOfEachDensityUntilTheConfigurationChanges) {
+  TempDir dir;
+  ResourceTable table;
+  addPackage(table, dir, {"xhdpi", "xxhdpi", "land-xxhdpi"});
+  Resources resources(table);
+  const ResId id = *table.find("com.example", ResType::String, "where");
+
+  resources.setConfiguration(dev("port-xhdpi"));
+  // The device's own first, then another, and the other way round.
+  EXPECT_EQ(where(resources, table), "xhdpi");
+  EXPECT_EQ(whereFor(resources, table, kDensityXxhdpi), "xxhdpi");
+  EXPECT_EQ(whereFor(resources, table, kDensityHdpi), "xhdpi");
+  EXPECT_EQ(where(resources, table), "xhdpi");
+  const Candidate* xxhdpi = resources.candidateForDensity(id, kDensityXxhdpi);
+  EXPECT_EQ(resources.candidateForDensity(id, kDensityXxhdpi), xxhdpi);
+
+  resources.setConfiguration(dev("land-xhdpi"));
+  EXPECT_EQ(whereFor(resources, table, kDensityXxhdpi), "land-xxhdpi");
+  resources.setConfiguration(dev("port-xhdpi"));
+  EXPECT_EQ(whereFor(resources, table, kDensityXxhdpi), "xxhdpi");
+
+  // A table assigned another, of the same resource but other folders: what was picked for a
+  // density was of the one that is gone.
+  {
+    const TempDir otherDir;
+    ResourceTable other;
+    addPackage(other, otherDir, {"hdpi", "xhdpi"});
+    table = std::move(other);
+  }
+  EXPECT_TRUE(isOfTheTable(resources.candidateForDensity(id, kDensityXxhdpi), table, id));
+  EXPECT_EQ(whereFor(resources, table, kDensityXxhdpi), "xhdpi");
+}
+
 // ---- the locale of the device ----------------------------------------------------------------
 
 TEST(ResourcesLocale, TheDevicesOwnWithoutAList) {

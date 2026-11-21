@@ -83,6 +83,14 @@ class Resources {
   // `generation`, if given, is set to the generation the answer is of.
   HYDROID_RES_API const Candidate* candidate(ResId id, uint32_t* generation = nullptr) const;
 
+  // As `candidate`, for the configuration with another density, as Resources.getValueForDensity
+  // and getDrawableForDensity have AssetManager2::FindEntry pick with its density_override:
+  // `density` as Config::density has it, and 0 for the device's own. Nothing else of the
+  // configuration changes, nor does the generation; the answers are kept as those of `candidate`
+  // are, for each density.
+  HYDROID_RES_API const Candidate* candidateForDensity(ResId id, uint16_t density,
+                                                       uint32_t* generation = nullptr) const;
+
  private:
   struct Impl;
   std::unique_ptr<Impl> impl_;
