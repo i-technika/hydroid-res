@@ -550,6 +550,25 @@ TEST(ResourcesLocale, OldLanguageCodes) {
   EXPECT_EQ(where(resources, table), "iw");
 }
 
+TEST(ResourcesLocale, OldLanguageCodesAloneInAList) {
+  // As apps and the framework have them (golden/aosp/framework_res_dirs.txt): values-iw/ and no
+  // values-he/, so a list finds Hebrew in the table only by reading iw as he.
+  TempDir dir;
+  ResourceTable table;
+  addPackage(table, dir, {"iw", "in", "ji", "ko"});
+  Resources resources(table);
+
+  resources.setConfiguration(Config{}, tags({"fr-FR", "he-IL", "ko-KR"}));
+  EXPECT_EQ(chosen(resources), "iw-rIL");
+  EXPECT_EQ(where(resources, table), "iw");
+  resources.setConfiguration(Config{}, tags({"fr-FR", "id-ID", "ko-KR"}));
+  EXPECT_EQ(chosen(resources), "in-rID");
+  EXPECT_EQ(where(resources, table), "in");
+  resources.setConfiguration(Config{}, tags({"fr-FR", "yi", "ko-KR"}));
+  EXPECT_EQ(chosen(resources), "ji");
+  EXPECT_EQ(where(resources, table), "ji");
+}
+
 TEST(ResourcesLocale, TagalogIsFilipinoInAList) {
   for (const char* folder : {"tl", "tl-rPH"}) {
     SCOPED_TRACE(folder);
