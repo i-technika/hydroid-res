@@ -34,6 +34,7 @@
     <string name="pick_en">default</string>
     <string name="pick_en_lang">default</string>
     <string name="pick_en_pseudo">default</string>
+    <string name="pick_en_us">default</string>
     <string name="pick_es">default</string>
     <string name="pick_es_mx">default</string>
     <string name="pick_zh">default</string>

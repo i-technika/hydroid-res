@@ -699,6 +699,8 @@ TEST(ConfigIsBetterThan, UsEnglishTakesItsOwnOverNone) {
   // but values-en-rUS/ is still better than values/; AOSP's cases have no en-US candidate.
   const Config device = cfg("en-rUS");
   EXPECT_TRUE(isBetterThan(cfg("en-rUS"), Config{}, device));
+  // Only this checks the other way round: a table has values/ first, so it never asks it, and
+  // the golden app's pick_en_us would not tell.
   EXPECT_FALSE(isBetterThan(Config{}, cfg("en-rUS"), device));
   // So too for an English close to US English, with its own region.
   const Config puertoRico = cfg("en-rPR");

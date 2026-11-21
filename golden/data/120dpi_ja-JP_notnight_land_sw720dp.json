@@ -112,242 +112,248 @@
       "data": 2,
       "string": "default"
     },
-    "string\/pick_es": {
+    "string\/pick_en_us": {
       "id": "0x7f06000c",
       "type": 3,
       "data": 2,
       "string": "default"
     },
-    "string\/pick_es_mx": {
+    "string\/pick_es": {
       "id": "0x7f06000d",
       "type": 3,
       "data": 2,
       "string": "default"
     },
-    "string\/pick_fil": {
+    "string\/pick_es_mx": {
       "id": "0x7f06000e",
       "type": 3,
       "data": 2,
       "string": "default"
     },
-    "string\/pick_fr": {
+    "string\/pick_fil": {
       "id": "0x7f06000f",
       "type": 3,
       "data": 2,
       "string": "default"
     },
-    "string\/pick_gamut": {
+    "string\/pick_fr": {
       "id": "0x7f060010",
+      "type": 3,
+      "data": 2,
+      "string": "default"
+    },
+    "string\/pick_gamut": {
+      "id": "0x7f060011",
       "type": 3,
       "data": 36,
       "string": "nowidecg"
     },
     "string\/pick_hdr": {
-      "id": "0x7f060011",
+      "id": "0x7f060012",
       "type": 3,
       "data": 38,
       "string": "lowdr"
     },
     "string\/pick_he": {
-      "id": "0x7f060012",
+      "id": "0x7f060013",
       "type": 3,
       "data": 2,
       "string": "default"
     },
     "string\/pick_height": {
-      "id": "0x7f060013",
+      "id": "0x7f060014",
       "type": 3,
       "data": 20,
       "string": "h600dp"
     },
     "string\/pick_id": {
-      "id": "0x7f060014",
-      "type": 3,
-      "data": 2,
-      "string": "default"
-    },
-    "string\/pick_in": {
       "id": "0x7f060015",
       "type": 3,
       "data": 2,
       "string": "default"
     },
-    "string\/pick_iw": {
+    "string\/pick_in": {
       "id": "0x7f060016",
       "type": 3,
       "data": 2,
       "string": "default"
     },
-    "string\/pick_keyboard": {
+    "string\/pick_iw": {
       "id": "0x7f060017",
+      "type": 3,
+      "data": 2,
+      "string": "default"
+    },
+    "string\/pick_keyboard": {
+      "id": "0x7f060018",
       "type": 3,
       "data": 47,
       "string": "qwerty"
     },
     "string\/pick_keys_exposed": {
-      "id": "0x7f060018",
-      "type": 3,
-      "data": 53,
-      "string": "keysexposed"
-    },
-    "string\/pick_keys_hidden": {
       "id": "0x7f060019",
       "type": 3,
       "data": 53,
       "string": "keysexposed"
     },
-    "string\/pick_layout_dir": {
+    "string\/pick_keys_hidden": {
       "id": "0x7f06001a",
+      "type": 3,
+      "data": 53,
+      "string": "keysexposed"
+    },
+    "string\/pick_layout_dir": {
+      "id": "0x7f06001b",
       "type": 3,
       "data": 29,
       "string": "ldltr"
     },
     "string\/pick_locale_or_width": {
-      "id": "0x7f06001b",
+      "id": "0x7f06001c",
       "type": 3,
       "data": 2,
       "string": "default"
     },
     "string\/pick_long": {
-      "id": "0x7f06001c",
+      "id": "0x7f06001d",
       "type": 3,
       "data": 9,
       "string": "long"
     },
     "string\/pick_mcc": {
-      "id": "0x7f06001d",
+      "id": "0x7f06001e",
       "type": 3,
-      "data": 113,
+      "data": 114,
       "string": "mcc310-mnc260"
     },
     "string\/pick_nav_hidden": {
-      "id": "0x7f06001e",
+      "id": "0x7f06001f",
       "type": 3,
       "data": 2,
       "string": "default"
     },
     "string\/pick_navigation": {
-      "id": "0x7f06001f",
+      "id": "0x7f060020",
       "type": 3,
       "data": 49,
       "string": "nonav"
     },
     "string\/pick_night": {
-      "id": "0x7f060020",
+      "id": "0x7f060021",
       "type": 3,
       "data": 12,
       "string": "notnight"
     },
     "string\/pick_orientation": {
-      "id": "0x7f060021",
+      "id": "0x7f060022",
       "type": 3,
       "data": 59,
       "string": "land"
     },
     "string\/pick_pixels": {
-      "id": "0x7f060022",
+      "id": "0x7f060023",
       "type": 3,
       "data": 44,
       "string": "1920x1080"
     },
     "string\/pick_precedence": {
-      "id": "0x7f060023",
+      "id": "0x7f060024",
       "type": 3,
       "data": 24,
       "string": "sw600dp"
     },
     "string\/pick_pt": {
-      "id": "0x7f060024",
-      "type": 3,
-      "data": 2,
-      "string": "default"
-    },
-    "string\/pick_qaa": {
       "id": "0x7f060025",
       "type": 3,
       "data": 2,
       "string": "default"
     },
-    "string\/pick_round": {
+    "string\/pick_qaa": {
       "id": "0x7f060026",
+      "type": 3,
+      "data": 2,
+      "string": "default"
+    },
+    "string\/pick_round": {
+      "id": "0x7f060027",
       "type": 3,
       "data": 33,
       "string": "notround"
     },
     "string\/pick_size": {
-      "id": "0x7f060027",
+      "id": "0x7f060028",
       "type": 3,
       "data": 5,
       "string": "normal"
     },
     "string\/pick_size_small": {
-      "id": "0x7f060028",
-      "type": 3,
-      "data": 2,
-      "string": "default"
-    },
-    "string\/pick_sr": {
       "id": "0x7f060029",
       "type": 3,
       "data": 2,
       "string": "default"
     },
-    "string\/pick_sw": {
+    "string\/pick_sr": {
       "id": "0x7f06002a",
+      "type": 3,
+      "data": 2,
+      "string": "default"
+    },
+    "string\/pick_sw": {
+      "id": "0x7f06002b",
       "type": 3,
       "data": 25,
       "string": "sw720dp"
     },
     "string\/pick_tl": {
-      "id": "0x7f06002b",
-      "type": 3,
-      "data": 2,
-      "string": "default"
-    },
-    "string\/pick_tl_fil": {
       "id": "0x7f06002c",
       "type": 3,
       "data": 2,
       "string": "default"
     },
-    "string\/pick_touch": {
+    "string\/pick_tl_fil": {
       "id": "0x7f06002d",
+      "type": 3,
+      "data": 2,
+      "string": "default"
+    },
+    "string\/pick_touch": {
+      "id": "0x7f06002e",
       "type": 3,
       "data": 62,
       "string": "finger"
     },
     "string\/pick_ui_mode": {
-      "id": "0x7f06002e",
+      "id": "0x7f06002f",
       "type": 3,
       "data": 2,
       "string": "default"
     },
     "string\/pick_version": {
-      "id": "0x7f06002f",
+      "id": "0x7f060030",
       "type": 3,
       "data": 41,
       "string": "v37"
     },
     "string\/pick_width": {
-      "id": "0x7f060030",
+      "id": "0x7f060031",
       "type": 3,
       "data": 17,
       "string": "w1000dp"
     },
     "string\/pick_width_height": {
-      "id": "0x7f060031",
+      "id": "0x7f060032",
       "type": 3,
       "data": 18,
       "string": "w600dp-h400dp"
     },
     "string\/pick_zh": {
-      "id": "0x7f060032",
+      "id": "0x7f060033",
       "type": 3,
       "data": 2,
       "string": "default"
     },
     "string\/qualifier_hint": {
-      "id": "0x7f060033",
+      "id": "0x7f060034",
       "type": 3,
       "data": 2,
       "string": "default"
