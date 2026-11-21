@@ -20,7 +20,7 @@ resolves values exactly as Android does, for UIKit, GTK4 and WinUI 3. Design and
 | `golden/aapt2/` | What the SDK's aapt2 makes of literal values, resource folder names, strings and whole `res/` folders |
 | `golden/aosp/` | The folder names of AOSP's framework `res/`, which must all parse |
 | `scripts/golden/` | Runs the dump on a device and pulls the JSON; runs aapt2 for `golden/aapt2/` |
-| `scripts/gen_locale_data.py` | Makes `src/core/LocaleDataTables.inc`, the locale tables matching goes by, from AOSP's |
+| `scripts/gen_locale_data.py` | Makes `src/core/LocaleDataTables.inc`, the locale tables matching goes by, from AOSP's `libs/androidfw/LocaleDataLookup.cpp` ([Locale tables](#locale-tables)) |
 
 ## Build and test
 
