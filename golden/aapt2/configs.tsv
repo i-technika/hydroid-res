@@ -2838,7 +2838,10 @@ trackball	trackball
 tvdpi	tvdpi-v4
 v21	v21
 v30	v30
+v36	v36
+v36.1	v36.1
 v37	v37
+v37.1	v37.1
 v38	v38
 vrheadset	vrheadset-v26
 w1000dp	w1000dp-v13
@@ -2883,8 +2886,6 @@ v0
 v1	v1
 v4	v4
 v34	v34
-v36	v36
-v36.1	v36.1
 v65535	v65535
 any	
 any-any	

@@ -204,8 +204,11 @@ TEST(GoldenMatch, EveryFolderIsPickedSomewhere) {
       {"pick_pixels", {"4000x3000", "800x480", "default"}},
       // Every condition is of API 37: v30 and v37 always match, v38 never does. The app is built
       // for API 24 and up, so aapt2 leaves out what v21 replaces there, the value of values/.
+      // v37 is better than v36.1, the version going before the minor one.
       {"pick_precedence", {"default"}},
-      {"pick_version", {"default", "v21", "v30", "v38"}},
+      {"pick_version", {"default", "v21", "v30", "v36.1", "v38"}},
+      // And of API 37.0: v36.1 matches and is better than v36, and v37.1 needs 37.1 or later.
+      {"pick_minor_version", {"default", "v36", "v37.1"}},
   };
   EXPECT_EQ(never, kNeverPicked);
 }
