@@ -159,6 +159,13 @@ TEST(Resources, VersionOfTheDevice) {
   EXPECT_EQ(where(resources, table), "v21");
   resources.setConfiguration(cfg("v38"));
   EXPECT_EQ(where(resources, table), "v38");
+  // A minor version alone is a version all the same, and kept.
+  Config minorOnly = dev("port");
+  minorOnly.minorVersion = 1;
+  resources.setConfiguration(minorOnly);
+  EXPECT_EQ(resources.configuration().sdkVersion, 0);
+  EXPECT_EQ(resources.configuration().minorVersion, 1);
+  EXPECT_EQ(where(resources, table), "default");
 }
 
 TEST(Resources, TheLongerSideOfTheScreenIsItsWidth) {
@@ -505,13 +512,16 @@ TEST(ResourcesLocale, FirstOfTheListWhereTheTableHasNone) {
 }
 
 TEST(ResourcesLocale, ATableWithoutLocalesChoosesNothing) {
-  TempDir dir;
-  ResourceTable table;
-  addPackage(table, dir, {"night", "en-rXA"});
-  Resources resources(table);
-  // Not even English: with no locales but the pseudo-locales, Android does not look.
-  resources.setConfiguration(Config{}, tags({"fr-FR", "en-US"}));
-  EXPECT_EQ(chosen(resources), "fr-rFR");
+  for (const char* pseudo : {"en-rXA", "ar-rXB"}) {
+    SCOPED_TRACE(pseudo);
+    TempDir dir;
+    ResourceTable table;
+    addPackage(table, dir, {"night", pseudo});
+    Resources resources(table);
+    // Not even English: with no locales but the pseudo-locales, Android does not look.
+    resources.setConfiguration(Config{}, tags({"fr-FR", "en-US"}));
+    EXPECT_EQ(chosen(resources), "fr-rFR");
+  }
 }
 
 TEST(ResourcesLocale, TheSystemsLocalesWhereTheAppHasNone) {
@@ -522,10 +532,13 @@ TEST(ResourcesLocale, TheSystemsLocalesWhereTheAppHasNone) {
   Resources resources(table);
   resources.setConfiguration(Config{}, tags({"fr-FR", "ja-JP", "ko-KR"}));
   EXPECT_EQ(chosen(resources), "ja-rJP");
+  EXPECT_EQ(where(resources, table, "android"), "ja");
 
-  // Once the app has a locale of its own, only the app's count.
+  // Once the app has a locale of its own, only the app's count, and what was picked for the old
+  // locale is picked again.
   addPackage(table, dir, {"ko"}, "com.example.lib", 0x7e);
   EXPECT_EQ(chosen(resources), "ko-rKR");
+  EXPECT_EQ(where(resources, table, "android"), "ko");
 }
 
 TEST(ResourcesLocale, OldLanguageCodes) {
@@ -602,6 +615,15 @@ TEST(ResourcesLocale, ALanguageWithoutAKnownScriptGoesByRegion) {
   EXPECT_EQ(chosen(resources), "ko-rKR");
   resources.setConfiguration(Config{}, tags({"ja-JP", "qaa-FR", "ko-KR"}));
   EXPECT_EQ(chosen(resources), "qaa-rFR");
+
+  // A folder of the language without a region is of every region of it.
+  TempDir otherDir;
+  ResourceTable other;
+  addPackage(other, otherDir, {"qaa", "ko"});
+  Resources any(other);
+  any.setConfiguration(Config{}, tags({"ja-JP", "qaa-CA", "ko-KR"}));
+  EXPECT_EQ(chosen(any), "qaa-rCA");
+  EXPECT_EQ(where(any, other), "qaa");
 }
 
 TEST(ResourcesLocale, KeepsTheScriptAndVariantOfTheChosen) {
