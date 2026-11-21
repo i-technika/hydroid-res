@@ -295,7 +295,7 @@ jobs:
         working-directory: golden
         run: ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest
 
-  # The three below come on top of the 11 runners above, to look where none of those does.
+  # The four below come on top of the 11 runners above, to look where none of those does.
 
   release:
     name: core (${{ matrix.os }}, release)
@@ -407,3 +407,18 @@ jobs:
           grep -q __tsan_init symbols.txt
       - name: Test
         run: ctest --preset tsan
+
+  locale-tables:
+    name: locale tables
+    if: github.event_name == 'push' || github.base_ref == 'main' || inputs.scope == 'full'
+    # SdkBaselineTest reads only the header of src/core/LocaleDataTables.inc, as making the tables
+    # again downloads AOSP's LocaleDataLookup.cpp. This makes them from the commit the script pins
+    # and fails when they are not the file in the repository: edited by hand, or a header moved to
+    # another commit without the tables (#228).
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Make the locale tables again
+        run: python3 scripts/gen_locale_data.py
+      - name: Check that they are the ones in the repository
+        run: git diff --exit-code -- src/core/LocaleDataTables.inc

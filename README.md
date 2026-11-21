@@ -174,3 +174,9 @@ Android matches a locale by its script, and picks between regions by the parent 
 ```sh
 python scripts/gen_locale_data.py
 ```
+
+It downloads that file from android.googlesource.com, so no test makes the tables again;
+`SdkBaseline` checks only that their header names the release and commit the script pins.
+The `locale tables` job of the full CI makes them again and fails when they are not the file in
+the repository (#228): tables edited by hand, or a header moved to another commit without
+them.

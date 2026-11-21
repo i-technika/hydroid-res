@@ -17,7 +17,8 @@ android<N>-release the matching code in src/core/ConfigMatch.cpp and LocaleData.
 from, and COMMIT the commit of it golden/aosp/framework_res_dirs.txt lists. Raise both with
 kEmulatedSdkVersion (include/hydroid/res/Version.h), port the matching code again and make the
 tables again: SdkBaselineTest wants the header of the tables, and the files that name the release
-they were ported from, to say these.
+they were ported from, to say these. The locale tables job of the full CI (.github/workflows/ci.yml)
+runs this and fails when the tables it makes are not the ones in the repository.
 """
 
 import base64
@@ -73,7 +74,7 @@ def main():
     if len(sys.argv) == 2:
         text = Path(sys.argv[1]).read_text(encoding="utf-8")
     else:
-        with urllib.request.urlopen(URL) as response:
+        with urllib.request.urlopen(URL, timeout=60) as response:
             text = base64.b64decode(response.read()).decode("utf-8")
 
     scripts = re.findall(r"/\* *\d+ *\*/ \{'(.)', '(.)', '(.)', '(.)'\},", text)
