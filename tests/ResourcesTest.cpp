@@ -567,6 +567,10 @@ TEST(ResourcesLocale, OldLanguageCodesAloneInAList) {
   resources.setConfiguration(Config{}, tags({"fr-FR", "yi", "ko-KR"}));
   EXPECT_EQ(chosen(resources), "ji");
   EXPECT_EQ(where(resources, table), "ji");
+  // And a list that gives the old code finds it too, by reading its own iw as he.
+  resources.setConfiguration(Config{}, tags({"fr-FR", "iw-IL", "ko-KR"}));
+  EXPECT_EQ(chosen(resources), "iw-rIL");
+  EXPECT_EQ(where(resources, table), "iw");
 }
 
 TEST(ResourcesLocale, TagalogIsFilipinoInAList) {
