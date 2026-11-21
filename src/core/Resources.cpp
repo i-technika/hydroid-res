@@ -152,7 +152,8 @@ bool isPseudoLocalesOnly(const std::set<Locale>& locales) {
 }
 
 // ResourcesImpl.updateConfiguration: the index of the one of `locales`, which are more than one,
-// that the resources of a table of `available` locales are read in.
+// that the resources of a table of `available` locales are read in, or kNoMatch if the table has
+// no locales but pseudo-locales, of the app's or the system's.
 size_t chooseLocaleIndex(const std::vector<Config>& locales, const TableLocales& available) {
   const std::set<Locale>* supported = &available.app;
   std::set<Locale> all;
@@ -160,13 +161,40 @@ size_t chooseLocaleIndex(const std::vector<Config>& locales, const TableLocales&
     // No locales of the app's own, so the system's.
     all = available.app;
     all.insert(available.system.begin(), available.system.end());
-    if (isPseudoLocalesOnly(all)) return 0;
+    if (isPseudoLocalesOnly(all)) return kNoMatch;
     supported = &all;
   }
   std::vector<Locale> desired;
   desired.reserve(locales.size());
   for (const Config& locale : locales) desired.push_back(javaLocaleOf(locale));
   return computeFirstMatchIndex(desired, *supported);
+}
+
+// LocaleList.getIntersection: the indexes of those of `locales` that one of `supported` matches
+// by language and script, in their order.
+std::vector<size_t> intersection(const std::vector<Config>& locales,
+                                 const std::vector<Config>& supported) {
+  std::vector<size_t> out;
+  for (size_t i = 0; i < locales.size(); i++) {
+    const Locale desired = javaLocaleOf(locales[i]);
+    for (const Config& s : supported) {
+      if (matchesLanguageAndScript(javaLocaleOf(s), desired)) {
+        out.push_back(i);
+        break;
+      }
+    }
+  }
+  return out;
+}
+
+// ResTable_config::isBetterThanBeforeLocale: whether `a` is better than `b` for `device` by what
+// comes before the locale, the mcc and mnc.
+bool isBetterThanBeforeLocale(const Config& a, const Config& b, const Config& device) {
+  if (a.mcc != 0 || a.mnc != 0 || b.mcc != 0 || b.mnc != 0) {
+    if (a.mcc != b.mcc && device.mcc != 0) return a.mcc != 0;
+    if (a.mnc != b.mnc && device.mnc != 0) return a.mnc != 0;
+  }
+  return false;
 }
 
 // The configuration setConfiguration makes of a device's state and the locale chosen for it, if
@@ -201,6 +229,18 @@ Config withScript(const Config& config) {
   return out;
 }
 
+// The default locale of `config`, as ResourcesImpl gives it to AssetManager2: a locale alone,
+// under its old code.
+std::optional<Config> defaultLocaleOf(const LocaleConfig& config) {
+  if (!config.defaultLocale) return std::nullopt;
+  Config locale;
+  locale.lang = oldCode(config.defaultLocale->lang);
+  locale.region = config.defaultLocale->region;
+  locale.script = config.defaultLocale->script;
+  locale.variant = config.defaultLocale->variant;
+  return locale;
+}
+
 }  // namespace
 
 const Candidate* bestCandidate(const Entry& entry, const Config& device) {
@@ -214,40 +254,91 @@ const Candidate* bestCandidate(const Entry& entry, const Config& device) {
 
 struct Resources::Impl {
   explicit Impl(const ResourceTable& t) : table(t), tableRevision(t.revision()) {
-    setConfig(effectiveConfig(device, nullptr));
+    configs = effective(device, locales, chosen);
+    matchConfigs = withScripts(configs);
   }
 
-  void setConfig(const Config& c) {
-    config = c;
-    matchConfig = withScript(c);
+  // effectiveConfig of `device` and each of `locales` at `chosen`, or of `device` alone.
+  static std::vector<Config> effective(const Config& device, const std::vector<Config>& locales,
+                                       const std::vector<size_t>& chosen) {
+    if (chosen.empty()) return {effectiveConfig(device, nullptr)};
+    std::vector<Config> out;
+    out.reserve(chosen.size());
+    for (const size_t i : chosen) out.push_back(effectiveConfig(device, &locales[i]));
+    return out;
   }
 
-  // The index of the one of `of` the resources are read in, for the table at `revision`. It
-  // changes nothing but the locales of the table it keeps, so the choice and what it was made
-  // of are left as they were if it throws.
-  size_t chooseLocale(const std::vector<Config>& of, uint64_t revision) {
-    if (of.size() <= 1) return 0;
-    if (!tableLocales || tableLocalesRevision != revision) {
-      tableLocales = localesOf(table);
-      tableLocalesRevision = revision;
+  static std::vector<Config> withScripts(const std::vector<Config>& of) {
+    std::vector<Config> out;
+    out.reserve(of.size());
+    for (const Config& config : of) out.push_back(withScript(config));
+    return out;
+  }
+
+  // What a call makes before it changes anything, so that one that throws leaves all as it was.
+  struct Next {
+    std::vector<size_t> chosen;
+    std::vector<Config> configs;
+    std::vector<Config> matchConfigs;
+  };
+
+  Next next(std::vector<size_t> c, const Config& d, const std::vector<Config>& l) const {
+    Next n;
+    n.configs = effective(d, l, c);
+    n.matchConfigs = withScripts(n.configs);
+    n.chosen = std::move(c);
+    return n;
+  }
+
+  // Makes `n` what the values are picked for, which changes what is picked if its
+  // configurations, or the default locale they are read with, are not those already, or the
+  // table has changed since.
+  void commit(Next& n, const std::optional<Config>& newDefault, uint64_t revision) noexcept {
+    chosen.swap(n.chosen);
+    const bool sameDefault = newDefault == defaultLocale || n.configs.size() == 1;
+    defaultLocale = newDefault;
+    if (n.configs == configs && sameDefault && revision == tableRevision) return;
+    configs.swap(n.configs);
+    matchConfigs.swap(n.matchConfigs);
+    tableRevision = revision;
+    clearCaches();
+    generation++;
+  }
+
+  // The indexes of those of `of` the resources are read in, for the table at `revision` and the
+  // LocaleConfig `app`, in their order: none if `of` is empty. It changes nothing but the
+  // locales of the table it keeps, so the choice and what it was made of are left as they were
+  // if it throws.
+  std::vector<size_t> chooseLocales(const std::vector<Config>& of, uint64_t revision,
+                                    const LocaleConfig& app) {
+    if (of.empty()) return {};
+    if (of.size() > 1) {
+      if (app.defaultLocale) {
+        std::vector<size_t> supported = intersection(of, app.supported);
+        if (!supported.empty()) return supported;
+      }
+      if (!tableLocales || tableLocalesRevision != revision) {
+        tableLocales = localesOf(table);
+        tableLocalesRevision = revision;
+      }
+      const size_t index = chooseLocaleIndex(of, *tableLocales);
+      if (index != kNoMatch) return {index};
     }
-    return chooseLocaleIndex(of, *tableLocales);
-  }
-
-  // effectiveConfig of `device` and the locale chosen of `locales`.
-  Config effective() const {
-    return effectiveConfig(device, locales.empty() ? nullptr : &locales[localeIndex]);
+    // One locale, or no locales in the table to choose by: with a default locale, all of them.
+    if (!app.defaultLocale) return {0};
+    std::vector<size_t> all(of.size());
+    for (size_t i = 0; i < all.size(); i++) all[i] = i;
+    return all;
   }
 
   // Takes in what the table has changed since the last call, as the packages it has added: what
-  // was picked from it is gone, and the locale may be another.
+  // was picked from it is gone, and the locales may be others.
   void syncWithTable() {
-    if (table.revision() == tableRevision) return;
-    localeIndex = chooseLocale(locales, table.revision());
-    tableRevision = table.revision();
-    setConfig(effective());
-    clearCaches();
-    generation++;
+    const uint64_t revision = table.revision();
+    if (revision == tableRevision) return;
+    Next n = next(chooseLocales(locales, revision, localeConfig), device, locales);
+    const std::optional<Config> same = defaultLocale;
+    commit(n, same, revision);
   }
 
   void clearCaches() {
@@ -255,37 +346,62 @@ struct Resources::Impl {
     densityCaches.clear();
   }
 
-  // The value of `id` for `matchConfig` with the density `density`, 0 being its own, from the
-  // cache of that density, where it is put the first time.
+  // AssetManager2::FindEntry: the value of `entry` for `matchConfigs` with the density `density`,
+  // 0 being their own.
+  const Candidate* find(const Entry& entry, uint16_t density) const {
+    const Candidate* best = nullptr;
+    bool bestHasLocale = false;
+    for (const Config& config : matchConfigs) {
+      Config overridden;
+      const Config* desired = &config;
+      if (density != 0 && density != config.density) {
+        overridden = config;
+        overridden.density = density;
+        desired = &overridden;
+      }
+      const Candidate* found = bestCandidate(entry, *desired);
+      // A locale of them for which no value matches has the resource found for none.
+      if (found == nullptr) return nullptr;
+      if (matchConfigs.size() == 1) return found;
+      // A value without a locale is of the default locale, for the locale it is in.
+      const bool hasLocale =
+          found->config.lang[0] != '\0' || (defaultLocale && matches(*defaultLocale, config));
+      if (best == nullptr || isBetterThanBeforeLocale(found->config, best->config, *desired) ||
+          (!isBetterThanBeforeLocale(best->config, found->config, *desired) && hasLocale &&
+           !bestHasLocale)) {
+        best = found;
+        bestHasLocale = hasLocale;
+      }
+    }
+    return best;
+  }
+
+  // The value of `id` with the density `density`, 0 being their own, from the cache of that
+  // density, where it is put the first time.
   const Candidate* pick(ResId id, uint16_t density) {
-    const bool own = density == 0 || density == matchConfig.density;
+    const bool own = density == 0 || density == matchConfigs.front().density;
     std::unordered_map<ResId, const Candidate*>& kept = own ? cache : densityCaches[density];
     if (const auto it = kept.find(id); it != kept.end()) return it->second;
     const Entry* entry = table.entry(id);
     if (entry == nullptr) return nullptr;
-    const Candidate* best;
-    if (own) {
-      best = bestCandidate(*entry, matchConfig);
-    } else {
-      Config overridden = matchConfig;
-      overridden.density = density;
-      best = bestCandidate(*entry, overridden);
-    }
+    const Candidate* best = find(*entry, own ? 0 : density);
     kept.emplace(id, best);
     return best;
   }
 
   const ResourceTable& table;
   std::mutex mutex;             // guards all that follows
-  uint64_t tableRevision;       // of the table as the choice, `config` and `cache` were made of it
+  uint64_t tableRevision;       // of the table as the choice, `configs` and `cache` were made of it
   Config device;                // as setConfiguration was given it
   std::vector<Config> locales;  // as setConfiguration was given them
-  size_t localeIndex = 0;       // in `locales`, of the one chosen
-  Config config;                // effectiveConfig of those
-  Config matchConfig;           // withScript(config), which the values are picked by
+  LocaleConfig localeConfig;    // as setLocaleConfig was given it
+  std::optional<Config> defaultLocale;  // defaultLocaleOf(localeConfig)
+  std::vector<size_t> chosen;           // in `locales`, of those the resources are read in
+  std::vector<Config> configs;          // effectiveConfig of those, one at least
+  std::vector<Config> matchConfigs;     // withScript of each, which the values are picked by
   uint32_t generation = 0;
-  std::unordered_map<ResId, const Candidate*> cache;  // of `config`, in the table as it is
-  // As `cache`, of `config` with another density, by the density.
+  std::unordered_map<ResId, const Candidate*> cache;  // of `configs`, in the table as it is
+  // As `cache`, of `configs` with another density, by the density.
   std::unordered_map<uint16_t, std::unordered_map<ResId, const Candidate*>> densityCaches;
   // The locales of the table at `tableLocalesRevision`, made when a choice first needs them.
   std::optional<TableLocales> tableLocales;
@@ -301,27 +417,39 @@ void Resources::setConfiguration(const Config& device, const std::vector<Config>
   const std::lock_guard<std::mutex> lock(impl_->mutex);
   const uint64_t tableRevision = impl_->table.revision();
   // As ResourcesImpl.updateConfigurationImpl, which asks for the locales of the table only when
-  // the user's have changed: the locale is chosen again only when they, or the table, have.
-  if (locales != impl_->locales || tableRevision != impl_->tableRevision) {
-    // Made before anything is changed, so that a call that throws leaves all as it was.
-    const size_t localeIndex = impl_->chooseLocale(locales, tableRevision);
-    std::vector<Config> copy = locales;
-    impl_->locales.swap(copy);
-    impl_->localeIndex = localeIndex;
+  // the user's have changed: the locales are chosen again only when they, or the table, have.
+  const bool localesChanged = locales != impl_->locales;
+  std::vector<Config> copy;
+  std::vector<size_t> chosen;
+  if (localesChanged || tableRevision != impl_->tableRevision) {
+    chosen = impl_->chooseLocales(locales, tableRevision, impl_->localeConfig);
+    if (localesChanged) copy = locales;
+  } else {
+    chosen = impl_->chosen;
   }
+  Impl::Next n = impl_->next(std::move(chosen), device, locales);
+  if (localesChanged) impl_->locales.swap(copy);
   impl_->device = device;
-  const Config config = impl_->effective();
-  if (config == impl_->config && tableRevision == impl_->tableRevision) return;
-  impl_->tableRevision = tableRevision;
-  impl_->setConfig(config);
-  impl_->clearCaches();
-  impl_->generation++;
+  const std::optional<Config> same = impl_->defaultLocale;
+  impl_->commit(n, same, tableRevision);
+}
+
+void Resources::setLocaleConfig(const LocaleConfig& config) {
+  const std::lock_guard<std::mutex> lock(impl_->mutex);
+  const uint64_t tableRevision = impl_->table.revision();
+  LocaleConfig copy = config;
+  const std::optional<Config> defaultLocale = defaultLocaleOf(config);
+  Impl::Next n = impl_->next(impl_->chooseLocales(impl_->locales, tableRevision, config),
+                             impl_->device, impl_->locales);
+  impl_->localeConfig.supported.swap(copy.supported);
+  impl_->localeConfig.defaultLocale = copy.defaultLocale;
+  impl_->commit(n, defaultLocale, tableRevision);
 }
 
 Config Resources::configuration() const {
   const std::lock_guard<std::mutex> lock(impl_->mutex);
   impl_->syncWithTable();
-  return impl_->config;
+  return impl_->configs.front();
 }
 
 uint32_t Resources::generation() const {

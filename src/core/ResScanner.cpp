@@ -193,6 +193,8 @@ class XmlFileCollector {
 
 }  // namespace
 
+const char* readFile(const fs::path& path, std::string* text) { return read(path, text); }
+
 void scanResFolder(const fs::path& res, const std::string& package, ParsedFolder& out,
                    Diagnostics& diag) {
   std::error_code ec;

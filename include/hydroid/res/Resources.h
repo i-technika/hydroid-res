@@ -1,7 +1,9 @@
 #pragma once
 
 #include <cstdint>
+#include <filesystem>
 #include <memory>
+#include <optional>
 #include <vector>
 
 #include "hydroid/res/Config.h"
@@ -21,6 +23,24 @@ namespace hydroid::res {
 // is the order Android meets them in, in the table aapt2 writes, and it matters, as isBetterThan
 // is not an order.
 HYDROID_RES_API const Candidate* bestCandidate(const Entry& entry, const Config& device);
+
+// The locales an app says it has (android.app.LocaleConfig): those of the file its manifest names
+// by android:localeConfig, and, from Android 15, the one of them its values without a language
+// are in, android:defaultLocale. Each is a locale alone, as parseLanguageTag (ConfigParser.h)
+// makes it. Resources::setLocaleConfig says what the default changes.
+struct LocaleConfig {
+  std::vector<Config> supported;
+  std::optional<Config> defaultLocale;  // one of `supported`, if any
+};
+
+// LocaleConfig.parseLocaleConfig: the LocaleConfig of a file such as res/xml/locales_config.xml:
+// a root <locale-config>, with android:defaultLocale perhaps, holding a <locale> for each locale,
+// which android:name gives. Anything else in the root is passed over. nullopt, with what and
+// where in `errors` if given, if the file cannot be read, is no XML, has another root, a <locale>
+// without a name or one that is no language tag, or a default that is not, as written, one of
+// the names: Android has no default for an app then, and the locales without one change nothing.
+HYDROID_RES_API std::optional<LocaleConfig> parseLocaleConfig(
+    const std::filesystem::path& file, std::vector<Diagnostic>* errors = nullptr);
 
 // A table and the configuration of the device it is read for.
 //
@@ -51,6 +71,16 @@ class Resources {
   //     packages, if those have values of no language. Without any, the first locale it is. The
   //     choice is for the whole table and not for each resource: a resource that has no value
   //     for the chosen language takes its value without a language, not that of the user's next.
+  //     That is unless the app has a default locale (setLocaleConfig): then, of more than one
+  //     locale, those that one it supports matches by language and script are each read in, in
+  //     their order, and configuration() has the first. Each resource takes, of the values each
+  //     of them picks, the first that is of a locale, a value without one being of the default
+  //     where that matches the locale it was picked for; so a resource without a value of the
+  //     first language takes that of the next. One whose values are for an mcc or mnc the device
+  //     has comes before one that is not, whatever its locale (isBetterThanBeforeLocale). A
+  //     resource that has no value for one of those locales has none at all, as on Android. If
+  //     the app supports none of the locales, or the table has none but pseudo-locales, the
+  //     choice is as without a default; in the latter, every locale is read in as above.
   //   - A language that has an old code is given that code, which is the one Android's resources
   //     go by: he is iw, id is in, yi is ji. So values-iw/ is Hebrew, and values-he/ is not
   //     picked for it.
@@ -66,8 +96,16 @@ class Resources {
   HYDROID_RES_API void setConfiguration(const Config& device,
                                         const std::vector<Config>& locales = {});
 
+  // Sets the locales the app says it has, as ResourcesImpl.setLocaleConfig, which Android gives
+  // the LocaleConfig of the app's manifest (parseLocaleConfig reads its file): its default
+  // locale, if it has one, has the resources picked for each of the user's locales it supports,
+  // as setConfiguration says. The locales are chosen again for the locales setConfiguration was
+  // last given, and the generation goes up if that changes the configuration. An empty
+  // LocaleConfig, which a Resources starts with, is an app without one.
+  HYDROID_RES_API void setLocaleConfig(const LocaleConfig& config);
+
   // The configuration the values are picked for: the device's as setConfiguration made it, with
-  // the locale it chose.
+  // the locale it chose, or the first of those it reads in, with a default locale.
   HYDROID_RES_API Config configuration() const;
 
   // A number that changes whenever what `candidate` returns may: when setConfiguration changes

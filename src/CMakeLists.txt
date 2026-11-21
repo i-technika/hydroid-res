@@ -3,6 +3,7 @@ add_library(hydroid-res
   core/Config.cpp
   core/ConfigMatch.cpp
   core/ConfigParser.cpp
+  core/LocaleConfig.cpp
   core/LocaleData.cpp
   core/ResScanner.cpp
   core/ResourceTable.cpp
