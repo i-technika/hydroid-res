@@ -244,6 +244,8 @@ Package name=com.itechnika.hydroid.golden id=7f
       () "default"
       (sr) "sr"
       (b+sr+Latn) "b+sr+Latn"
+      (b+sr+Latn+RS) "b+sr+Latn+RS"
+      (b+sr+Latn+RS+ekavsk) "b+sr+Latn+RS+ekavsk"
     resource 0x7f06002a string/pick_sw
       () "default"
       (sw320dp-v13) "sw320dp"

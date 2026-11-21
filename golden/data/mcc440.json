@@ -217,7 +217,7 @@
     "string\/pick_mcc": {
       "id": "0x7f06001d",
       "type": 3,
-      "data": 110,
+      "data": 112,
       "string": "mcc440"
     },
     "string\/pick_nav_hidden": {

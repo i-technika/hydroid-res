@@ -217,7 +217,7 @@
     "string\/pick_mcc": {
       "id": "0x7f06001d",
       "type": 3,
-      "data": 111,
+      "data": 113,
       "string": "mcc310-mnc260"
     },
     "string\/pick_nav_hidden": {
@@ -289,8 +289,8 @@
     "string\/pick_sr": {
       "id": "0x7f060029",
       "type": 3,
-      "data": 84,
-      "string": "b+sr+Latn"
+      "data": 104,
+      "string": "b+sr+Latn+RS"
     },
     "string\/pick_sw": {
       "id": "0x7f06002a",

@@ -90,13 +90,18 @@ class GoldenDumpTest {
             screenLayout = (screenLayout and mask.inv()) or value
         }
 
-        // A locale against the regions and scripts the app has, and with a variant, which no
-        // folder of the app has (README.md, Golden data).
+        // A locale against the regions and scripts the app has, and with a variant: de-DE-1901
+        // against values-de-rDE/, as no folder can have a variant with no script (README.md,
+        // Golden data), and sr-Latn-RS with ekavsk, with none and with another against
+        // values-b+sr+Latn+RS+ekavsk/ and values-b+sr+Latn+RS/, of the same region. Only for
+        // ekavsk does the variant decide: the other two take values-b+sr+Latn+RS/, which comes
+        // first in the table.
         val locales = listOf(
             "en-GB", "en-AU", "en-IN", "en-CA", "en-PH", "en-001", "en-XA", "en",
             "es-ES", "es-MX", "es-AR", "es-US", "es-419", "es-GQ",
             "zh-CN", "zh-TW", "zh-HK", "zh-MO", "zh-SG", "zh-Hant-CN", "zh",
-            "sr-RS", "sr-Latn-RS", "sr-ME", "pt-BR", "pt-PT", "pt-AO", "pt",
+            "sr-RS", "sr-Latn-RS", "sr-Latn-RS-ekavsk", "sr-Latn-RS-ijekavsk", "sr-ME",
+            "pt-BR", "pt-PT", "pt-AO", "pt",
             "fr-FR", "fr-CA", "fr-BE", "fr-CH", "ar-EG", "ar-DZ", "ar-SA", "ar-XB",
             "de-DE", "de-AT", "de-CH", "de-DE-1901", "he-IL", "id-ID", "fil-PH", "tl-PH",
             "qaa-US", "qaa-GB", "ko-KP", "th-TH",

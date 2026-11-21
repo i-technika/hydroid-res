@@ -2796,6 +2796,8 @@ anydpi	anydpi-v21
 appliance	appliance-v8
 b+ar+015	ar-r015
 b+es+419	es-r419
+b+sr+Latn+RS	b+sr+Latn+RS
+b+sr+Latn+RS+ekavsk	b+sr+Latn+RS+ekavsk
 b+zh+Hant	b+zh+Hant
 desk	desk-v8
 dpad	dpad
@@ -3021,7 +3023,6 @@ b+en+abcde	b+en+abcde
 b+en+abcdefgh	b+en+abcdefgh
 b+en+abcdefghi	-
 b+en+a	-
-b+sr+Latn+RS	b+sr+Latn+RS
 b+sr+Latn+RS+x	b+sr+Latn+RS+x
 b+sr+1234+RS	b+sr+1234+RS
 b+sr+Lat+RS	sr-rRS
