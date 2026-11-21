@@ -78,14 +78,16 @@ const std::map<std::string, std::string> kDeliberateRejects = {
     // b+ with an empty subtag.
     {"b+", ""}, {"b++en", "en"}, {"b+sr+Latn+RS+", "b+sr+Latn+RS"},
     {"b+sr+Latn++x", "b+sr+Latn+X\\x00"}, {"b+zh+Hant+TW+", "b+zh+Hant+TW"},
-    {"b+zh+Hant++", "b+zh+Hant"},
+    {"b+zh+Hant++", "b+zh+Hant"}, {"b+de+DE+1901+", "de-rDE"},
     // A language of 1 or of 4 and more letters, or not of letters.
     {"b+e", "e\\x00"}, {"b+english", "eng"}, {"b+e1", "e1"}, {"b+e1+US", "e1-rUS"},
     // A region of 1 character or 3 letters.
     {"b+en+abc", "en-rABC"}, {"b+en+xyz", "en-r89;"}, {"b+en+aaa", "en-rAAA"},
     {"b+sr+Latn+R+x", "b+sr+Latn+R\\x00"}, {"b+sr+Latn+abc+x", "b+sr+Latn+ABC+x"},
+    // Of four subtags, a second of 3 is the region (#225), and the two after it are dropped.
+    {"b+sr+Lat+RS+x", "sr-rLA4"}, {"b+de+abc+x+y", "de-rABC"},
     // A script that is not 4 characters, or a variant past 8.
-    {"b+sr+Lat+RS+x", "sr-rLA4"}, {"b+sr+Latnx+RS+x", "b+sr+Latn+RS+x"},
+    {"b+sr+Latnx+RS+x", "b+sr+Latn+RS+x"},
     {"b+de+CH+19011901x", "b+de+CH+19011901"}, {"b+de+CH+abcdefghi", "b+de+CH+abcdefgh"},
     {"b+sr+Latn+RS+abcdefghi", "b+sr+Latn+RS+abcdefgh"},
     // A character that is not an ASCII letter or digit.

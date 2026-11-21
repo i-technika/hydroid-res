@@ -1,26 +1,44 @@
 // hydroid-rc: compiles an Android res/ folder into a .hrt binary table.
-// Compilation lands in step 9; for now it prints a res/ folder as `aapt2 dump resources` does.
+// Compilation lands in step 9; for now it prints a res/ folder as `aapt2 dump resources` does,
+// or the values of it that a device picks.
 
 #include <cstdio>
 #include <filesystem>
 #include <iostream>
+#include <optional>
 #include <string>
+#include <string_view>
 #include <system_error>
+#include <utility>
 #include <vector>
 
+#include "hydroid/res/Config.h"
+#include "hydroid/res/ConfigParser.h"
 #include "hydroid/res/ResourceTable.h"
+#include "hydroid/res/Resources.h"
 #include "hydroid/res/Version.h"
 
 namespace {
 
 namespace fs = std::filesystem;
+namespace res = hydroid::res;
 
 int usage() {
   std::fprintf(stderr,
                "usage: hydroid-rc --version\n"
                "       hydroid-rc dump <res-folder> [<package>]\n"
+               "       hydroid-rc pick <res-folder> <qualifiers> [--locales <tag,...>] "
+               "[<package>]\n"
                "  dump  loads the folder as <package> (com.example by default), id 7f, and prints\n"
-               "        it as `aapt2 dump resources` prints an APK\n");
+               "        it as `aapt2 dump resources` prints an APK\n"
+               "  pick  loads it so too, and prints the value each resource has on the device\n"
+               "        that <qualifiers> describe as a folder name does (ko-rKR-land-xhdpi; \"\"\n"
+               "        for none), and whose languages, the most wanted first, are the BCP 47\n"
+               "        tags of --locales (ko-KR,en-US): first the locale it reads them in, then\n"
+               "        a line for each resource, with the configuration of its value. Without a\n"
+               "        version (v34) among the qualifiers, the device is of API %d; with one,\n"
+               "        of that one, even where a folder so named is of a later (night-v4)\n",
+               res::kEmulatedSdkVersion);
   return 2;
 }
 
@@ -30,14 +48,114 @@ std::string utf8(const fs::path& p) {
   return std::string(s.begin(), s.end());
 }
 
-int dump(const fs::path& res, const std::string& package) {
-  hydroid::res::ResourceTable table;
-  std::vector<hydroid::res::Diagnostic> errors;
-  if (!table.addPackage(res, package, hydroid::res::kAppPackageId, &errors)) {
-    for (const hydroid::res::Diagnostic& e : errors) std::cerr << "error: " << e << '\n';
-    return 1;
+std::optional<res::ResourceTable> load(const fs::path& folder, const std::string& package) {
+  res::ResourceTable table;
+  std::vector<res::Diagnostic> errors;
+  if (!table.addPackage(folder, package, res::kAppPackageId, &errors)) {
+    for (const res::Diagnostic& e : errors) std::cerr << "error: " << e << '\n';
+    return std::nullopt;
   }
-  hydroid::res::dump(std::cout, table);
+  return table;
+}
+
+int dump(const fs::path& folder, const std::string& package) {
+  const std::optional<res::ResourceTable> table = load(folder, package);
+  if (!table) return 1;
+  res::dump(std::cout, *table);
+  return 0;
+}
+
+// The '-' part of a folder name that is its version, as v21 or v36.1 are, or "" for none.
+std::string_view versionPart(std::string_view qualifiers) {
+  while (true) {
+    const size_t dash = qualifiers.find('-');
+    const std::string_view part = qualifiers.substr(0, dash);
+    if (part.size() > 1 && (part[0] == 'v' || part[0] == 'V') && part[1] >= '0' && part[1] <= '9') {
+      return part;
+    }
+    if (dash == std::string_view::npos) return {};
+    qualifiers.remove_prefix(dash + 1);
+  }
+}
+
+// The device of `qualifiers`, as parseConfig reads a folder name, but for the version that it
+// raises to the first that knows a qualifier (night is night-v8, and night-v4 too): a device is
+// of the version it says, and of kEmulatedSdkVersion, through setConfiguration, if it says none.
+// nullopt, said on stderr, for what is no folder name, and for a version no device has, which a
+// folder may name only as it is raised: anydpi-v4.1 is anydpi-v21, but a minor version needs v36
+// or later.
+std::optional<res::Config> deviceOf(const std::string& qualifiers) {
+  std::optional<res::Config> device = res::parseConfig(qualifiers);
+  if (!device) {
+    std::cerr << "error: not the qualifiers of a folder name: " << qualifiers << '\n';
+    return std::nullopt;
+  }
+  std::optional<res::Config> version = res::Config();  // version 0, for none
+  const std::string_view part = versionPart(qualifiers);
+  if (!part.empty()) version = res::parseConfig(part);
+  if (!version) {
+    std::cerr << "error: not the version of a device: " << part
+              << " (a minor version needs v36 or later)\n";
+    return std::nullopt;
+  }
+  device->sdkVersion = version->sdkVersion;
+  device->minorVersion = version->minorVersion;
+  return device;
+}
+
+// "ko-KR,en-US" as the locales of setConfiguration.
+std::optional<std::vector<res::Config>> localesOf(std::string_view tags) {
+  std::vector<res::Config> locales;
+  while (true) {
+    const size_t comma = tags.find(',');
+    const std::optional<res::Config> locale = res::parseLanguageTag(tags.substr(0, comma));
+    if (!locale) return std::nullopt;
+    locales.push_back(*locale);
+    if (comma == std::string_view::npos) return locales;
+    tags.remove_prefix(comma + 1);
+  }
+}
+
+// What the device of `device` and `locales` picks of the table: the locale it chose, as
+// "locale (ko-rKR)", then for each resource of the folder its line of `dump`, PUBLIC and all,
+// followed by the configuration and the value it picked, or by "no value" if none matches. The
+// lines that follow a style, array, plurals or attribute are indented under it.
+int pick(const fs::path& folder, const std::string& package, const res::Config& device,
+         const std::vector<res::Config>& locales) {
+  const std::optional<res::ResourceTable> table = load(folder, package);
+  if (!table) return 1;
+  res::Resources resources(*table);
+  resources.setConfiguration(device, locales);
+  const res::Config configuration = resources.configuration();
+  res::Config locale;
+  locale.lang = configuration.lang;
+  locale.region = configuration.region;
+  locale.script = configuration.script;
+  locale.variant = configuration.variant;
+  std::cout << "locale (" << res::toString(locale) << ")\n";
+  for (const res::Package& p : table->packages()) {
+    for (const res::TypeTable& type : p.types) {
+      if (type.type == res::ResType::Styleable) continue;  // left out of dump too
+      for (const res::Entry& entry : type.entries) {
+        const res::ResId id = res::makeResId(p.id, type.id, entry.id);
+        char hex[16];
+        std::snprintf(hex, sizeof hex, "0x%08x", static_cast<unsigned>(id));
+        std::cout << "resource " << hex << ' ' << res::toString(type.type) << '/' << entry.name
+                  << (entry.isPublic ? " PUBLIC" : "");
+        const res::Candidate* candidate = resources.candidate(id);
+        if (candidate == nullptr) {
+          std::cout << " no value\n";
+          continue;
+        }
+        std::cout << " (" << res::toString(candidate->config) << ") ";
+        for (const char c : res::describe(p, type.type, candidate->value)) {
+          std::cout << c;
+          if (c == '\n') std::cout << "  ";
+        }
+        std::cout << '\n';
+      }
+    }
+  }
   return 0;
 }
 
@@ -48,7 +166,7 @@ int dump(const fs::path& res, const std::string& package) {
 // an error, not an abort. The library writes such a path with U+FFFD for what it lacks (#111).
 int run(const std::vector<fs::path>& args) {
   if (args.size() == 2 && args[1] == "--version") {
-    std::printf("hydroid-rc %s\n", hydroid::res::version());
+    std::printf("hydroid-rc %s\n", res::version());
     return 0;
   }
   if ((args.size() == 3 || args.size() == 4) && args[1] == "dump") {
@@ -63,6 +181,39 @@ int run(const std::vector<fs::path>& args) {
     }
     // addPackage throws nothing about the folder, which it reports among its errors (#85).
     return dump(args[2], package);
+  }
+  if (args.size() >= 4 && args[1] == "pick") {
+    // The qualifiers, then --locales and the package in either order.
+    std::vector<std::string> rest;
+    try {
+      for (size_t i = 3; i < args.size(); i++) rest.push_back(utf8(args[i]));
+    } catch (const std::system_error&) {
+      std::cerr << "error: an argument is not Unicode text\n";
+      return 1;
+    }
+    std::optional<std::string> tags;
+    std::optional<std::string> package;
+    for (size_t i = 1; i < rest.size(); i++) {
+      if (rest[i] == "--locales" && !tags && i + 1 < rest.size()) {
+        tags = rest[++i];
+      } else if (rest[i] != "--locales" && !package) {
+        package = rest[i];
+      } else {
+        return usage();
+      }
+    }
+    const std::optional<res::Config> device = deviceOf(rest[0]);
+    if (!device) return 1;
+    std::vector<res::Config> locales;
+    if (tags) {
+      std::optional<std::vector<res::Config>> parsed = localesOf(*tags);
+      if (!parsed) {
+        std::cerr << "error: not a list of BCP 47 language tags: " << *tags << '\n';
+        return 1;
+      }
+      locales = std::move(*parsed);
+    }
+    return pick(args[2], package.value_or("com.example"), *device, locales);
   }
   return usage();
 }

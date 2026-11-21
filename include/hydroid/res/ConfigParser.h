@@ -20,6 +20,9 @@
 //   - In the place of the locale, any 2 or 3 letters but "car" are a language, even ones that
 //     look like a later qualifier: "dpi" alone is the language dpi, and so is "mcc", as an mcc
 //     needs its 3 digits.
+//   - In the b+ form, the subtags are told apart by their count and length. Of four, a second
+//     of 2 or 3 characters is the region and the two after it are dropped, so b+de+DE+1901+1996
+//     is de-rDE; any other second is the script, before a region and a variant. Five fail.
 //   - The version is raised to the first one that knows a qualifier, as the runtime of an older
 //     Android would otherwise take the folder for one it knows: hdpi is hdpi-v4, sw600dp
 //     sw600dp-v13, anydpi anydpi-v21, round round-v23, widecg widecg-v26, feminine
