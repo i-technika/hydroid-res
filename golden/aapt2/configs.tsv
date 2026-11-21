@@ -3037,6 +3037,13 @@ en+US	-
 b+en++US	-
 b++en	en
 b+en+	-
+b+de+DE+1901+1996	de-rDE
+b+ca+ES+valencia+1996	ca-rES
+b+es+419+1901+1996	es-r419
+b+de+DE+x+abcdefghi	de-rDE
+b+de+1901+1996	b+de+1901+1996
+b+sr+Latn+RS+ekavsk+1996	-
+b+de+DE+1901+1996+abcde	-
 b+e1	e1
 b+e1+US	e1-rUS
 en-r+x	en-r+X
@@ -3056,6 +3063,8 @@ b+abc+Latn	b+abc+Latn
 b+zh+Hant+TW+	b+zh+Hant+TW
 b+zh+Hant++	b+zh+Hant
 b+fil+PH+1901	b+fil+PH+1901
+b+de+abc+x+y	de-rABC
+b+de+DE+1901+	de-rDE
 v0.0	
 v0.1	-
 v35.0	v35
