@@ -1533,9 +1533,7 @@ TEST(ResourceTable, NoDefinitionComesAtLink) {
         {"values/v.xml", resources({"<public type='string' name='z'/>"})}},
        {{"v.xml", 2, missing("string", "z")}}},
   };
-  for (size_t i = 0; i < cases.size(); i++) {
-    const Case& c = cases[i];
-    SCOPED_TRACE("case " + std::to_string(i) + ": " + c.files.back().second);
+  const auto expectErrors = [](const Case& c) {
     TempDir dir;
     ResourceTable table;
     std::vector<Diagnostic> errors;
@@ -1545,27 +1543,42 @@ TEST(ResourceTable, NoDefinitionComesAtLink) {
       got.push_back({d.file.filename().string(), d.line, d.message});
     }
     EXPECT_TRUE(got == c.errors) << errorsOf(errors);
+  };
+  for (size_t i = 0; i < cases.size(); i++) {
+    SCOPED_TRACE("case " + std::to_string(i) + ": " + cases[i].files.back().second);
+    expectErrors(cases[i]);
   }
 
   // An entry with no value takes an id as any other, so one more of them than a type has ids
   // fails where the ids are given, on the last by name, before any "no definition". The error is
-  // in aapt2 37.0.0's words (#188); no golden case has it, as it would be 2 MB of names.
-  std::string symbols = "<resources>";
-  for (int i = 0; i <= 0x10000; i++) {
+  // in aapt2 37.0.0's words (#188); no golden case has it, as it would be 2 MB of names. aapt2
+  // gives it no file or line: it is given where the entry is declared, or has its first value.
+  const auto symbol = [](int i) {
     char name[16];
     std::snprintf(name, sizeof name, "n%05d", i);
-    symbols += "\n<java-symbol type='string' name='" + std::string(name) + "'/>";
+    return "\n<java-symbol type='string' name='" + std::string(name) + "'/>";
+  };
+  const auto noIdFor = [](const std::string& name) {
+    return "can't assign resource ID to resource string/" + name +
+           " because resource type ID has exceeded the maximum number of resource entries (65536)";
+  };
+  std::string symbols = "<resources>";
+  for (int i = 0; i < 0xffff; i++) symbols += symbol(i);
+  const std::vector<Case> tooMany = {
+      {{{"values/v.xml", symbols + symbol(0xffff) + symbol(0x10000) + "\n</resources>"}},
+       {{"v.xml", 0x10000 + 2, noIdFor("n65536")}}},
+      // The last id of the type is the one a <public> gives, and the entry left with none has a
+      // value, in a later file.
+      {{{"values/v.xml", symbols +
+                             "\n<string name='a'>a</string>"
+                             "<public type='string' name='a' id='0x7f01ffff'/>\n</resources>"},
+        {"values/z.xml", resources({"", "<string name='zz'>z</string>"})}},
+       {{"z.xml", 3, noIdFor("zz")}}},
+  };
+  for (size_t i = 0; i < tooMany.size(); i++) {
+    SCOPED_TRACE("too many, case " + std::to_string(i));
+    expectErrors(tooMany[i]);
   }
-  TempDir dir;
-  ResourceTable table;
-  std::vector<Diagnostic> errors;
-  EXPECT_FALSE(load(table, dir, {{"values/v.xml", symbols + "\n</resources>"}}, "com.example", 0x7f,
-                    &errors));
-  ASSERT_EQ(errors.size(), 1u) << errorsOf(errors);
-  EXPECT_EQ(errors[0].line, 0x10000 + 2);
-  EXPECT_EQ(errors[0].message,
-            "can't assign resource ID to resource string/n65536 because resource type ID has "
-            "exceeded the maximum number of resource entries (65536)");
 }
 
 // What an XML file names in android is linked once a package android is loaded, as aapt2 links
