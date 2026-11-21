@@ -35,11 +35,13 @@ struct LocaleConfig {
 
 // LocaleConfig.parseLocaleConfig: the LocaleConfig of a file such as res/xml/locales_config.xml:
 // a root <locale-config>, with android:defaultLocale perhaps, holding a <locale> for each locale,
-// which android:name gives. Anything else in the root is passed over, and so is a <locale>
-// without a name, or with one that is no language tag, which Android would make a locale of
-// all the same. nullopt, with what and where in `errors` if given, if the file cannot be read, is
-// no XML, has another root, or has a default that is not, as written, one of the names (Android
-// has no default for an app then, and the locales without one change nothing), or is no tag.
+// which android:name gives. Anything else in the root is passed over. A name is read as
+// Locale.forLanguageTag reads it, up to its first subtag that is not well-formed ("en-US-ab" is
+// en-US); a <locale> without a name, or of one with no language, is the root locale, which
+// matches no other, and is left out. A default of no language is "und", as ResourcesImpl gives
+// it. nullopt, with what and where in `errors` if given, if the file cannot be read, is no XML,
+// has another root, or has a default that is not, as written, one of the names: Android has no
+// default for an app then, and the locales without one change nothing.
 HYDROID_RES_API std::optional<LocaleConfig> parseLocaleConfig(
     const std::filesystem::path& file, std::vector<Diagnostic>* errors = nullptr);
 
@@ -82,9 +84,12 @@ class Resources {
   //     resource that has no value for one of those locales has none at all, as on Android. If
   //     the app supports none of the locales, or the table has none but pseudo-locales, the
   //     choice is as without a default; in the latter, every locale is read in as above. In the
-  //     former, Android puts the one chosen first in the configuration's locales, and reads in
-  //     those at the next update that leaves them as they are: so the next call that gives the
-  //     same `locales` reads in all of them, the one chosen first, then the others in order.
+  //     former, Android puts the one chosen first in the configuration's locales, and an update
+  //     that leaves those as they are reads them all in. So if the one chosen is the first, the
+  //     next call that gives the same `locales` reads in all of them; if it is another, a call
+  //     that gives them with that one first and the others in order does, and one that gives
+  //     the same again chooses the same one again. A table that changes has the locales chosen
+  //     as if they were given afresh.
   //   - A language that has an old code is given that code, which is the one Android's resources
   //     go by: he is iw, id is in, yi is ji. So values-iw/ is Hebrew, and values-he/ is not
   //     picked for it.

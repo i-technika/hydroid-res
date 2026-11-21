@@ -27,6 +27,18 @@ const char* androidAttribute(pugi::xml_node element, std::string_view name) {
   return nullptr;
 }
 
+// Locale.forLanguageTag, which leaves out the first subtag that is not well-formed and all those
+// after it: the locale of the longest run of subtags from the first that parseLanguageTag reads,
+// or nullopt if there is none, for the root locale, which has no language.
+std::optional<Config> forLanguageTag(std::string_view tag) {
+  for (;;) {
+    if (std::optional<Config> locale = parseLanguageTag(tag)) return locale;
+    const size_t dash = tag.rfind('-');
+    if (dash == std::string_view::npos) return std::nullopt;
+    tag = tag.substr(0, dash);
+  }
+}
+
 }  // namespace
 
 std::optional<LocaleConfig> parseLocaleConfig(const std::filesystem::path& file,
@@ -57,11 +69,11 @@ std::optional<LocaleConfig> parseLocaleConfig(const std::filesystem::path& file,
     if (child.type() != pugi::node_element || detail::localName(child.name()) != "locale") {
       continue;
     }
-    // LocaleConfig takes a <locale> without a name, and Locale.forLanguageTag makes a locale of
-    // any name; those it makes of what is no language tag are left out, as no Config holds them.
+    // LocaleConfig takes a <locale> without a name, which is the root locale to it, as is one of
+    // a name with no language. The root locale matches no other, so they are left out.
     const char* name = androidAttribute(child, "name");
     if (name == nullptr || !names.insert(name).second) continue;
-    if (std::optional<Config> locale = parseLanguageTag(name)) config.supported.push_back(*locale);
+    if (std::optional<Config> locale = forLanguageTag(name)) config.supported.push_back(*locale);
   }
 
   if (const char* defaultLocale = androidAttribute(root, "defaultLocale")) {
@@ -70,11 +82,10 @@ std::optional<LocaleConfig> parseLocaleConfig(const std::filesystem::path& file,
       return fail(doc.line(root), "default locale '" + std::string(defaultLocale) +
                                       "' is not one of the <locale> names");
     }
-    config.defaultLocale = parseLanguageTag(defaultLocale);
-    if (!config.defaultLocale) {
-      return fail(doc.line(root),
-                  "default locale '" + std::string(defaultLocale) + "' is no language tag");
-    }
+    // A default with no language is the root locale, which ResourcesImpl gives AssetManager2 as
+    // "und": a language of its own, which no value is of.
+    config.defaultLocale = forLanguageTag(defaultLocale);
+    if (!config.defaultLocale) config.defaultLocale = parseLanguageTag("und");
   }
   return config;
 }
