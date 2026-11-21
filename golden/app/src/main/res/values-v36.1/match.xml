@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="pick_minor_version">v36.1</string>
+    <string name="pick_version">v36.1</string>
 </resources>

@@ -164,8 +164,8 @@ if(NOT result EQUAL 0 OR NOT out MATCHES "\nresource [^ ]+ string/app_name PUBLI
     "${out}${err}")
 endif()
 
-# values-v21/, values-v30/, values-v37/ and values-v38/ hold pick_version, and values-night/,
-# which aapt2 makes night-v8, pick_night.
+# values-v21/, values-v30/, values-v36.1/, values-v37/ and values-v38/ hold pick_version, and
+# values-night/, which aapt2 makes night-v8, pick_night.
 expect_string(pick_version " (v37) \"v37\"" night)
 expect_string(pick_version " (v30) \"v30\"" night-v30)
 expect_string(pick_version " () \"default\"" night-v4)

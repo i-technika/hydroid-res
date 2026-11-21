@@ -284,6 +284,7 @@ Package name=com.itechnika.hydroid.golden id=7f
       () "default"
       (v21) "v21"
       (v30) "v30"
+      (v36.1) "v36.1"
       (v37) "v37"
       (v38) "v38"
     resource 0x7f060032 string/pick_width
