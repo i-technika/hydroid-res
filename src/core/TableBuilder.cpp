@@ -726,6 +726,8 @@ std::optional<Package> buildPackage(ParsedFolder folder, const std::string& name
       }
     }
   }
+  // aapt2 stops at what fails to merge, before VerifyNoExternalPackages (#183).
+  if (!diag.empty()) return std::nullopt;
   // One error for each such id, after merging and in the order of package and name, as aapt2's
   // VerifyNoExternalPackages gives them from the merged table.
   for (const auto& [external, source] : externalIds) {

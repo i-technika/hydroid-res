@@ -1389,20 +1389,26 @@ TEST(ResourceTable, ProductFilterComesAfterLink) {
 }
 
 // What fails to merge stops link before ids are given and references linked, now that
-// ProductFilter, which used to stop it, comes after link (#180).
+// ProductFilter, which used to stop it, comes after link (#180). A conflict stops it before the
+// ids made in another package are looked for, too (#183).
 TEST(ResourceTable, MergeErrorsStopBeforeLink) {
   const std::string missing = "<resources><string name='q'>@string/nothing</string></resources>";
+  const std::string conflict = "resource 'string/s' has a conflicting value for configuration ()";
   const std::vector<std::pair<std::vector<std::pair<std::string, std::string>>, std::string>>
       cases = {
           {{{"values/a.xml", "<resources><string name='s'>a</string></resources>"},
             {"values/b.xml", "<resources><string name='s'>b</string></resources>"},
             {"values/c.xml", missing}},
-           "resource 'string/s' has a conflicting value for configuration ()"},
+           conflict},
+          {{{"layout/l.xml", "<a y='@+app:id/b'/>"},
+            {"values/a.xml", "<resources><string name='s'>a</string></resources>"},
+            {"values/b.xml", "<resources><string name='s'>b</string></resources>"}},
+           conflict},
           {{{"layout/l.xml", "<a y='@+app:id/b'/>"}, {"values/c.xml", missing}},
            "defined resource 'app:id/b' for external package 'app'"},
       };
   for (const auto& [files, message] : cases) {
-    SCOPED_TRACE(message);
+    SCOPED_TRACE(files[0].first + ": " + message);
     TempDir dir;
     ResourceTable table;
     std::vector<Diagnostic> errors;
