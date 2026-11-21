@@ -59,7 +59,7 @@ Package name=com.itechnika.hydroid.golden id=7f
       (sw600dp-v13) 3
       (land) 2
       (sw720dp-land-v13) 4
-  type string id=06 entryCount=53
+  type string id=06 entryCount=54
     resource 0x7f060000 string/app_name
       () "Hydroid Golden"
     resource 0x7f060001 string/density_bucket
@@ -117,106 +117,109 @@ Package name=com.itechnika.hydroid.golden id=7f
       () "default"
       (en) "en"
       (en-rXA) "en-rXA"
-    resource 0x7f06000c string/pick_es
+    resource 0x7f06000c string/pick_en_us
+      () "default"
+      (en-rUS) "en-rUS"
+    resource 0x7f06000d string/pick_es
       () "default"
       (es) "es"
       (es-r419) "b+es+419"
       (es-rES) "es-rES"
       (es-rUS) "es-rUS"
-    resource 0x7f06000d string/pick_es_mx
+    resource 0x7f06000e string/pick_es_mx
       () "default"
       (es) "es"
       (es-rMX) "es-rMX"
-    resource 0x7f06000e string/pick_fil
+    resource 0x7f06000f string/pick_fil
       () "default"
       (fil) "fil"
-    resource 0x7f06000f string/pick_fr
+    resource 0x7f060010 string/pick_fr
       () "default"
       (fr-rCA) "fr-rCA"
       (fr-rFR) "fr-rFR"
-    resource 0x7f060010 string/pick_gamut
+    resource 0x7f060011 string/pick_gamut
       () "default"
       (nowidecg-v26) "nowidecg"
       (widecg-v26) "widecg"
-    resource 0x7f060011 string/pick_hdr
+    resource 0x7f060012 string/pick_hdr
       () "default"
       (lowdr-v26) "lowdr"
       (highdr-v26) "highdr"
-    resource 0x7f060012 string/pick_he
+    resource 0x7f060013 string/pick_he
       () "default"
       (he) "he"
-    resource 0x7f060013 string/pick_height
+    resource 0x7f060014 string/pick_height
       () "default"
       (h600dp-v13) "h600dp"
       (h800dp-v13) "h800dp"
-    resource 0x7f060014 string/pick_id
+    resource 0x7f060015 string/pick_id
       () "default"
       (id) "id"
-    resource 0x7f060015 string/pick_in
+    resource 0x7f060016 string/pick_in
       () "default"
       (in) "in"
-    resource 0x7f060016 string/pick_iw
+    resource 0x7f060017 string/pick_iw
       () "default"
       (iw) "iw"
-    resource 0x7f060017 string/pick_keyboard
+    resource 0x7f060018 string/pick_keyboard
       () "default"
       (nokeys) "nokeys"
       (qwerty) "qwerty"
       (12key) "12key"
-    resource 0x7f060018 string/pick_keys_exposed
+    resource 0x7f060019 string/pick_keys_exposed
       () "default"
       (keysexposed) "keysexposed"
-    resource 0x7f060019 string/pick_keys_hidden
+    resource 0x7f06001a string/pick_keys_hidden
       () "default"
       (keysexposed) "keysexposed"
       (keyshidden) "keyshidden"
       (keyssoft) "keyssoft"
-    resource 0x7f06001a string/pick_layout_dir
+    resource 0x7f06001b string/pick_layout_dir
       () "default"
       (ldltr) "ldltr"
       (ldrtl) "ldrtl"
-    resource 0x7f06001b string/pick_locale_or_width
+    resource 0x7f06001c string/pick_locale_or_width
       () "default"
       (en-rGB) "en-rGB"
       (en-rIN-sw600dp-v13) "en-rIN-sw600dp"
-    resource 0x7f06001c string/pick_long
+    resource 0x7f06001d string/pick_long
       () "default"
       (notlong-v4) "notlong"
       (long-v4) "long"
-    resource 0x7f06001d string/pick_mcc
+    resource 0x7f06001e string/pick_mcc
       () "default"
       (mcc310) "mcc310"
       (mcc440) "mcc440"
       (mcc310-mnc260) "mcc310-mnc260"
-    resource 0x7f06001e string/pick_minor_version
+    resource 0x7f06001f string/pick_minor_version
       () "default"
       (v36) "v36"
       (v36.1) "v36.1"
       (v37.1) "v37.1"
-    resource 0x7f06001f string/pick_nav_hidden
+    resource 0x7f060020 string/pick_nav_hidden
       () "default"
       (navexposed) "navexposed"
       (navhidden) "navhidden"
-    resource 0x7f060020 string/pick_navigation
+    resource 0x7f060021 string/pick_navigation
       () "default"
       (nonav) "nonav"
       (dpad) "dpad"
       (trackball) "trackball"
       (wheel) "wheel"
-    resource 0x7f060021 string/pick_night
+    resource 0x7f060022 string/pick_night
       () "default"
       (notnight-v8) "notnight"
       (night-v8) "night"
-    resource 0x7f060022 string/pick_orientation
+    resource 0x7f060023 string/pick_orientation
       () "default"
       (port) "port"
       (land) "land"
-    resource 0x7f060023 string/pick_pixels
+    resource 0x7f060024 string/pick_pixels
       () "default"
       (800x480) "800x480"
       (1920x1080) "1920x1080"
       (4000x3000) "4000x3000"
-    resource 0x7f060024 string/pick_precedence
+    resource 0x7f060025 string/pick_precedence
       () "default"
       (night-v8) "night"
       (sw600dp-v13) "sw600dp"
@@ -224,52 +227,52 @@ Package name=com.itechnika.hydroid.golden id=7f
       (land) "land"
       (xhdpi-v4) "xhdpi"
       (ko) "ko"
-    resource 0x7f060025 string/pick_pt
+    resource 0x7f060026 string/pick_pt
       () "default"
       (pt) "pt"
       (pt-rBR) "pt-rBR"
       (pt-rPT) "pt-rPT"
-    resource 0x7f060026 string/pick_qaa
+    resource 0x7f060027 string/pick_qaa
       () "default"
       (qaa-rUS) "qaa-rUS"
-    resource 0x7f060027 string/pick_round
+    resource 0x7f060028 string/pick_round
       () "default"
       (notround-v23) "notround"
       (round-v23) "round"
-    resource 0x7f060028 string/pick_size
+    resource 0x7f060029 string/pick_size
       () "default"
       (small-v4) "small"
       (normal-v4) "normal"
       (large-v4) "large"
       (xlarge-v4) "xlarge"
-    resource 0x7f060029 string/pick_size_small
+    resource 0x7f06002a string/pick_size_small
       () "default"
       (small-v4) "small"
-    resource 0x7f06002a string/pick_sr
+    resource 0x7f06002b string/pick_sr
       () "default"
       (sr) "sr"
       (b+sr+Latn) "b+sr+Latn"
       (b+sr+Latn+RS) "b+sr+Latn+RS"
       (b+sr+Latn+RS+ekavsk) "b+sr+Latn+RS+ekavsk"
-    resource 0x7f06002b string/pick_sw
+    resource 0x7f06002c string/pick_sw
       () "default"
       (sw320dp-v13) "sw320dp"
       (sw600dp-v13) "sw600dp"
       (sw720dp-v13) "sw720dp"
       (sw800dp-v13) "sw800dp"
-    resource 0x7f06002c string/pick_tl
+    resource 0x7f06002d string/pick_tl
       () "default"
       (tl) "tl"
-    resource 0x7f06002d string/pick_tl_fil
+    resource 0x7f06002e string/pick_tl_fil
       () "default"
       (fil) "fil"
       (tl) "tl"
-    resource 0x7f06002e string/pick_touch
+    resource 0x7f06002f string/pick_touch
       () "default"
       (notouch) "notouch"
       (stylus) "stylus"
       (finger) "finger"
-    resource 0x7f06002f string/pick_ui_mode
+    resource 0x7f060030 string/pick_ui_mode
       () "default"
       (desk-v8) "desk"
       (car-v8) "car"
@@ -277,30 +280,30 @@ Package name=com.itechnika.hydroid.golden id=7f
       (appliance-v8) "appliance"
       (watch-v8) "watch"
       (vrheadset-v26) "vrheadset"
-    resource 0x7f060030 string/pick_version
+    resource 0x7f060031 string/pick_version
       () "default"
       (v21) "v21"
       (v30) "v30"
       (v37) "v37"
       (v38) "v38"
-    resource 0x7f060031 string/pick_width
+    resource 0x7f060032 string/pick_width
       () "default"
       (w600dp-v13) "w600dp"
       (w800dp-v13) "w800dp"
       (w1000dp-v13) "w1000dp"
-    resource 0x7f060032 string/pick_width_height
+    resource 0x7f060033 string/pick_width_height
       () "default"
       (w500dp-v13) "w500dp"
       (w600dp-h400dp-v13) "w600dp-h400dp"
       (h500dp-v13) "h500dp"
       (w400dp-h600dp-v13) "w400dp-h600dp"
-    resource 0x7f060033 string/pick_zh
+    resource 0x7f060034 string/pick_zh
       () "default"
       (b+zh+Hant) "b+zh+Hant"
       (zh-rHK) "zh-rHK"
       (zh-rCN) "zh-rCN"
       (zh-rTW) "zh-rTW"
-    resource 0x7f060034 string/qualifier_hint
+    resource 0x7f060035 string/qualifier_hint
       () "default"
       (ko) "ko"
       (ko-rKR) "ko-rKR"
