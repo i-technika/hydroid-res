@@ -183,8 +183,7 @@ TEST(SdkBaseline, AospFolderListIsOfEmulatedLevel) {
 // gen_locale_data.py pins the android<N>-release that ConfigMatch.cpp and LocaleData.cpp were
 // ported from, and the commit of it that LocaleDataTables.inc is made from (#215). Both are the
 // release and commit golden/aosp lists the framework folders of, so that raising the level, or
-// moving golden/aosp to another commit, without porting the matching code and making the tables
-// again fails here.
+// moving golden/aosp to another commit, without raising BRANCH and COMMIT fails here.
 TEST(SdkBaseline, LocaleScriptPinsEmulatedRelease) {
   std::string branch;
   std::string commit;
@@ -200,7 +199,8 @@ TEST(SdkBaseline, LocaleScriptPinsEmulatedRelease) {
 
 // LocaleDataTables.inc names the release and commit it was made from, "// <branch> at <commit>,",
 // which must be what gen_locale_data.py pins: changing a pin without making the tables again
-// fails here (#215).
+// fails here (#215). Only the header is read: the tables themselves are not compared with what
+// the script makes of that commit (#228).
 TEST(SdkBaseline, LocaleTablesComeFromScriptPins) {
   std::string branch;
   std::string commit;
@@ -219,6 +219,31 @@ TEST(SdkBaseline, LocaleTablesComeFromScriptPins) {
   }
   EXPECT_EQ(named, 1) << HYDROID_LOCALE_TABLES
                       << " does not name, once in its header, the release and commit it is of";
+}
+
+// The port itself is not read, only what each file says it was ported from: ConfigMatch.cpp and
+// LocaleData.h name the release of BRANCH, as do README.md and Version.h, and any other
+// android<N>-release they name is held to it too. Raising BRANCH without them fails here (#215),
+// so that a new release is not taken without looking at the code that says it follows the old
+// one.
+TEST(SdkBaseline, PortNamesScriptRelease) {
+  std::string branch;
+  ASSERT_NO_FATAL_FAILURE(readScriptPin(HYDROID_LOCALE_SCRIPT, "BRANCH", &branch));
+  const std::regex release(R"(android\d+-release)");
+  for (const char* path : {HYDROID_CONFIG_MATCH_SOURCE, HYDROID_LOCALE_DATA_HEADER, HYDROID_README,
+                           HYDROID_VERSION_HEADER}) {
+    std::ifstream in(path);
+    ASSERT_TRUE(in) << "cannot open " << path;
+    std::stringstream file;
+    file << in.rdbuf();
+    const std::string text = file.str();
+    int named = 0;
+    for (std::sregex_iterator m(text.begin(), text.end(), release), end; m != end; ++m) {
+      ++named;
+      EXPECT_EQ(m->str(), branch) << path << ": " << m->str() << " is not BRANCH";
+    }
+    EXPECT_NE(named, 0) << path << " does not name the release it follows";
+  }
 }
 
 }  // namespace

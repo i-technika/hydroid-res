@@ -12,9 +12,12 @@ switches and writes the same data as sorted arrays, which src/core/LocaleData.cp
   - the depth of the deepest tree of parents
 
 Usage: python scripts/gen_locale_data.py [<LocaleDataLookup.cpp>]
-Without a file it downloads the one of COMMIT from android.googlesource.com. Raise COMMIT with
-kEmulatedSdkVersion (include/hydroid/res/Version.h): it is the android<N>-release the matching
-code in src/core/ConfigMatch.cpp and LocaleData.cpp was ported from.
+Without a file it downloads the one of COMMIT from android.googlesource.com. BRANCH is the
+android<N>-release the matching code in src/core/ConfigMatch.cpp and LocaleData.cpp was ported
+from, and COMMIT the commit of it golden/aosp/framework_res_dirs.txt lists. Raise both with
+kEmulatedSdkVersion (include/hydroid/res/Version.h), port the matching code again and make the
+tables again: SdkBaselineTest wants the header of the tables, and the files that name the release
+they were ported from, to say these.
 """
 
 import base64
