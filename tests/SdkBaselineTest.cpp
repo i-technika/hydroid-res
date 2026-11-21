@@ -199,8 +199,9 @@ TEST(SdkBaseline, LocaleScriptPinsEmulatedRelease) {
 
 // LocaleDataTables.inc names the release and commit it was made from, "// <branch> at <commit>,",
 // which must be what gen_locale_data.py pins: changing a pin without making the tables again
-// fails here (#215). Only the header is read: the tables themselves are not compared with what
-// the script makes of that commit (#228).
+// fails here (#215). Only the header is read, as making the tables again downloads from
+// android.googlesource.com: the locale tables job of the full CI compares them with what the
+// script makes of that commit (#228).
 TEST(SdkBaseline, LocaleTablesComeFromScriptPins) {
   std::string branch;
   std::string commit;
