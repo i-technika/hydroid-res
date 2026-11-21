@@ -426,10 +426,12 @@ TEST(ResourceTable, StyleableDefinesAttrsOfAFileBeforeLeavingOtherPackagesOut) {
                      "<public type='attr' name='a'/></resources>"}},
                    "com.lib", 0x7e, &errors))
       << errorsOf(errors);
-  const std::string a = "<declare-styleable name='A'><attr name='com.lib:a' format='integer'/>"
-                        "</declare-styleable>";
-  const std::string b = "<declare-styleable name='B'><attr name='com.lib:a' format='color'/>"
-                        "</declare-styleable>";
+  const std::string a =
+      "<declare-styleable name='A'><attr name='com.lib:a' format='integer'/>"
+      "</declare-styleable>";
+  const std::string b =
+      "<declare-styleable name='B'><attr name='com.lib:a' format='color'/>"
+      "</declare-styleable>";
 
   EXPECT_FALSE(load(table, dir, {{"values/v.xml", "<resources>" + a + b + "</resources>"}},
                     "com.one", 0x7f, &errors));
@@ -1281,8 +1283,7 @@ TEST(ResourceTable, AnotherPackagesPrivateResourceNeedsAPrivateReference) {
   const std::vector<std::tuple<std::string, std::string, std::string>> cases = {
       {"<string name='s'>@com.other:string/priv</string>", "",
        "resource com.other:string/priv is private"},
-      {"<string name='s'>?com.other:attr/qa</string>", "",
-       "resource com.other:attr/qa is private"},
+      {"<string name='s'>?com.other:attr/qa</string>", "", "resource com.other:attr/qa is private"},
       {"<style name='S' parent='@com.other:style/QS'/>", "",
        "resource com.other:style/QS is private"},
       {"<style name='S'><item name='com.other:qa'>x</item></style>", "",
@@ -1317,11 +1318,10 @@ TEST(ResourceTable, AnotherPackagesPrivateResourceNeedsAPrivateReference) {
   for (const auto& [values, attributes, message] : cases) {
     SCOPED_TRACE(values + attributes);
     errors.clear();
-    const bool loaded =
-        load(table, dir,
-             {{"values/v.xml", "<resources" + ns + ">" + values + "</resources>"},
-              {"layout/l.xml", "<a" + ns + " " + attributes + "/>"}},
-             "com.probe" + std::to_string(id), id, &errors);
+    const bool loaded = load(table, dir,
+                             {{"values/v.xml", "<resources" + ns + ">" + values + "</resources>"},
+                              {"layout/l.xml", "<a" + ns + " " + attributes + "/>"}},
+                             "com.probe" + std::to_string(id), id, &errors);
     id--;
     if (message.empty()) {
       EXPECT_TRUE(loaded) << errorsOf(errors);
@@ -1407,7 +1407,8 @@ TEST(ResourceTable, ProductFilterComesAfterLink) {
   EXPECT_EQ(p.styles.size(), 1u);
 
   const std::vector<std::pair<std::string, std::vector<std::pair<int, std::string>>>> cases = {
-      {"<string name='p' product='tablet'>@string/n1</string>\n<string name='p'>@string/n2</string>",
+      {"<string name='p' product='tablet'>@string/n1</string>\n<string "
+       "name='p'>@string/n2</string>",
        {{3, "resource string/n2 not found"}, {2, "resource string/n1 not found"}}},
       {"<string name='p' product='default'>a</string>\n<string name='p'>b</string>",
        {{2, "multiple default products defined for resource string/p"}}},

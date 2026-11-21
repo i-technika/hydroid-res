@@ -818,10 +818,11 @@ std::optional<Package> buildPackage(ParsedFolder folder, const std::string& name
     if (packageId(resId) != id) {
       diag.error(entry.idSource, cannot + "package already has ID " + hex("%x", packageId(resId)));
     } else if (owner != typeOfId.end() && owner->second != key.first) {
-      diag.error(entry.idSource, "can't assign type ID " + hex("0x%02x", typeId(resId)) +
-                                     " to non staged type " + toString(key.first) +
-                                     " because this type ID have been assigned to non staged type " +
-                                     toString(owner->second));
+      diag.error(entry.idSource,
+                 "can't assign type ID " + hex("0x%02x", typeId(resId)) + " to non staged type " +
+                     toString(key.first) +
+                     " because this type ID have been assigned to non staged type " +
+                     toString(owner->second));
     } else if (has != typeIds.end() && has->second != typeId(resId)) {
       diag.error(entry.idSource, cannot + "type already has ID " + hex("%x", typeId(resId)));
     } else if (other != given.end()) {
