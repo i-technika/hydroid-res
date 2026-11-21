@@ -1552,7 +1552,8 @@ TEST(ResourceTable, NoDefinitionComesAtLink) {
   // An entry with no value takes an id as any other, so one more of them than a type has ids
   // fails where the ids are given, on the last by name, before any "no definition". The error is
   // in aapt2 37.0.0's words (#188); no golden case has it, as it would be 2 MB of names. aapt2
-  // gives it no file or line: it is given where the entry is declared, or has its first value.
+  // gives it no file or line: it is given where the entry has its first value, or is declared if
+  // it has none.
   const auto symbol = [](int i) {
     char name[16];
     std::snprintf(name, sizeof name, "n%05d", i);
@@ -1567,11 +1568,11 @@ TEST(ResourceTable, NoDefinitionComesAtLink) {
   const std::vector<Case> tooMany = {
       {{{"values/v.xml", symbols + symbol(0xffff) + symbol(0x10000) + "\n</resources>"}},
        {{"v.xml", 0x10000 + 2, noIdFor("n65536")}}},
-      // The last id of the type is the one a <public> gives, and the entry left with none has a
-      // value, in a later file.
-      {{{"values/v.xml", symbols +
-                             "\n<string name='a'>a</string>"
-                             "<public type='string' name='a' id='0x7f01ffff'/>\n</resources>"},
+      // The last id of the type is the one a <public> gives, and the entry left with none is
+      // declared here and has a value in a later file.
+      {{{"values/v.xml", symbols + "\n<string name='a'>a</string>"
+                                   "<public type='string' name='a' id='0x7f01ffff'/>"
+                                   "<public type='string' name='zz'/>\n</resources>"},
         {"values/z.xml", resources({"", "<string name='zz'>z</string>"})}},
        {{"z.xml", 3, noIdFor("zz")}}},
   };
