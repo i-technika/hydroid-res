@@ -555,8 +555,7 @@ TEST(ResourcesLocale, TheSystemsLocalesWhereTheAppHasNone) {
 
 // The locale is chosen once for the locales and the table, and kept while the rest of the device
 // changes (#206); chosen again when the locales are others, or the table is. This sees that what
-// is kept is right, not that the table is gone through only once, which it does not check: with
-// 93,000 values, Debug, a call of the same arguments took 312 ms before, and 0.008 ms now.
+// is kept is right; that the table is not gone through again, ResourcesAllocTest.cpp.
 TEST(ResourcesLocale, KeepsTheChoiceUntilTheLocalesOrTheTableChange) {
   TempDir dir;
   ResourceTable table;
