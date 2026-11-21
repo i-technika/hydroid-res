@@ -42,7 +42,9 @@
 //   - <attr> and <declare-styleable> always go in the default configuration, as do the ids that
 //     @+id/ makes, in values or in the attributes of an XML file, and those of the names of
 //     <enum> and <flag>. The id a <public type="id"> defines goes in the configuration of its
-//     folder. Of the values with a product="", the one with none or "default" stays.
+//     folder. Of the values with a product="", the one with none or "default" stays. An <attr>
+//     of product="default" stays, and a reference finds it, but a style item or an attribute of
+//     an XML file that names it is told it is not an attribute, as aapt2 says.
 //   - A style without parent="" is the child of its name up to its last '.', which must exist.
 //     Its items are read against the format of their attribute, as Android does.
 //   - Every reference must name a resource of the table. One of another package must be <public>

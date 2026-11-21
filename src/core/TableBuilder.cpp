@@ -279,7 +279,9 @@ class Linker {
 
   // An attr found where a style item or an XML attribute names an <attr>, which is not one (#166).
   // resolve() has not found any other: this one is of this package, with no value of the default
-  // configuration and no product.
+  // configuration and no product: an <item type='attr'> in values-land/ only, or an attr of
+  // product='default', an <attr> or not (#178). An <attr> in values-land/ is of the default
+  // configuration, where compile puts it.
   void notAnAttr(const ResName& name, const Source& source, Naming naming) {
     diag_.error(source, described(name, naming) + " is not an attribute");
   }
@@ -359,12 +361,15 @@ class Linker {
     return it->second ? &*it->second : nullptr;
   }
 
+  // Of this package, as unfound(), only the value of the default configuration and no product is
+  // read: aapt2's symbol table takes an <attr> of product='default', which ProductFilter keeps as
+  // it is, for none (#178).
   std::optional<AttrInfo> readAttrInfo(const ResName& name, ResId id) const {
     AttrInfo info;
     if (own(name.package)) {
       for (const PendingValue& v : entries_.at({ResType::Attr, name.entry})) {
         const auto* attr = std::get_if<ParsedAttr>(&v.value);
-        if (!attr) continue;
+        if (!attr || v.config != Config{} || !v.product.empty()) continue;
         info.formats = attr->formats;
         info.min = attr->min;
         info.max = attr->max;
