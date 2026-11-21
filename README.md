@@ -12,7 +12,7 @@ resolves values exactly as Android does, for UIKit, GTK4 and WinUI 3. Design and
 | `include/hydroid_res.h` | Stable C API, used by the Swift adapter |
 | `src/core/` | Shared core: parsers, ResourceTable, Config matching, Theme/Style |
 | `src/capi/` | C API implementation |
-| `tools/hydroid-rc/` | `res/` → `.hrt` binary table compiler; for now `hydroid-rc dump <res>` |
+| `tools/hydroid-rc/` | `res/` → `.hrt` binary table compiler; for now `hydroid-rc dump <res>` and `hydroid-rc pick <res> <qualifiers>` |
 | `tests/` | GoogleTest unit and golden tests |
 | `golden/` | Android test app + instrumentation test that dumps Android's answers |
 | `golden/data/` | The dumped golden JSON the C++ tests compare against |
@@ -96,6 +96,18 @@ change one thing the matrix leaves alone, such as a locale of another region or 
 of languages, the screen's size or shape, the UI mode, the input devices or the mcc. Each file
 records the `Configuration` the resources were resolved for and the value of every resource.
 `GoldenMatchTest` builds the same device from it and checks that hydroid picks the same values.
+To see by hand what hydroid picks for one device,
+`hydroid-rc pick <res> <qualifiers> [--locales <tag,...>] [<package>]` takes the device as the
+qualifiers of a folder name and its languages as BCP 47 tags, and prints the locale it chose and
+the value of each resource, with the configuration it comes from:
+
+```sh
+hydroid-rc pick golden/app/src/main/res ko-rKR-land-night-xhdpi --locales ko-KR com.itechnika.hydroid.golden
+```
+
+A device whose qualifiers name no version is of `kEmulatedSdkVersion`, not the one `parseConfig`
+raises them to (night is night-v8). `HydroidRc.PicksWhatAndroidPicked` checks it against one
+condition of `golden/data`.
 
 The `pick_` strings of the app's `values*/match.xml` are there for that: each has a value in
 `values/` and in some `values-<qualifiers>/`, which says the folder it is in, so the dump shows
