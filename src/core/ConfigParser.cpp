@@ -406,27 +406,28 @@ std::optional<Config> parseLanguageTag(std::string_view tag) {
   size_t i = 0;
   const std::string& lang = subtags[i++];
   if (lang.size() < 2 || lang.size() > 3 || !letters(lang)) return std::nullopt;
-  std::string_view script, region, variant;
+  std::string_view script, region;
   if (i < subtags.size() && subtags[i].size() == 4 && letters(subtags[i])) script = subtags[i++];
   if (i < subtags.size() && ((subtags[i].size() == 2 && letters(subtags[i])) ||
                              (subtags[i].size() == 3 && digits(subtags[i])))) {
     region = subtags[i++];
   }
+  Config c;
   for (; i < subtags.size(); i++) {
     const std::string& s = subtags[i];
     if (!allOf(s, isAlnum)) return std::nullopt;
     // An extension or private use, which goes on to the end of the tag.
     if (s.size() == 1) break;
     if (s.size() > 8 || s.size() < 4 || (s.size() == 4 && !isDigit(s[0]))) return std::nullopt;
-    if (variant.empty()) variant = s;
+    // setBcp47Locale writes each variant over the front of the one before, so the last is kept
+    // with the tail of a longer one before it: ca-ES-valencia-1996 has "1996ncia".
+    for (size_t k = 0; k < s.size(); k++) c.variant[k] = s[k];
   }
 
-  Config c;
   setChars(c.lang, lang, keep);
   setChars(c.script, script, keep);
   c.script[0] = toUpper(c.script[0]);
   setChars(c.region, region, toUpper);
-  setChars(c.variant, variant, keep);
   return c;
 }
 
