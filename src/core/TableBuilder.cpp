@@ -32,6 +32,7 @@ enum class Visibility : uint8_t { Undefined, Private, Public };
 struct PendingEntry {
   std::vector<PendingValue> values;
   Visibility visibility = Visibility::Undefined;
+  Source visibilitySource;  // the first declaration that gave it that visibility
   std::optional<ResId> id;  // the one a <public id=""> gives
   Source idSource;          // that <public>
 };
@@ -641,8 +642,11 @@ std::optional<Package> buildPackage(ParsedFolder folder, const std::string& name
         continue;
       }
       PendingEntry& entry = files.back()[{"", {symbol.type, symbol.name}}];
-      entry.visibility =
-          std::max(entry.visibility, symbol.isPublic ? Visibility::Public : Visibility::Private);
+      const Visibility visibility = symbol.isPublic ? Visibility::Public : Visibility::Private;
+      if (visibility > entry.visibility) {
+        entry.visibility = visibility;
+        entry.visibilitySource = symbol.source;
+      }
       if (!symbol.id) continue;
       if (entry.id && *entry.id != *symbol.id) {
         diag.error(symbol.source, "trying to add resource '" + nameOf(symbol.type, symbol.name) +
@@ -710,6 +714,7 @@ std::optional<Package> buildPackage(ParsedFolder folder, const std::string& name
           entry.idSource = compiled.idSource;
         }
         entry.visibility = compiled.visibility;
+        entry.visibilitySource = compiled.visibilitySource;
       } else if (compiled.visibility == Visibility::Public &&
                  entry.visibility == Visibility::Public && entry.id && compiled.id &&
                  *entry.id != *compiled.id) {
@@ -739,16 +744,12 @@ std::optional<Package> buildPackage(ParsedFolder folder, const std::string& name
     diag.error(source, "defined resource '" + package + ":" + nameOf(ResType::Id, entry) +
                            "' for external package '" + package + "'");
   }
-  for (const SymbolDecl& s : folder.symbols) {
-    const auto it = entries.find({s.type, s.name});
-    if (it == entries.end() || it->second.values.empty()) {
-      diag.error(s.source, "no definition for declared symbol '" + nameOf(s.type, s.name) + "'");
-    }
-  }
   if (!diag.empty()) return std::nullopt;
 
   // Every value of each entry, in the order of configuration, then product, that aapt2's
-  // ResourceEntry keeps them in, and link and ProductFilter go through them in.
+  // ResourceEntry keeps them in, and link and ProductFilter go through them in. An entry a
+  // <public>, <java-symbol> or <symbol> declares and nothing defines has none, and is given an id
+  // as any other before link fails on it (#182).
   std::map<Key, std::vector<PendingValue>> all;
   for (auto& [key, entry] : entries) {
     std::vector<PendingValue>& values = all[key] = std::move(entry.values);
@@ -848,7 +849,7 @@ std::optional<Package> buildPackage(ParsedFolder folder, const std::string& name
     uint32_t& next = nextEntry[key.first];
     while (next <= 0xffff && given.count(makeResId(id, type, static_cast<uint16_t>(next)))) next++;
     if (next > 0xffff) {
-      diag.error(values.front().source,
+      diag.error(values.empty() ? entries[key].visibilitySource : values.front().source,
                  "more than 65536 resources of type " + std::string(toString(key.first)));
       return std::nullopt;
     }
@@ -883,6 +884,14 @@ std::optional<Package> buildPackage(ParsedFolder folder, const std::string& name
   for (const auto& [key, values] : all) {
     // The package is not const, only the lookup.
     Entry& entry = const_cast<Entry&>(*std::as_const(package).entry(ids[key]));
+    // ReferenceLinker gives this of each entry before it links its values, so it comes after the
+    // errors of ids, and among those of references in the order of the entries (#182): once for
+    // an entry, where the first declaration of its visibility is written.
+    const PendingEntry& declared = entries[key];
+    if (declared.visibility != Visibility::Undefined && values.empty()) {
+      diag.error(declared.visibilitySource,
+                 "no definition for declared symbol '" + nameOf(key.first, key.second) + "'");
+    }
     const std::vector<bool>& kept = keep[key];
     for (size_t i = 0; i < values.size(); i++) {
       const PendingValue& v = values[i];
