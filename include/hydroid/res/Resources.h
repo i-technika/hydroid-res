@@ -30,8 +30,11 @@ HYDROID_RES_API const Candidate* bestCandidate(const Entry& entry, const Config&
 // assigned or moved from (its revision, ResourceTable.h).
 class Resources {
  public:
-  // For `table`, which must outlive this, and the default configuration, which only takes the
-  // values without qualifiers, or with a version up to kEmulatedSdkVersion (Version.h).
+  // For `table`, which must outlive this, and the default configuration, which takes the values
+  // without qualifiers, or with a version up to kEmulatedSdkVersion (Version.h), and those of a
+  // density, which never keeps a value from matching. It asks for no density, which is mdpi, as
+  // is a value of none: values-anydpi/ comes before all, then values-mdpi/, as good as values/
+  // and after it in the table, then values/, then the other densities.
   HYDROID_RES_API explicit Resources(const ResourceTable& table);
   HYDROID_RES_API ~Resources();
   HYDROID_RES_API Resources(Resources&& other) noexcept;
