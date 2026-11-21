@@ -65,8 +65,8 @@ step)를 보고 **오류**인지 **오류가 아닌 실패**인지 가린다.
 
 | 구분 | 판단 근거 |
 | --- | --- |
-| 오류 | 빌드 실패(컴파일·링크 오류, 경고가 오류로), 테스트 실패, configure 실패(의존성 버전, 옵션), clang-format 차이, 검사 step(export, SONAME, 새니타이저 기호 등)의 실패. 같은 커밋에서 다시 돌려도 같은 결과가 나올 것 |
-| 오류가 아닌 실패 | `conclusion`이 `cancelled`·`timed_out`, 러너를 잃음(`The runner has received a shutdown signal`, `lost communication`), 내려받기 실패(checkout, FetchContent, apt, pipx, Gradle의 네트워크·HTTP 5xx·429), 캐시 서비스 오류, 대기열 지연으로 시작하지 못함. 코드와 상관없이 다시 돌리면 지나갈 것 |
+| 오류 | 빌드 실패(컴파일·링크 오류, 경고가 오류로), 테스트 실패, configure 실패(의존성 버전, 옵션), clang-format 차이, `locale tables`의 `git diff` 차이, 검사 step(export, SONAME, 새니타이저 기호 등)의 실패. 같은 커밋에서 다시 돌려도 같은 결과가 나올 것 |
+| 오류가 아닌 실패 | `conclusion`이 `cancelled`·`timed_out`, 러너를 잃음(`The runner has received a shutdown signal`, `lost communication`), 내려받기 실패(checkout, FetchContent, apt, pipx, Gradle, `locale tables`의 android.googlesource.com 내려받기에서 네트워크·timeout·HTTP 5xx·429), 캐시 서비스 오류, 대기열 지연으로 시작하지 못함. 코드와 상관없이 다시 돌리면 지나갈 것 |
 
 둘이 섞여 있으면 오류로 처리한다. 어느 쪽인지 가릴 수 없으면 오류가 아닌 실패로 보고 한 번 다시 돌려 본다.
 
