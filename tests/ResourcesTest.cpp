@@ -120,8 +120,11 @@ TEST(Resources, DefaultConfigurationTakesValuesOfADensity) {
     const Resources resources(table);
     return where(resources, table);
   };
-  // anydpi before all, and none before another density, as medium is asked for.
-  EXPECT_EQ(pick({"anydpi", "hdpi"}, true), "anydpi");
+  // anydpi before all. mdpi is asked for, and no density is mdpi too: values-mdpi/ is as good as
+  // values/ and comes after it in the table, so it is taken. And none before another density.
+  EXPECT_EQ(pick({"anydpi", "mdpi", "hdpi"}, true), "anydpi");
+  EXPECT_EQ(pick({"mdpi"}, true), "mdpi");
+  EXPECT_EQ(pick({"mdpi", "hdpi"}, true), "mdpi");
   EXPECT_EQ(pick({"hdpi", "ldpi"}, true), "default");
   // And where there is no value without one, a value of a density all the same.
   for (const char* density : {"ldpi", "hdpi", "xxhdpi", "nodpi"}) {
