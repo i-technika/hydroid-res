@@ -20,6 +20,7 @@
 #include "hydroid/res/ConfigParser.h"
 #include "hydroid/res/ResourceTable.h"
 #include "hydroid/res/Resources.h"
+#include "hydroid_res.h"
 
 namespace {
 
@@ -93,10 +94,9 @@ std::vector<Config> tags(const std::vector<const char*>& languageTags) {
   return locales;
 }
 
-// The allocations of adding a package of a string in values/ and each values-<qualifiers>/ of
-// `folders`, which are all the library's.
-long addPackage(ResourceTable& table, const TempDir& dir, const std::vector<const char*>& folders,
-                const std::string& name = "com.example", uint8_t id = kAppPackageId) {
+// A res/ folder `name` of a string in values/ and each values-<qualifiers>/ of `folders`.
+std::filesystem::path writePackage(const TempDir& dir, const std::vector<const char*>& folders,
+                                   const std::string& name) {
   const std::filesystem::path res = dir.path() / name;
   std::vector<std::string> all = {"values"};
   for (const char* folder : folders) all.push_back(std::string("values-") + folder);
@@ -105,6 +105,13 @@ long addPackage(ResourceTable& table, const TempDir& dir, const std::vector<cons
     std::ofstream(res / folder / "strings.xml", std::ios::binary)
         << "<resources><string name=\"where\">" << folder << "</string></resources>";
   }
+  return res;
+}
+
+// The allocations of adding a package of writePackage, which are all the library's.
+long addPackage(ResourceTable& table, const TempDir& dir, const std::vector<const char*>& folders,
+                const std::string& name = "com.example", uint8_t id = kAppPackageId) {
+  const std::filesystem::path res = writePackage(dir, folders, name);
   bool added = false;
   const long n = allocationsOf([&] { added = table.addPackage(res, name, id); });
   EXPECT_TRUE(added) << name;
@@ -250,6 +257,96 @@ TEST(ResourcesAllocations, AFailedChoiceForAChangedTableLeavesItToTheNextCall) {
       break;
     }
   }
+#endif
+}
+
+// The C API (#203), for each allocation its calls make but those of loading a package (#256),
+// failing it: no exception leaves a C function, and one that fails says so and leaves what it would
+// have written as it was. The table changes before each call that reads the configuration, so that
+// each takes the change in.
+TEST(ResourcesAllocations, NoExceptionLeavesTheCApi) {
+#if HYDROID_NOEXCEPT_ALLOCATES
+  GTEST_SKIP() << "the checked iterators allocate where they cannot throw";
+#else
+  TempDir dir;
+  const std::string app = writePackage(dir, {"night"}, "com.example").u8string();
+  const std::string lib = writePackage(dir, {"ko"}, "com.example.lib").u8string();
+  // Made here, as an allocation of the test that fails would throw from it.
+  const std::vector<std::string> libs = {"com.example.lib0", "com.example.lib1", "com.example.lib2",
+                                         "com.example.lib3"};
+  const char* locales[] = {"fr-FR", "ko-KR"};
+  hydroid_res_config device{};
+  device.ui_mode_night = 2;
+
+  int failures = 0;  // of the calls, in one run
+  const auto run = [&] {
+    failures = 0;
+    hydroid_res_table* table = hydroid_res_table_create();
+    if (!table) {
+      failures++;
+      return;
+    }
+    // Not while a package loads: an allocation that fails in a callback of expat ends the program
+    // on GCC, as it cannot unwind through expat's C (#256).
+    const auto add = [&](const std::string& res, const char* name, uint8_t id) {
+      counting = false;
+      if (hydroid_res_table_add_package(table, res.c_str(), name, id) != 1) failures++;
+      counting = true;
+    };
+    add(app, "com.example", 0x7f);
+    hydroid_res_resources* resources = hydroid_res_resources_create(table);
+    if (!resources) {
+      failures++;
+      hydroid_res_table_destroy(table);
+      return;
+    }
+    if (hydroid_res_resources_set_configuration(resources, &device, locales, 2) != 1) failures++;
+    const uint32_t where = hydroid_res_table_find(table, "com.example:string/where", nullptr);
+
+    const auto change = [&](size_t n) {
+      add(lib, libs[n].c_str(), static_cast<uint8_t>(0x70 + n));
+    };
+    change(0);
+    hydroid_res_value value;
+    value.kind = HYDROID_RES_VALUE_BOOL;
+    uint32_t generation = 0xdead;
+    if (hydroid_res_resources_value(resources, where, &value, &generation) == -1) {
+      failures++;
+      EXPECT_EQ(value.kind, HYDROID_RES_VALUE_BOOL);
+      EXPECT_EQ(generation, 0xdeadu);
+    }
+    change(1);
+    if (hydroid_res_resources_value_for_density(resources, where, 480, &value, nullptr) == -1) {
+      failures++;
+    }
+    change(2);
+    hydroid_res_config config;
+    config.mcc = 0xdead;
+    if (hydroid_res_resources_configuration(resources, &config) != 1) {
+      failures++;
+      EXPECT_EQ(config.mcc, 0xdead);
+    }
+    change(3);
+    generation = 0xdead;
+    if (hydroid_res_resources_generation(resources, &generation) != 1) {
+      failures++;
+      EXPECT_EQ(generation, 0xdeadu);
+    }
+    hydroid_res_resources_destroy(resources);
+    hydroid_res_table_destroy(table);
+  };
+
+  const long all = allocationsOf(run);
+  REQUIRE_COUNTED(all);
+  EXPECT_EQ(failures, 0) << "a call fails with no allocation failing";
+  int failed = 0;
+  for (long failAt = 0; failAt < all; failAt++) {
+    SCOPED_TRACE(failAt);
+    EXPECT_NO_THROW(allocationsOf(run, failAt));
+    failed += failures > 0;
+  }
+  // Each call allocates, and one of them fails with each allocation that does.
+  EXPECT_GT(failed, 0);
 #endif
 }
 
