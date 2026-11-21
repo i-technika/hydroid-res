@@ -700,6 +700,10 @@ TEST(ConfigIsBetterThan, UsEnglishTakesItsOwnOverNone) {
   const Config device = cfg("en-rUS");
   EXPECT_TRUE(isBetterThan(cfg("en-rUS"), Config{}, device));
   EXPECT_FALSE(isBetterThan(Config{}, cfg("en-rUS"), device));
+  // So too for an English close to US English, with its own region.
+  const Config puertoRico = cfg("en-rPR");
+  EXPECT_TRUE(isBetterThan(cfg("en-rPR"), Config{}, puertoRico));
+  EXPECT_FALSE(isBetterThan(Config{}, cfg("en-rPR"), puertoRico));
 }
 
 // ---- bestCandidate ---------------------------------------------------------------------------
