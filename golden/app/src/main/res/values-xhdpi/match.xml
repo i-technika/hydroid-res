@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="pick_precedence">xhdpi</string>
+    <string name="pick_density">xhdpi</string>
+    <string name="pick_density_sparse">xhdpi</string>
+    <string name="pick_density_any">xhdpi</string>
+</resources>

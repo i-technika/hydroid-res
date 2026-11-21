@@ -7,8 +7,8 @@ add_executable(hydroid-res-tests
   ComplexTest.cpp
   ConfigMatchTest.cpp
   ConfigParserTest.cpp
-  GoldenColorTest.cpp
   GoldenComplexTest.cpp
+  GoldenMatchTest.cpp
   PathUtf8Test.cpp
   PublicHeaderTest.cpp
   ResourceTableTest.cpp

@@ -20,6 +20,7 @@ resolves values exactly as Android does, for UIKit, GTK4 and WinUI 3. Design and
 | `golden/aapt2/` | What the SDK's aapt2 makes of literal values, resource folder names, strings and whole `res/` folders |
 | `golden/aosp/` | The folder names of AOSP's framework `res/`, which must all parse |
 | `scripts/golden/` | Runs the dump on a device and pulls the JSON; runs aapt2 for `golden/aapt2/` |
+| `scripts/gen_locale_data.py` | Makes `src/core/LocaleDataTables.inc`, the locale tables matching goes by, from AOSP's |
 
 ## Build and test
 
@@ -89,8 +90,20 @@ Open `golden/` in Android Studio, or build it with `golden/gradlew`. Then:
 python scripts/golden/pull_golden.py
 ```
 
-This runs `GoldenDumpTest` over 252 conditions (7 densities × 3 languages × night × orientation ×
-3 smallest widths) and writes `golden/data/*.json`.
+This runs `GoldenDumpTest` over 375 conditions and writes `golden/data/*.json`: a matrix of 252
+(7 densities × 3 languages × night × orientation × 3 smallest widths), and 123 more that each
+change one thing the matrix leaves alone, such as a locale of another region or script, a list
+of languages, the screen's size or shape, the UI mode, the input devices or the mcc. Each file
+records the `Configuration` the resources were resolved for and the value of every resource.
+`GoldenMatchTest` builds the same device from it and checks that hydroid picks the same values.
+
+The `pick_` strings of the app's `values*/match.xml` are there for that: each has a value in
+`values/` and in some `values-<qualifiers>/`, which says the folder it is in, so the dump shows
+which folder Android took it from. A folder added for one needs a condition that picks it, or a
+line in `GoldenMatch.EveryFolderIsPickedSomewhere` saying why none does. Two things have no
+folder there, because the app is built by the Android Gradle plugin and dumped through the SDK:
+a locale with a variant (the plugin builds `values-b+de+DE+1901` as `values-de`, where aapt2 on
+its own keeps the variant), and the grammatical gender (the SDK only sets it for a whole app).
 
 The aapt2 files need only the SDK (build-tools 37.0.0 and platform android-37.0), no device, but
 they must be made on Windows: aapt2 writes some rows otherwise on Linux and macOS (#62).
@@ -110,3 +123,17 @@ prints a folder the same way, from hydroid's `ResourceTable`, to compare by hand
 
 On another OS the scripts stop. With `--any-host` they run anyway and write
 `build/aapt2-<os>-<cpu>/` instead of `golden/aapt2/`, to compare with the golden files.
+
+A folder added to the golden app goes into `configs.tsv` and `app_table.txt` too, so both
+scripts run again after it.
+
+## Locale tables
+
+Android matches a locale by its script, and picks between regions by the parent of each locale
+(es-MX under es-419 under es), from tables AOSP generates from ICU's CLDR data.
+`src/core/LocaleDataTables.inc` holds the same tables, made from AOSP's
+`libs/androidfw/LocaleDataLookup.cpp` at the commit of `android17-release` the script pins:
+
+```sh
+python scripts/gen_locale_data.py
+```

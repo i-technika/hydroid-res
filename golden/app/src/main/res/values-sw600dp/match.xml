@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="pick_precedence">sw600dp</string>
+    <string name="pick_sw">sw600dp</string>
+</resources>
