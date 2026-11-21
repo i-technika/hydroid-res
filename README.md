@@ -120,8 +120,10 @@ line in `GoldenMatch.EveryFolderIsPickedSomewhere` saying why none does. Two thi
 folder there, because the app is built by the Android Gradle plugin and dumped through the SDK:
 a locale with a variant and no script, and the grammatical gender (the SDK only sets it for a
 whole app). A variant with a script the plugin keeps, so `values-b+sr+Latn+RS+ekavsk/` and
-`values-b+sr+Latn+RS/` check the variant, of two folders of the same region: `sr-Latn-RS-ekavsk`
-takes the first, and `sr-Latn-RS` and `sr-Latn-RS-ijekavsk` the second.
+`values-b+sr+Latn+RS/`, of the same region, are there for it: `sr-Latn-RS-ekavsk` takes the
+first, only because its variant matches. `sr-Latn-RS` and `sr-Latn-RS-ijekavsk` take the
+second, which they would take anyway as the first of two equal folders in the table, so that a
+device with no variant prefers a folder with none only `ConfigMatchTest` checks.
 
 The plugin (9.5.1) compiles values and most files (raw, layout, xml) with a compiler of its own,
 not aapt2, and that writes the variant of a locale with no script as empty (#198). An app it
@@ -132,8 +134,8 @@ follows aapt2, which keeps the variant, so from such a folder it can pick anothe
 an app built by the plugin does. (aapt2 drops variants only after a region in a `b+` name of
 four subtags, and hydroid with it: `values-b+de+DE+1901+1996` is `de-rDE`, #225.) The
 `folder-locale-variant` case of `table_cases.json` checks what aapt2 makes of them, and
-`ConfigMatchTest` the rules for variants, from AOSP's tests; the golden app checks them only
-with a script.
+`ConfigMatchTest` the rules for variants, from AOSP's tests; the golden app checks only that a
+matching variant wins, and only with a script.
 
 The aapt2 files need only the SDK (build-tools 37.0.0 and platform android-37.0), no device, but
 they must be made on Windows: aapt2 writes some rows otherwise on Linux and macOS (#62).

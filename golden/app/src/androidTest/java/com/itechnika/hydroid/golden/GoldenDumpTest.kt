@@ -93,7 +93,9 @@ class GoldenDumpTest {
         // A locale against the regions and scripts the app has, and with a variant: de-DE-1901
         // against values-de-rDE/, as no folder can have a variant with no script (README.md,
         // Golden data), and sr-Latn-RS with ekavsk, with none and with another against
-        // values-b+sr+Latn+RS+ekavsk/ and values-b+sr+Latn+RS/, of the same region.
+        // values-b+sr+Latn+RS+ekavsk/ and values-b+sr+Latn+RS/, of the same region. Only for
+        // ekavsk does the variant decide: the other two take values-b+sr+Latn+RS/, which comes
+        // first in the table.
         val locales = listOf(
             "en-GB", "en-AU", "en-IN", "en-CA", "en-PH", "en-001", "en-XA", "en",
             "es-ES", "es-MX", "es-AR", "es-US", "es-419", "es-GQ",
