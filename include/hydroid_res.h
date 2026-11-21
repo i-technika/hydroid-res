@@ -44,9 +44,10 @@ HYDROID_RES_API void hydroid_res_table_destroy(hydroid_res_table* table);
 HYDROID_RES_API int hydroid_res_table_add_package(hydroid_res_table* table, const char* res,
                                                   const char* name, uint8_t id);
 
-/* Why the last hydroid_res_table_add_package failed: one problem a line, "file:line: message",
- * each ended with '\n'. "" if it loaded, or none was called. The string is the table's, and stays
- * until the next hydroid_res_table_add_package. */
+/* Why the last hydroid_res_table_add_package failed: one problem a line, each ended with '\n', as
+ * "file:line: message", or "file: message" or "message" where it has no line or no file. "" if it
+ * loaded, or none was called. The string is the table's, and stays until the next
+ * hydroid_res_table_add_package. */
 HYDROID_RES_API const char* hydroid_res_table_error(const hydroid_res_table* table);
 
 /* The id of the resource `name`, "com.example:string/app_name", "@com.example:string/app_name",
@@ -60,7 +61,8 @@ HYDROID_RES_API uint32_t hydroid_res_table_find(const hydroid_res_table* table, 
  * The fields of Config (hydroid/res/Config.h), with its numbers, which are those of Android's
  * AConfiguration (android/configuration.h): orientation 1 is ACONFIGURATION_ORIENTATION_PORT, and
  * so on. 0 is "any", so a hydroid_res_config of all 0 is the default configuration. The locale
- * fields are NUL-padded, the script not NUL-terminated: "ko" and "KR", or "sr" and "Latn". */
+ * fields are NUL-padded, and not NUL-terminated where they are full: "ko" and "KR", or "sr" and
+ * "Latn", and a variant of 8 characters, "basiceng". */
 typedef struct hydroid_res_config {
   uint16_t mcc;
   uint16_t mnc;
@@ -128,8 +130,9 @@ typedef enum hydroid_res_value_kind {
  *   - DIMENSION, FRACTION: `data` is Android's complex data, with its unit (Complex.h).
  *   - STRING, STYLED_STRING: `string` is the text, `string_length` bytes long, which can hold a
  *     NUL before the one that ends it. A styled string's spans are not given.
- *   - FILE: `string` is its path in the APK, "res/drawable-hdpi-v4/icon.png", and `format` what
- *     aapt2 makes of it: 0 kept as it is, 1 compiled XML, 2 a PNG.
+ *   - FILE: `string` is its path in the APK, "res/drawable-hdpi-v4/icon.png", which is not where
+ *     it is in the res/ folder, and `format` what aapt2 makes of it: 0 kept as it is, 1 compiled
+ *     XML, 2 a PNG.
  * `data` and `format` are 0 for the other kinds, and `string` NULL. A string is the table's, and
  * stays until the table changes (hydroid_res_table_add_package) or goes. */
 typedef struct hydroid_res_value {
@@ -163,12 +166,16 @@ HYDROID_RES_API int hydroid_res_resources_set_configuration(hydroid_res_resource
                                                             size_t locale_count);
 
 /* The configuration the values are picked for, into `out`: the device's as
- * hydroid_res_resources_set_configuration made it, with the locale it chose. */
-HYDROID_RES_API void hydroid_res_resources_configuration(const hydroid_res_resources* resources,
-                                                         hydroid_res_config* out);
+ * hydroid_res_resources_set_configuration made it, with the locale it chose. 1 if it did; 0 if
+ * there was no memory to take in what the table has changed, which the first call after a change
+ * does, and `out` is left as it was. */
+HYDROID_RES_API int hydroid_res_resources_configuration(const hydroid_res_resources* resources,
+                                                        hydroid_res_config* out);
 
-/* A number that changes whenever the values may: see Resources::generation. */
-HYDROID_RES_API uint32_t hydroid_res_resources_generation(const hydroid_res_resources* resources);
+/* A number that changes whenever the values may (Resources::generation), into `out`. 1 if it did;
+ * 0 as for hydroid_res_resources_configuration, and `out` is left as it was. */
+HYDROID_RES_API int hydroid_res_resources_generation(const hydroid_res_resources* resources,
+                                                     uint32_t* out);
 
 /* The value of the resource `id` for the configuration, into `out`. 1 if it has one; 0 if the
  * table has no such resource or none of its values matches, and `out` is a NULL value; -1 if there

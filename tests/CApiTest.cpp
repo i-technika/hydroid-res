@@ -5,12 +5,12 @@
 #include <gtest/gtest.h>
 
 #include <cstring>
+#include <filesystem>
 #include <optional>
 #include <string>
 #include <vector>
 
 #include "TempDir.h"
-#include "core/FieldCount.h"
 #include "hydroid/res/ConfigParser.h"
 #include "hydroid/res/ResourceTable.h"
 #include "hydroid/res/Resources.h"
@@ -22,6 +22,11 @@ namespace {
 using test::TempDir;
 
 constexpr const char* kTablePackage = "com.itechnika.hydroid.table";
+
+// A device with every field of Config, as KeepsEveryFieldOfTheDevice sets it in C.
+constexpr const char* kEveryField =
+    "mcc310-mnc260-b+sr+Latn+RS+1901-feminine-ldrtl-sw600dp-w960dp-h600dp-large-long-notround-"
+    "widecg-lowdr-land-car-night-xxhdpi-finger-keyssoft-qwerty-navhidden-dpad-2400x1080-v36.1";
 
 // The C handles, freed at the end of their scope.
 struct CTable {
@@ -78,8 +83,11 @@ hydroid_res_config toC(const Config& c) {
 
 // Every field of `a` and `b`, by name, so that a failure says which differs.
 void expectSameConfig(const hydroid_res_config& a, const hydroid_res_config& b) {
-  // 25 fields and the 20 chars of the 4 locale fields: one added goes here too.
-  static_assert(detail::fieldCount<hydroid_res_config>() == 45);
+  // It binds 29 names, as Config has 29 fields, and fails to build once there are more: one added
+  // goes here too.
+  [[maybe_unused]] const auto& [f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15,
+                                f16, f17, f18, f19, f20, f21, f22, f23, f24, f25, f26, f27, f28,
+                                f29] = a;
 #define HYDROID_EXPECT_FIELD(f) EXPECT_EQ(a.f, b.f) << #f
   HYDROID_EXPECT_FIELD(mcc);
   HYDROID_EXPECT_FIELD(mnc);
@@ -117,6 +125,18 @@ Config cfg(const std::string& qualifiers) {
   const std::optional<Config> c = parseConfig(qualifiers);
   EXPECT_TRUE(c) << qualifiers;
   return c.value_or(Config{});
+}
+
+uint32_t generationOf(const hydroid_res_resources* resources) {
+  uint32_t generation = 0;
+  EXPECT_EQ(hydroid_res_resources_generation(resources, &generation), 1);
+  return generation;
+}
+
+hydroid_res_config configurationOf(const hydroid_res_resources* resources) {
+  hydroid_res_config config{};
+  EXPECT_EQ(hydroid_res_resources_configuration(resources, &config), 1);
+  return config;
 }
 
 std::string text(const hydroid_res_value& v) {
@@ -246,15 +266,23 @@ TEST(CApi, GivesTheValuesTheCppApiPicks) {
   const Package& package = table.packages().front();
 
   struct Device {
-    const char* qualifiers;
+    std::string qualifiers;
     std::vector<const char*> locales;
   };
-  const std::vector<Device> devices = {
+  std::vector<Device> devices = {
       {"", {}},
       {"ko-rKR-land-night-xxhdpi", {}},
       {"sw600dp-hdpi", {"fr-CA", "ko"}},
       {"mcc310-mnc260-en-rUS-port-v21", {"de-CH"}},
+      {kEveryField, {}},
   };
+  // And one of each values-<qualifiers>/, which then decide config_order: a field the
+  // conversions lose, or two they swap, picks another (w720dp/ for w720dp, h480dp/ if swapped).
+  for (const auto& folder : std::filesystem::directory_iterator(HYDROID_TABLE_RES_DIR)) {
+    const std::string name = folder.path().filename().string();
+    if (name.rfind("values-", 0) == 0) devices.push_back({name.substr(7), {}});
+  }
+  ASSERT_GT(devices.size(), 50u);
   std::vector<int> kinds(HYDROID_RES_VALUE_STYLEABLE_DECL + 1);
   for (const Device& device : devices) {
     SCOPED_TRACE(device.qualifiers);
@@ -266,9 +294,7 @@ TEST(CApi, GivesTheValuesTheCppApiPicks) {
     ASSERT_EQ(hydroid_res_resources_set_configuration(r.resources, &cConfig, device.locales.data(),
                                                       device.locales.size()),
               1);
-    hydroid_res_config got;
-    hydroid_res_resources_configuration(r.resources, &got);
-    expectSameConfig(got, toC(resources.configuration()));
+    expectSameConfig(configurationOf(r.resources), toC(resources.configuration()));
 
     for (const TypeTable& type : package.types) {
       for (const Entry& entry : type.entries) {
@@ -277,7 +303,7 @@ TEST(CApi, GivesTheValuesTheCppApiPicks) {
         hydroid_res_value value;
         uint32_t generation = 0xdead;
         const int found = hydroid_res_resources_value(r.resources, id, &value, &generation);
-        EXPECT_EQ(generation, hydroid_res_resources_generation(r.resources));
+        EXPECT_EQ(generation, generationOf(r.resources));
         const std::string what = std::string(toString(type.type)) + "/" + entry.name;
         if (!want) {
           EXPECT_EQ(found, 0) << what;
@@ -385,7 +411,7 @@ TEST(CApi, SaysWhenThereIsNoValue) {
   EXPECT_EQ(v.format, 0);
   EXPECT_EQ(v.string, nullptr);
   EXPECT_EQ(v.string_length, 0u);
-  EXPECT_EQ(generation, hydroid_res_resources_generation(r.resources));
+  EXPECT_EQ(generation, generationOf(r.resources));
   EXPECT_EQ(hydroid_res_resources_value(r.resources, 0, &v, nullptr), 0);
 }
 
@@ -402,20 +428,19 @@ TEST(CApi, TakesTheUsersLanguages) {
 
   const hydroid_res_config device{};
   const char* locales[] = {"xx-YY", "ko-KR"};
-  const uint32_t before = hydroid_res_resources_generation(r.resources);
+  const uint32_t before = generationOf(r.resources);
   ASSERT_EQ(hydroid_res_resources_set_configuration(r.resources, &device, locales, 2), 1);
-  const uint32_t after = hydroid_res_resources_generation(r.resources);
+  const uint32_t after = generationOf(r.resources);
   EXPECT_NE(after, before);
   ASSERT_EQ(hydroid_res_resources_value(r.resources, order, &v, nullptr), 1);
   EXPECT_EQ(text(v), "ko-rKR");
-  hydroid_res_config got;
-  hydroid_res_resources_configuration(r.resources, &got);
+  const hydroid_res_config got = configurationOf(r.resources);
   EXPECT_EQ(std::string(got.lang, 4), std::string("ko\0\0", 4));
   EXPECT_EQ(std::string(got.region, 4), std::string("KR\0\0", 4));
 
   const char* bad[] = {"ko-KR", "not a tag"};
   EXPECT_EQ(hydroid_res_resources_set_configuration(r.resources, &device, bad, 2), 0);
-  EXPECT_EQ(hydroid_res_resources_generation(r.resources), after);
+  EXPECT_EQ(generationOf(r.resources), after);
   ASSERT_EQ(hydroid_res_resources_value(r.resources, order, &v, nullptr), 1);
   EXPECT_EQ(text(v), "ko-rKR");
 
@@ -426,11 +451,11 @@ TEST(CApi, TakesTheUsersLanguages) {
   // A package added after changes the generation.
   TempDir dir;
   dir.write("values/strings.xml", "<resources><string name=\"a\">x</string></resources>");
-  const uint32_t beforeTable = hydroid_res_resources_generation(r.resources);
+  const uint32_t beforeTable = generationOf(r.resources);
   ASSERT_EQ(
       hydroid_res_table_add_package(c.table, dir.path().u8string().c_str(), "com.other", 0x7e), 1);
   ASSERT_EQ(hydroid_res_resources_value(r.resources, order, &v, nullptr), 1);
-  EXPECT_NE(hydroid_res_resources_generation(r.resources), beforeTable);
+  EXPECT_NE(generationOf(r.resources), beforeTable);
 }
 
 // Each field of the device goes through, and comes back as setConfiguration makes it.
@@ -471,7 +496,7 @@ TEST(CApi, KeepsEveryFieldOfTheDevice) {
   ASSERT_EQ(hydroid_res_resources_set_configuration(r.resources, &device, nullptr, 0), 1);
   hydroid_res_config got;
   std::memset(&got, 0x5a, sizeof got);
-  hydroid_res_resources_configuration(r.resources, &got);
+  ASSERT_EQ(hydroid_res_resources_configuration(r.resources, &got), 1);
   hydroid_res_config want = device;
   want.nav_hidden = 0;  // as Android tells its resources nothing of it
   expectSameConfig(got, want);
@@ -480,10 +505,7 @@ TEST(CApi, KeepsEveryFieldOfTheDevice) {
   ResourceTable table;
   ASSERT_TRUE(table.addPackage(HYDROID_TABLE_RES_DIR, kTablePackage, kAppPackageId));
   Resources resources(table);
-  resources.setConfiguration(
-      cfg("mcc310-mnc260-b+sr+Latn+RS+1901-feminine-ldrtl-sw600dp-w960dp-h600dp-large-long-"
-          "notround-widecg-lowdr-land-car-night-xxhdpi-finger-keyssoft-qwerty-navhidden-dpad-"
-          "2400x1080-v36.1"));
+  resources.setConfiguration(cfg(kEveryField));
   expectSameConfig(got, toC(resources.configuration()));
 }
 

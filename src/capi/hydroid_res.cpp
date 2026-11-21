@@ -296,13 +296,24 @@ int hydroid_res_resources_set_configuration(hydroid_res_resources* resources,
   }
 }
 
-void hydroid_res_resources_configuration(const hydroid_res_resources* resources,
-                                         hydroid_res_config* out) {
-  *out = toC(resources->resources.configuration());
+// Both take in a change of the table, which allocates (Resources.cpp, syncWithTable).
+int hydroid_res_resources_configuration(const hydroid_res_resources* resources,
+                                        hydroid_res_config* out) {
+  try {
+    *out = toC(resources->resources.configuration());
+    return 1;
+  } catch (...) {
+    return 0;
+  }
 }
 
-uint32_t hydroid_res_resources_generation(const hydroid_res_resources* resources) {
-  return resources->resources.generation();
+int hydroid_res_resources_generation(const hydroid_res_resources* resources, uint32_t* out) {
+  try {
+    *out = resources->resources.generation();
+    return 1;
+  } catch (...) {
+    return 0;
+  }
 }
 
 int hydroid_res_resources_value(const hydroid_res_resources* resources, uint32_t id,
