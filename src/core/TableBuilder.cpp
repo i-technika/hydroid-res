@@ -739,6 +739,7 @@ std::optional<Package> buildPackage(ParsedFolder folder, const std::string& name
       diag.error(s.source, "no definition for declared symbol '" + nameOf(s.type, s.name) + "'");
     }
   }
+  if (!diag.empty()) return std::nullopt;
 
   // Every value of each entry, in the order of configuration, then product, that aapt2's
   // ResourceEntry keeps them in, and link and ProductFilter go through them in.

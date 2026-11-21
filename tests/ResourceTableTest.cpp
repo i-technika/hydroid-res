@@ -1388,6 +1388,30 @@ TEST(ResourceTable, ProductFilterComesAfterLink) {
   }
 }
 
+// What fails to merge stops link before ids are given and references linked, now that
+// ProductFilter, which used to stop it, comes after link (#180).
+TEST(ResourceTable, MergeErrorsStopBeforeLink) {
+  const std::string missing = "<resources><string name='q'>@string/nothing</string></resources>";
+  const std::vector<std::pair<std::vector<std::pair<std::string, std::string>>, std::string>>
+      cases = {
+          {{{"values/a.xml", "<resources><string name='s'>a</string></resources>"},
+            {"values/b.xml", "<resources><string name='s'>b</string></resources>"},
+            {"values/c.xml", missing}},
+           "resource 'string/s' has a conflicting value for configuration ()"},
+          {{{"layout/l.xml", "<a y='@+app:id/b'/>"}, {"values/c.xml", missing}},
+           "defined resource 'app:id/b' for external package 'app'"},
+      };
+  for (const auto& [files, message] : cases) {
+    SCOPED_TRACE(message);
+    TempDir dir;
+    ResourceTable table;
+    std::vector<Diagnostic> errors;
+    EXPECT_FALSE(load(table, dir, files, "com.example", 0x7f, &errors));
+    ASSERT_EQ(errors.size(), 1u) << errorsOf(errors);
+    EXPECT_EQ(errors[0].message, message);
+  }
+}
+
 // What an XML file names in android is linked once a package android is loaded, as aapt2 links
 // it against android.jar, and left alone while none is, as hydroid cannot read android.jar yet
 // (#132). The golden cases load no android, so the cases that need one are here.
