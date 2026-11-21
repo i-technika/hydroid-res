@@ -849,8 +849,11 @@ std::optional<Package> buildPackage(ParsedFolder folder, const std::string& name
     uint32_t& next = nextEntry[key.first];
     while (next <= 0xffff && given.count(makeResId(id, type, static_cast<uint16_t>(next)))) next++;
     if (next > 0xffff) {
+      // In aapt2's words (#188), which gives it no file or line: it is given where the entry is.
       diag.error(values.empty() ? entries[key].visibilitySource : values.front().source,
-                 "more than 65536 resources of type " + std::string(toString(key.first)));
+                 "can't assign resource ID to resource " + nameOf(key.first, key.second) +
+                     " because resource type ID has exceeded the maximum number of resource "
+                     "entries (65536)");
       return std::nullopt;
     }
     ids[key] = makeResId(id, type, static_cast<uint16_t>(next++));

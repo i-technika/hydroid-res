@@ -1548,7 +1548,8 @@ TEST(ResourceTable, NoDefinitionComesAtLink) {
   }
 
   // An entry with no value takes an id as any other, so one more of them than a type has ids
-  // fails where the ids are given, on the last by name, before any "no definition".
+  // fails where the ids are given, on the last by name, before any "no definition". The error is
+  // in aapt2 37.0.0's words (#188); no golden case has it, as it would be 2 MB of names.
   std::string symbols = "<resources>";
   for (int i = 0; i <= 0x10000; i++) {
     char name[16];
@@ -1562,7 +1563,9 @@ TEST(ResourceTable, NoDefinitionComesAtLink) {
                     &errors));
   ASSERT_EQ(errors.size(), 1u) << errorsOf(errors);
   EXPECT_EQ(errors[0].line, 0x10000 + 2);
-  EXPECT_EQ(errors[0].message, "more than 65536 resources of type string");
+  EXPECT_EQ(errors[0].message,
+            "can't assign resource ID to resource string/n65536 because resource type ID has "
+            "exceeded the maximum number of resource entries (65536)");
 }
 
 // What an XML file names in android is linked once a package android is loaded, as aapt2 links
