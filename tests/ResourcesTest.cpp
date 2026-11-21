@@ -214,6 +214,38 @@ TEST(Resources, SeesAPackageTheTableAdds) {
   EXPECT_EQ(chosen(resources), "ko-rKR-night");
 }
 
+// A table assigned another, even of as many packages, is new to it (#205): nothing picked from the
+// one it held is given, and the locale is chosen again.
+TEST(Resources, SeesATableAssignedToIt) {
+  TempDir dir;
+  ResourceTable table;
+  addPackage(table, dir, {"night"});
+  Resources resources(table);
+  resources.setConfiguration(dev("night"), tags({"fr-FR", "ko-KR"}));
+  EXPECT_EQ(where(resources, table), "night");
+  EXPECT_EQ(chosen(resources), "fr-rFR-night");
+  uint32_t before = resources.generation();
+
+  // The same package and resource, as res/ is read again: the one picked before was of the
+  // table that is gone.
+  {
+    const TempDir otherDir;
+    ResourceTable other;
+    addPackage(other, otherDir, {"ko"});
+    table = std::move(other);
+  }
+  EXPECT_NE(resources.generation(), before);
+  EXPECT_EQ(chosen(resources), "ko-rKR-night");
+  EXPECT_EQ(where(resources, table), "ko");
+
+  // Assigned a copy of what it holds, it holds it at another place.
+  before = resources.generation();
+  const ResourceTable copy = table;
+  table = copy;
+  EXPECT_NE(resources.generation(), before);
+  EXPECT_EQ(where(resources, table), "ko");
+}
+
 TEST(Resources, MovesWithWhatItHolds) {
   TempDir dir;
   ResourceTable table;

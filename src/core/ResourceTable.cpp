@@ -84,6 +84,7 @@ bool ResourceTable::addPackage(const std::filesystem::path& res, std::string_vie
     }
   }
   packages_.push_back(std::move(*loaded));
+  revision_.value++;
   return true;
 }
 

@@ -259,9 +259,35 @@ class ResourceTable {
   // "com.example:string/app_name", or nullopt for an id of no resource.
   HYDROID_RES_API std::optional<std::string> nameOf(ResId id) const;
 
+  // A number that changes whenever what the table holds may: when it adds a package, and when it
+  // is assigned or moved from. It never comes back to a value it had in this table, so what is
+  // kept of the table can be kept by it, as Resources keeps what it picked.
+  uint64_t revision() const { return revision_.value; }
+
  private:
+  // Holds the revision through the table's implicit copies and moves: a table copied or moved
+  // into takes the revision of the one it is made from, and one assigned to, or moved from, goes
+  // to its next.
+  struct Revision {
+    uint64_t value = 0;
+
+    Revision() = default;
+    Revision(const Revision&) = default;
+    Revision(Revision&& other) noexcept : value(other.value) { other.value++; }
+    Revision& operator=(const Revision&) noexcept {
+      value++;
+      return *this;
+    }
+    Revision& operator=(Revision&& other) noexcept {
+      value++;
+      if (&other != this) other.value++;
+      return *this;
+    }
+  };
+
   std::vector<Package> packages_;
   std::unordered_map<std::string, ResId> byName_;  // "package:type/name"
+  Revision revision_;
 };
 
 // The table as `aapt2 dump resources` prints an APK, from its "Package name=" line on: what aapt2
