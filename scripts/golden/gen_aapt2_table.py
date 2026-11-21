@@ -431,6 +431,14 @@ CASES = {
     "style-key-attr-item-default-product": values("<string name='s'>x</string>"
                                                   "<item type='attr' name='r' product='default'>@string/s</item>"
                                                   "<style name='S'><item name='r'>1</item></style>"),
+    # An <attr> of product='default' alike: a reference finds it, where a style item or an XML
+    # attribute that names it is told it is not an attribute (#178).
+    "attrref-attr-default-product": values("<attr name='r' format='integer' product='default'/>"
+                                           "<item type='integer' name='t'>?attr/r</item>"),
+    "style-key-attr-default-product": values("<attr name='r' format='integer' product='default'/>"
+                                             "<style name='S'><item name='r'>1</item></style>"),
+    "xml-link-attr-default-product": layout('app:r="1"',
+                                            "<attr name='r' format='integer' product='default'/>"),
     "styleable-attr-item-not-an-attr": values("<string name='s'>x</string><item type='attr' name='r'>@string/s</item>"
                                               "<declare-styleable name='S'><attr name='r'/></declare-styleable>"),
 
