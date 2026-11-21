@@ -111,8 +111,8 @@ inline bool operator!=(const Config& a, const Config& b) { return !(a == b); }
 // ResTable_config::compare, in which aapt2 keeps the values of a resource and
 // `aapt2 dump resources` lists them. It compares Android's packed fields as integers, so it is
 // not the order of the qualifiers in a folder name: the mnc before the mcc, the region before the
-// language and the second letter of each before the first, the density before the touchscreen
-// before the orientation, and the minor version before the version.
+// language and the second letter of each before the first, and the density before the
+// touchscreen before the orientation. The version comes before the minor version: v36, v36.1, v37.
 HYDROID_RES_API int compareConfigs(const Config& a, const Config& b);
 
 // The qualifiers as aapt2 writes them, which is how `aapt2 dump resources` prints a configuration:

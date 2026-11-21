@@ -280,7 +280,7 @@ struct Packed {
   uint32_t screenType;     // orientation | touchscreen << 8 | density << 16
   uint32_t input;          // keyboard | navigation << 8 | (keysHidden | navHidden << 2) << 16
   uint32_t screenSize;     // screenWidth | screenHeight << 16
-  uint32_t version;        // sdkVersion | minorVersion << 16
+  uint32_t version;        // minorVersion | sdkVersion << 16
   uint32_t screenLayout;   // screenSize | screenLong << 4 | layoutDir << 6
   uint32_t screenLayout2;  // screenRound
   uint32_t colorMode;      // wideColorGamut | hdr << 2
@@ -312,7 +312,8 @@ Packed pack(const Config& c) {
   p.screenType = u(c.orientation) | u(c.touchscreen) << 8 | uint32_t{c.density} << 16;
   p.input = u(c.keyboard) | u(c.navigation) << 8 | (u(c.keysHidden) | u(c.navHidden) << 2) << 16;
   p.screenSize = c.screenWidth | uint32_t{c.screenHeight} << 16;
-  p.version = c.sdkVersion | uint32_t{c.minorVersion} << 16;
+  // Android compares the version before the minor version, though the two share a union.
+  p.version = c.minorVersion | uint32_t{c.sdkVersion} << 16;
   p.screenLayout = u(c.screenSize) | u(c.screenLong) << 4 | u(c.layoutDir) << 6;
   p.screenLayout2 = u(c.screenRound);
   p.colorMode = u(c.wideColorGamut) | u(c.hdr) << 2;
