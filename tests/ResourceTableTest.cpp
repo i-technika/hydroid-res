@@ -185,6 +185,46 @@ TEST(ResourceTable, FindsAroundTheIdsAPublicGives) {
   }
 }
 
+// The last entry id, 0xffff, is one as any other: a <public> can give it, and the 65536th entry
+// of a type takes it. aapt2 37.0.0's IdAssigner gives it too, but aapt2 then stops on a check of
+// its own as it writes the table ("TableFlattener.cpp:175 Check failed"), with no error to
+// compare, so no golden case has such a folder (#190).
+TEST(ResourceTable, GivesTheLastEntryId) {
+  {
+    TempDir dir;
+    ResourceTable table;
+    std::vector<Diagnostic> errors;
+    ASSERT_TRUE(load(table, dir,
+                     {{"values/v.xml",
+                       "<resources><string name='a'>a</string><string name='b'>b</string>"
+                       "<public type='string' name='a' id='0x7f01ffff'/></resources>"}},
+                     "com.example", 0x7f, &errors))
+        << errorsOf(errors);
+    EXPECT_EQ(table.find("com.example", ResType::String, "a"), 0x7f01ffffu);
+    EXPECT_EQ(table.find("com.example", ResType::String, "b"), 0x7f010000u);
+    EXPECT_EQ(table.nameOf(0x7f01ffff), "com.example:string/a");
+  }
+
+  // One more entry is one too many (NoDefinitionComesAtLink).
+  std::string strings = "<resources>";
+  for (int i = 0; i <= 0xffff; i++) {
+    char name[16];
+    std::snprintf(name, sizeof name, "n%05d", i);
+    strings += "<string name='" + std::string(name) + "'>v</string>";
+  }
+  TempDir dir;
+  ResourceTable table;
+  std::vector<Diagnostic> errors;
+  ASSERT_TRUE(
+      load(table, dir, {{"values/v.xml", strings + "</resources>"}}, "com.example", 0x7f, &errors))
+      << errorsOf(errors);
+  ASSERT_NE(table.package(0x7f)->type(ResType::String), nullptr);
+  EXPECT_EQ(table.package(0x7f)->type(ResType::String)->entries.size(), 0x10000u);
+  EXPECT_EQ(table.find("com.example", ResType::String, "n00000"), 0x7f010000u);
+  EXPECT_EQ(table.find("com.example", ResType::String, "n65535"), 0x7f01ffffu);
+  EXPECT_EQ(table.nameOf(0x7f01ffff), "com.example:string/n65535");
+}
+
 TEST(ResourceTable, FillsValuesAndPools) {
   TempDir dir;
   ResourceTable table;

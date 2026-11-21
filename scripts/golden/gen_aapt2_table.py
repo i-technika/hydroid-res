@@ -703,7 +703,8 @@ CASES = {
         "<attr name='e' format='string'/><attr name='e'><enum name='1x' value='1'/></attr>"),
     "attr-failed-enum-bad-name": values(
         "<attr name='a'><enum name='1x' value='1'/><enum name='y' value='z'/></attr>"),
-    # aapt2 fails a check of its own on an entry id of 0xffff, which no case has.
+    # aapt2 fails a check of its own on an entry id of 0xffff, with no error to record, so no case
+    # has one. hydroid loads it (#190), which ResourceTableTest checks.
 
     # Attributes.
     "attr-formats": values("<attr name='a' format=' color | reference '/><attr name='b'/>"
