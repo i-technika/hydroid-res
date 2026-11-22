@@ -133,11 +133,13 @@ typedef enum hydroid_res_value_kind {
  *     NUL before the one that ends it. A styled string's spans are not given.
  *   - FILE: `string` is its path in the APK, "res/drawable-hdpi-v4/icon.png", which is not where
  *     it is in the res/ folder, and `format` what aapt2 makes of it: 0 kept as it is, 1 compiled
- *     XML, 2 a PNG. `source` is where it is in the res/ folder hydroid_res_table_add_package read,
- *     its folder and name in UTF-8 with '/' ("drawable-hdpi/icon.png"), `source_length` bytes
- *     long, which opens the file joined to that folder.
- * `data` and `format` are 0 for the other kinds, and `string` and `source` NULL. A string is the
- * table's, and stays until the table changes (hydroid_res_table_add_package) or goes. */
+ *     XML, 2 a PNG. `source` is where it is in the res/ folder that hydroid_res_table_add_package
+ *     read for the package of `id` (its high byte), its folder and name in UTF-8 with '/'
+ *     ("drawable-hdpi/icon.png"), `source_length` bytes long, which opens the file joined to that
+ *     folder.
+ * `data` and `format` are 0 for the other kinds, and `string` NULL. `source` is NULL but for FILE.
+ * A string is the table's, and stays until the table changes (hydroid_res_table_add_package) or
+ * goes. */
 typedef struct hydroid_res_value {
   hydroid_res_value_kind kind;
   uint32_t data;

@@ -187,10 +187,10 @@ void expectSameValue(const Package& package, const Value& want, const hydroid_re
   }
   EXPECT_EQ(got.data, data);
   EXPECT_EQ(got.format, format);
-  const auto expectText = [](const char* text, size_t length, const std::string* want) {
-    if (want) {
+  const auto expectText = [](const char* text, size_t length, const std::string* expected) {
+    if (expected) {
       ASSERT_NE(text, nullptr);
-      EXPECT_EQ(std::string(text, length), *want);
+      EXPECT_EQ(std::string(text, length), *expected);
       EXPECT_EQ(text[length], '\0');
     } else {
       EXPECT_EQ(text, nullptr);
