@@ -79,8 +79,13 @@ gh issue develop <N> --base <base> --name fix/<N>-<slug> --checkout
    버전이 다를 수 있어, CI의 VS 2022에서만 나는 경고는 여전히 단계 PR의 full CI에서야 드러날 수 있다. 이
    PC의 MSVC에서만 나는 경고도 `/WX`로 빌드를 멈추므로 CI에서 나지 않더라도 고친다. 빌드
    디렉터리가 다르므로(`build/debug`, `build/release`) 서로를 덮지 않는다.
-   decimal-comma 로케일이 이 PC에 없어서 configure가 실패하면 `-DHYDROID_RES_REQUIRE_LOCALE_TESTS=ON`만
-   빼고 다시 하고, PR의 테스트 항목에 그렇게 적는다.
+   `-DHYDROID_RES_REQUIRE_LOCALE_TESTS=ON`은 configure와 빌드를 멈추지 않는다. decimal-comma 로케일이 이
+   PC에 없으면, 그 로케일이 필요한 테스트(`HYDROID_NEED_DECIMAL_COMMA`를 쓰는 것)가 skip 대신 `ctest`에서
+   `no locale with a decimal comma is installed`로 실패한다(`tests/DecimalCommaLocale.h`). 그때는 Debug와
+   Release를 `-DHYDROID_RES_REQUIRE_LOCALE_TESTS=OFF`로 다시 configure하고(옵션을 빼기만 하면 CMake 캐시의
+   `ON`이 남는다) 빌드와 `ctest`를 다시 돌려 그 테스트가 skip되는지 보고, PR의 테스트 항목에 그렇게 적는다.
+   이후 이 PC에서 다시 돌릴 때는 언제나(이 스킬의 이후 단계와 `/open-ms`에서도) 위 블록의 `=ON` 대신
+   `=OFF`로 configure한다. `=ON`을 주면 캐시가 다시 `ON`이 되어 같은 테스트가 또 실패한다.
 3. 바꾼 `*.h`, `*.cpp`에 clang-format 23.1.5(`.clang-format`)로 `--dry-run --Werror`를 돌린다.
    서브이슈 PR의 CI(quick)도 `clang-format` job을 돌리지만, push하기 전에 여기서 먼저 확인한다. 23.1.5가
    없으면 건너뛰고 PR에 "clang-format은 이 PR의 CI에서 확인됩니다"라고 적는다.

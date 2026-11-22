@@ -113,7 +113,8 @@ records the `Configuration` the resources were resolved for and the value of eve
 To see by hand what hydroid picks for one device,
 `hydroid-rc pick <res> <qualifiers> [--locales <tag,...>] [<package>]` takes the device as the
 qualifiers of a folder name and its languages as BCP 47 tags, and prints the locale it chose and
-the value of each resource, with the configuration it comes from:
+the value of each resource, with the configuration it comes from (an app's LocaleConfig and the
+devices after the first it takes too, as below):
 
 ```sh
 hydroid-rc pick golden/app/src/main/res ko-rKR-land-night-xhdpi --locales ko-KR com.itechnika.hydroid.golden
@@ -150,6 +151,22 @@ through `setConfiguration` and `setLocaleConfig`:
 ```sh
 python scripts/golden/pull_golden.py --app localeconfig
 ```
+
+`hydroid-rc pick` replays such a lifecycle by hand: `--locale-config <file>` gives the
+`Resources` the app's LocaleConfig after the first device, as Android does, if that has more than
+one language, and each `--then <qualifiers> [--locales <tag,...>]` sets the same `Resources` to
+another device, of the languages of the one before, its `--locales` and the locale of its
+qualifiers, unless it names others: `--locales`, or a language in its qualifiers, which drops the
+`--locales` before too. It prints the
+lines of each device in turn, each starting with its locale. A `Resources` made for fr and es,
+then turned, reads `string/es` in es only at the turn:
+
+```sh
+hydroid-rc pick golden/localeconfig/src/main/res mcc310-port --locales fr-FR,es-ES --locale-config golden/localeconfig/src/main/res/xml/locales_config.xml --then mcc310-land
+```
+
+`HydroidRc.PicksWhatAndroidPickedWithLocaleConfig` checks it against every lifecycle of
+`golden/localeconfig/data`.
 
 Of a list of languages, Android reads an app's resources in the first that the app has, and
 takes it to have English, which it keeps in `values/`; the golden app has `values-en*/`, so
