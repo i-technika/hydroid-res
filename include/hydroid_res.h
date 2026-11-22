@@ -38,10 +38,9 @@ HYDROID_RES_API hydroid_res_table* hydroid_res_table_create(void);
 HYDROID_RES_API void hydroid_res_table_destroy(hydroid_res_table* table);
 
 /* Loads the res/ folder at `res` as the package `name` with the id `id` (0x7f for an app), after
- * those already loaded, as ResourceTable::addPackage does. 1 if it loaded; 0 if not, and the table
- * holds what it held, with the reasons in hydroid_res_table_error. Either way, the strings read
- * from the table before are gone. For now, where memory runs out in pugixml, what the files hold
- * may be left out, or failed for the wrong reason (#263). */
+ * those already loaded, as ResourceTable::addPackage does. 1 if it loaded; 0 if not, or if memory
+ * ran out, and the table holds what it held, with the reasons in hydroid_res_table_error. Either
+ * way, the strings read from the table before are gone. */
 HYDROID_RES_API int hydroid_res_table_add_package(hydroid_res_table* table, const char* res,
                                                   const char* name, uint8_t id);
 
