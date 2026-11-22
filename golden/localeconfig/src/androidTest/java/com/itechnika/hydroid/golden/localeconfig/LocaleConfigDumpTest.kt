@@ -82,10 +82,18 @@ class LocaleConfigDumpTest {
             Step("changed", "fr-FR,es-ES"),
             Step("rotated", "fr-FR,es-ES", landscape = true),
         )),
-        // An mcc the device has, of Spanish.
-        Lifecycle("mcc310 fr+es", listOf(
-            Step("created", "fr-FR,es-ES", mcc = 310),
-            Step("rotated", "fr-FR,es-ES", landscape = true, mcc = 310),
+        // With the LocaleConfig, none supported, and the first chosen: the next update of the same
+        // locales reads in all of them, de too.
+        Lifecycle("fr+es then ja+de", listOf(
+            Step("created", "fr-FR,es-ES"),
+            Step("changed to none supported", "ja-JP,de-DE"),
+            Step("rotated", "ja-JP,de-DE", landscape = true),
+        )),
+        // The emulator's mcc is 310, which every other step keeps, as a Configuration's mcc of 0
+        // changes nothing: values-mcc310-es/ is picked where es is read in. Not with another.
+        Lifecycle("mcc208 fr+es", listOf(
+            Step("created", "fr-FR,es-ES", mcc = 208),
+            Step("rotated", "fr-FR,es-ES", landscape = true, mcc = 208),
         )),
     )
 
@@ -143,7 +151,8 @@ class LocaleConfigDumpTest {
         smallestScreenWidthDp = 320
         screenWidthDp = if (step.landscape) 568 else 320
         screenHeightDp = if (step.landscape) 320 else 568
-        mcc = step.mcc
+        // 0 is "none" to Configuration.updateFrom, which leaves the device's then.
+        if (step.mcc != 0) mcc = step.mcc
         // Each lifecycle its own, so that ResourcesManager, which keeps a ResourcesImpl for each
         // configuration it is asked for, makes a new one for it.
         fontScale = scale

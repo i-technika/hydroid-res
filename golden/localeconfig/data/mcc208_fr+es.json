@@ -1,5 +1,5 @@
 {
-  "name": "mcc310 fr+es",
+  "name": "mcc208 fr+es",
   "localeConfig": true,
   "steps": [
     {
@@ -10,7 +10,7 @@
         "sdkIntFull": 3700000,
         "configuration": {
           "locales": "fr-FR,es-ES",
-          "mcc": 310,
+          "mcc": 208,
           "mnc": 260,
           "grammaticalGender": 0,
           "screenLayout": 268435810,
@@ -66,7 +66,7 @@
         "sdkIntFull": 3700000,
         "configuration": {
           "locales": "fr-FR,es-ES",
-          "mcc": 310,
+          "mcc": 208,
           "mnc": 260,
           "grammaticalGender": 0,
           "screenLayout": 268435810,
@@ -107,7 +107,7 @@
           "string": "fr"
         },
         "string\/mcc": {
-          "string": "mcc310-es"
+          "string": "fr"
         },
         "string\/none": {
           "string": "default"

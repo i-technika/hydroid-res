@@ -293,25 +293,25 @@ struct Resources::Impl {
     generation++;
   }
 
-  // ResourcesImpl.updateConfiguration, for the locales `of` given, with Android's configuration's
-  // locales `before` the update, if `changed` is not already known to be so: the locales the
-  // configuration has after it, and those the resources are read in, which leave nothing changed
-  // if it throws but the locales of the table it keeps.
+  // ResourcesImpl.updateConfiguration, for the locales `of` given and the LocaleConfig `app`, with
+  // Android's configuration's locales `before` the update, if `changed` is not already known to
+  // be so: the locales the configuration has after it, and those the resources are read in,
+  // which leave nothing changed if it throws but the locales of the table it keeps.
   struct Choice {
     std::vector<Config> configLocales;
     std::vector<Config> readIn;
   };
 
   Choice choose(const std::vector<Config>& of, const std::vector<Config>& before, bool changed,
-                uint64_t revision) {
+                uint64_t revision, const LocaleConfig& app) {
     Choice out;
     changed = changed || of != before;
     out.configLocales = changed ? of : before;
     bool chosen = false;
     if (changed && of.size() > 1) {
       // Of the locales the app supports, those of the list, which the configuration is made of.
-      if (localeConfig.defaultLocale) {
-        for (const size_t i : intersection(of, localeConfig.supported)) out.readIn.push_back(of[i]);
+      if (app.defaultLocale) {
+        for (const size_t i : intersection(of, app.supported)) out.readIn.push_back(of[i]);
         if (!out.readIn.empty()) {
           out.configLocales = out.readIn;
           chosen = true;
@@ -340,7 +340,7 @@ struct Resources::Impl {
     // Locales that are as they were, one, or a table of none but pseudo-locales: all of the
     // configuration's with a default locale, or its first.
     if (!chosen && !out.configLocales.empty()) {
-      if (localeConfig.defaultLocale) {
+      if (app.defaultLocale) {
         out.readIn = out.configLocales;
       } else {
         out.readIn = {out.configLocales.front()};
@@ -355,26 +355,32 @@ struct Resources::Impl {
   // otherwise, as it would choose the same again, those it chose.
   std::pair<const Config*, size_t> sameAgain() const {
     if (locales != configLocales || locales.empty()) return {readIn.data(), readIn.size()};
-    if (localeConfig.defaultLocale) return {configLocales.data(), configLocales.size()};
+    if (chosenWith.defaultLocale) return {configLocales.data(), configLocales.size()};
     return {configLocales.data(), 1};
   }
 
-  // Makes `c` the choice, once prepare() has made its configurations.
-  void commitChoice(Choice& c, uint64_t revision) noexcept {
+  // Makes `c` the choice, once prepare() has made its configurations; `with`, if given, the
+  // LocaleConfig it was made with, which setLocaleConfig has given since the choice before.
+  void commitChoice(Choice& c, uint64_t revision, LocaleConfig* with) noexcept {
     configLocales.swap(c.configLocales);
     readIn.swap(c.readIn);
-    stale = false;
-    commit(defaultLocaleOf(localeConfig), revision);
+    if (with != nullptr) {
+      chosenWith.supported.swap(with->supported);
+      chosenWith.defaultLocale = with->defaultLocale;
+      stale = false;
+    }
+    commit(defaultLocaleOf(chosenWith), revision);
   }
 
   // Takes in what the table has changed since the last call, as the packages it has added: what
-  // was picked from it is gone, and the locales are chosen again, as if given afresh.
+  // was picked from it is gone, and the locales are chosen again, as if given afresh, with the
+  // LocaleConfig of the choice before: one given since waits for setConfiguration, as on Android.
   void syncWithTable() {
     const uint64_t revision = table.revision();
     if (revision == tableRevision) return;
-    Choice c = choose(locales, configLocales, /*changed=*/true, revision);
+    Choice c = choose(locales, configLocales, /*changed=*/true, revision, chosenWith);
     prepare(c.readIn.data(), c.readIn.size(), device);
-    commitChoice(c, revision);
+    commitChoice(c, revision, nullptr);
   }
 
   void clearCaches() {
@@ -431,8 +437,9 @@ struct Resources::Impl {
   Config device;                // as setConfiguration was given it
   std::vector<Config> locales;  // as setConfiguration was given them
   LocaleConfig localeConfig;    // as setLocaleConfig was given it
-  // Whether setLocaleConfig has been called since the locales were chosen, which the next
-  // setConfiguration takes in.
+  LocaleConfig chosenWith;      // as it was when setConfiguration last chose
+  // Whether setLocaleConfig has been called since setConfiguration last chose, which the next
+  // takes it in.
   bool stale = false;
   std::vector<Config> configLocales;      // Android's configuration's, as the last choice left them
   std::vector<Config> readIn;             // of the last choice, which the resources are read in
@@ -463,9 +470,10 @@ void Resources::setConfiguration(const Config& device, const std::vector<Config>
   impl_->syncWithTable();
   const uint64_t tableRevision = impl_->tableRevision;
   if (locales == impl_->locales && !impl_->stale) {
-    // The device alone: what is chosen of the locales is as it was, and nothing allocated
-    // (#240). No vector is so much as made here, as an empty one allocates in MSVC's Debug
-    // library.
+    // The device alone: nothing is chosen again, and nothing allocated (#240), but by the first
+    // call that, as one locale was chosen of the configuration's with a default, reads in all of
+    // them, which needs room for them. No vector is so much as made here, as an empty one
+    // allocates in MSVC's Debug library.
     const auto [l, n] = impl_->sameAgain();
     impl_->prepare(l, n, device);
     impl_->device = device;
@@ -474,12 +482,14 @@ void Resources::setConfiguration(const Config& device, const std::vector<Config>
   }
   // As ResourcesImpl.updateConfiguration, which compares the locales with those of its
   // configuration, as the last update left them.
-  Impl::Choice c = impl_->choose(locales, impl_->configLocales, /*changed=*/false, tableRevision);
+  Impl::Choice c = impl_->choose(locales, impl_->configLocales, /*changed=*/false, tableRevision,
+                                 impl_->localeConfig);
   std::vector<Config> copy = locales;
+  LocaleConfig with = impl_->localeConfig;
   impl_->prepare(c.readIn.data(), c.readIn.size(), device);
   impl_->locales.swap(copy);
   impl_->device = device;
-  impl_->commitChoice(c, tableRevision);
+  impl_->commitChoice(c, tableRevision, &with);
 }
 
 void Resources::setLocaleConfig(const LocaleConfig& config) {

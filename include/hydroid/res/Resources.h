@@ -86,19 +86,20 @@ class Resources {
   //         the table has no locales but pseudo-locales, they are `locales` as they are.
   //       - The same, or one: with a default, all of the configuration's are read in, whether
   //         the app supports them or not; without, the first.
-  //     So a Resources made for fr and es (or de, fr and es, de being one the table has) reads
-  //     in fr alone, and, given a default, at the next call of the same locales, fr and es (or
-  //     de, fr and es). Android gives an app's LocaleConfig to the Resources it makes after they
-  //     have chosen, and only if they have more than one locale then (ContextImpl.setResources),
-  //     which a caller does by calling setConfiguration, then setLocaleConfig. Each resource
-  //     takes, of the values each of those read in picks, the first that is of a locale, a value
-  //     without one being of the default where that matches the locale it was picked for; so a
-  //     resource without a value of the first language takes that of the next. One whose values
-  //     are for an mcc or mnc the device has comes before one that is not, whatever its locale
-  //     (isBetterThanBeforeLocale). A resource that has no value for one of those locales has
-  //     none at all, as on Android. configuration() has the first of them. A table that changes
-  //     has the locales chosen as if `locales` were others. golden/localeconfig/data holds what
-  //     Android picked through such calls, and GoldenLocaleConfigTest checks it.
+  //     So a Resources made for fr and es reads in fr alone, and, given a default, at the next
+  //     call of the same locales, fr and es; one made for de, fr and es, de being one the table
+  //     has, reads in de alone, and then de, fr and es. Android gives an app's LocaleConfig to the
+  //     Resources it makes after they have chosen, and only if they have more than one locale then
+  //     (ContextImpl.setResources), which a caller does by calling setConfiguration, then
+  //     setLocaleConfig. Each resource takes, of the values each of those read in picks, the first
+  //     that is of a locale, a value without one being of the default where that matches the locale
+  //     it was picked for; so a resource without a value of the first language takes that of the
+  //     next. One whose values are for an mcc or mnc the device has comes before one that is not,
+  //     whatever its locale (isBetterThanBeforeLocale). A resource that has no value for one of
+  //     those locales has none at all, as on Android. configuration() has the first of them. A
+  //     table that changes has the locales chosen as if `locales` were others.
+  //     golden/localeconfig/data holds what Android picked through such calls, and
+  //     GoldenLocaleConfigTest checks it.
   //   - A language that has an old code is given that code, which is the one Android's resources
   //     go by: he is iw, id is in, yi is ji. So values-iw/ is Hebrew, and values-he/ is not
   //     picked for it.
@@ -119,8 +120,9 @@ class Resources {
   // the LocaleConfig of the app's manifest (parseLocaleConfig reads its file): its default
   // locale, if it has one, has the resources read in more than one locale, as setConfiguration
   // says. As on Android, it changes nothing until the next setConfiguration, which takes it in
-  // whatever it is given. An empty LocaleConfig, which a Resources starts with, is an app
-  // without one.
+  // whatever it is given: a table that changes before that has the locales chosen with the
+  // LocaleConfig before. An empty LocaleConfig, which a Resources starts with, is an app without
+  // one.
   HYDROID_RES_API void setLocaleConfig(const LocaleConfig& config);
 
   // The configuration the values are picked for: the device's as setConfiguration made it, with

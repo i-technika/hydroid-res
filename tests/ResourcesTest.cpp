@@ -1077,6 +1077,27 @@ TEST(ResourcesLocaleConfig, AChangedTableIsTakenInBeforeTheCall) {
   }
 }
 
+// A LocaleConfig given waits for setConfiguration, even where the table changes before it: the
+// locales are chosen again with the one before.
+TEST(ResourcesLocaleConfig, AChangedTableTakesNotALocaleConfigGivenSince) {
+  TempDir dir;
+  ResourceTable table;
+  addStrings(table, dir, {{"", {"x"}}, {"es", {"x"}}});
+  Resources resources(table);
+  const std::vector<Config> frEs = tags({"fr-FR", "es-ES"});
+  resources.setConfiguration(Config{}, frEs);
+  EXPECT_EQ(chosen(resources), "es-rES");
+  resources.setLocaleConfig(localeConfig({"fr", "es"}, "es"));
+
+  // The table has fr now: fr is chosen of the two, alone, as without a LocaleConfig.
+  addPackage(table, dir, {"fr"}, "com.example.lib", 0x7e);
+  EXPECT_EQ(chosen(resources), "fr-rFR");
+  EXPECT_EQ(from(resources, table, "x"), "default");
+  // The next call takes it in: the same locales, now the configuration's, are all read in.
+  resources.setConfiguration(Config{}, frEs);
+  EXPECT_EQ(from(resources, table, "x"), "es");
+}
+
 // A table that changes has the locales chosen again, by the app's default too.
 TEST(ResourcesLocaleConfig, ChosenAgainForAChangedTable) {
   TempDir dir;

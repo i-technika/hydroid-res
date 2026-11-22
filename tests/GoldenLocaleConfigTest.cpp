@@ -87,6 +87,17 @@ TEST(GoldenLocaleConfig, PicksWhatAndroidPicked) {
       const std::optional<Config> chosen = parseLanguageTag(locales.substr(0, locales.find(',')));
       ASSERT_TRUE(chosen) << locales;
       EXPECT_EQ(firstLocale(resources.configuration()), firstLocale(*chosen)) << locales;
+      // Every string of the res/ hydroid reads is one the app has: aapt2 link drops one that has
+      // no value without qualifiers, which hydroid keeps (ResourceTable.h).
+      size_t strings = 0;
+      for (const TypeTable& type : table().package(kPackage)->types) {
+        if (type.type != ResType::String) continue;
+        for (const Entry& entry : type.entries) {
+          strings++;
+          EXPECT_TRUE(step.at("values").contains("string/" + entry.name)) << entry.name;
+        }
+      }
+      EXPECT_EQ(strings, step.at("values").size());
       for (const auto& [key, v] : step.at("values").items()) {
         const std::string name = key.substr(key.find('/') + 1);
         const std::string want =

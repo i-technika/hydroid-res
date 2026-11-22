@@ -3,6 +3,5 @@
 <resources>
     <string name="all">fr</string>
     <string name="fr_es">fr</string>
-    <string name="fr_strict">fr</string>
     <string name="mcc">fr</string>
 </resources>
