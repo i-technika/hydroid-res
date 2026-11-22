@@ -38,25 +38,28 @@ TEST(SdkBaseline, GoldenDumpRanOnEmulatedLevel) {
   });
   EXPECT_GT(conditions, 0) << "no golden JSON in " << HYDROID_GOLDEN_DIR;
 
-  // And each step of the app with a LocaleConfig (#249).
-  int steps = 0;
-  for (const auto& file : std::filesystem::directory_iterator(HYDROID_GOLDEN_LOCALECONFIG_DIR)) {
-    if (file.path().extension() != ".json") continue;
-    std::ifstream in(file.path());
-    const nlohmann::json lifecycle = nlohmann::json::parse(in);
-    for (const nlohmann::json& step : lifecycle.at("steps")) {
-      ++steps;
-      const nlohmann::json& c = step.at("condition");
-      EXPECT_EQ(c.at("sdkInt").get<int>(), kEmulatedSdkVersion) << file.path().filename();
-      EXPECT_EQ(c.at("sdkIntFull").get<int>(), kEmulatedSdkVersion * 100000)
-          << file.path().filename();
+  // And each step of the app with a LocaleConfig (#249), and of the one with no locales (#252).
+  for (const char* dir : {HYDROID_GOLDEN_LOCALECONFIG_DIR, HYDROID_GOLDEN_NOLOCALE_DIR}) {
+    int steps = 0;
+    for (const auto& file : std::filesystem::directory_iterator(dir)) {
+      if (file.path().extension() != ".json") continue;
+      std::ifstream in(file.path());
+      const nlohmann::json lifecycle = nlohmann::json::parse(in);
+      for (const nlohmann::json& step : lifecycle.at("steps")) {
+        ++steps;
+        const nlohmann::json& c = step.at("condition");
+        EXPECT_EQ(c.at("sdkInt").get<int>(), kEmulatedSdkVersion) << file.path().filename();
+        EXPECT_EQ(c.at("sdkIntFull").get<int>(), kEmulatedSdkVersion * 100000)
+            << file.path().filename();
+      }
     }
+    EXPECT_GT(steps, 0) << "no golden JSON in " << dir;
   }
-  EXPECT_GT(steps, 0) << "no golden JSON in " << HYDROID_GOLDEN_LOCALECONFIG_DIR;
 }
 
 TEST(SdkBaseline, GoldenAppBuildsForEmulatedLevel) {
-  for (const char* file : {HYDROID_GOLDEN_APP_GRADLE, HYDROID_GOLDEN_LOCALECONFIG_GRADLE}) {
+  for (const char* file : {HYDROID_GOLDEN_APP_GRADLE, HYDROID_GOLDEN_LOCALECONFIG_GRADLE,
+                           HYDROID_GOLDEN_NOLOCALE_GRADLE}) {
     SCOPED_TRACE(file);
     std::ifstream in(file);
     ASSERT_TRUE(in) << "cannot open " << file;

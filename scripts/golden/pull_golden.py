@@ -3,7 +3,8 @@
 
 Usage: python scripts/golden/pull_golden.py [--serial SERIAL] [--skip-run] [--app APP]
 Needs adb on PATH (or ANDROID_HOME set) and a debuggable build of the golden app.
---app localeconfig dumps the app with a LocaleConfig into golden/localeconfig/data/ (#249).
+--app localeconfig dumps the app with a LocaleConfig into golden/localeconfig/data/ (#249), and
+--app nolocale the app with no locales but the pseudo-locales into golden/nolocale/data/ (#252).
 """
 
 import argparse
@@ -20,6 +21,8 @@ APPS = {
     "app": ("app", "com.itechnika.hydroid.golden", GOLDEN_PROJECT / "data"),
     "localeconfig": ("localeconfig", "com.itechnika.hydroid.golden.localeconfig",
                      GOLDEN_PROJECT / "localeconfig" / "data"),
+    "nolocale": ("nolocale", "com.itechnika.hydroid.golden.nolocale",
+                 GOLDEN_PROJECT / "nolocale" / "data"),
 }
 
 
@@ -68,12 +71,13 @@ def main() -> None:
     listing = subprocess.run(
         adb + ["shell", "run-as", package, "ls", "files/golden"],
         check=True, capture_output=True, text=True).stdout.split()
-    names = [n for n in listing if n.endswith(".json")]
+    # The JSON of the dump, and system_locales.txt of the app with no locales (#252).
+    names = [n for n in listing if n.endswith((".json", ".txt"))]
     if not names:
         sys.exit("no golden JSON on device; run the dump first")
 
     out_dir.mkdir(parents=True, exist_ok=True)
-    for old in out_dir.glob("*.json"):  # keep README.md and anything else checked in
+    for old in [*out_dir.glob("*.json"), *out_dir.glob("*.txt")]:  # keep README.md and the rest
         old.unlink()
     for name in names:
         data = subprocess.run(

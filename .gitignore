@@ -15,6 +15,7 @@ golden/.kotlin/
 golden/build/
 golden/app/build/
 golden/localeconfig/build/
+golden/nolocale/build/
 golden/local.properties
 golden/.idea/
 *.apk

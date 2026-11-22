@@ -95,6 +95,17 @@ class LocaleConfigDumpTest {
             Step("created", "fr-FR,es-ES", mcc = 208),
             Step("rotated", "fr-FR,es-ES", landscape = true, mcc = 208),
         )),
+        // The table has no English, and is taken to have it (LocaleList.computeFirstMatchIndex)
+        // where the first step chooses without the LocaleConfig: en-GB, not ja (#252).
+        Lifecycle("ko+en+ja", listOf(
+            Step("created", "ko-KR,en-GB,ja-JP"),
+            Step("rotated", "ko-KR,en-GB,ja-JP", landscape = true),
+        )),
+        // But not en-XA, a pseudo-locale.
+        Lifecycle("ko+en-XA+ja", listOf(
+            Step("created", "ko-KR,en-XA,ja-JP"),
+            Step("rotated", "ko-KR,en-XA,ja-JP", landscape = true),
+        )),
     )
 
     // The languages the app itself is set to, as a user sets them in Settings (LocaleManager).
@@ -102,7 +113,7 @@ class LocaleConfigDumpTest {
 
     @Test
     fun dumpAll() {
-        check(Build.VERSION.SDK_INT >= 35) { "needs API 35, which has the default locale" }
+        check(Build.VERSION.SDK_INT >= 36) { "needs API 36, which has SDK_INT_FULL" }
         val target = InstrumentationRegistry.getInstrumentation().targetContext
         val outDir = File(target.filesDir, "golden").apply {
             deleteRecursively()

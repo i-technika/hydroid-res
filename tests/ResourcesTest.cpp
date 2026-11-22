@@ -660,6 +660,20 @@ TEST(ResourcesLocale, TheSystemsLocalesWhereTheAppHasNone) {
   EXPECT_EQ(where(resources, table, "android"), "ko");
 }
 
+// AssetManager.getLocales, which ResourcesImpl looks at where the app has no locales but the
+// pseudo-locales, gives the app's with the system's. The golden emulator's system has en-XA and
+// ar-XB too, so golden/nolocale cannot tell this apart (#252).
+TEST(ResourcesLocale, TheAppsPseudoLocalesCountWithTheSystems) {
+  TempDir dir;
+  ResourceTable table;
+  addPackage(table, dir, {"ja"}, "android", kFrameworkPackageId);
+  addPackage(table, dir, {"night", "en-rXA"});
+  Resources resources(table);
+  resources.setConfiguration(Config{}, tags({"cy-GB", "en-XA", "ja-JP"}));
+  EXPECT_EQ(chosen(resources), "en-rXA");
+  EXPECT_EQ(where(resources, table), "en-rXA");
+}
+
 // The locale is chosen once for the locales and the table, and kept while the rest of the device
 // changes (#206); chosen again when the locales are others, or the table is. This sees that what
 // is kept is right; that the table is not gone through again, ResourcesAllocTest.cpp.

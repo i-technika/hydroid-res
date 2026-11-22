@@ -1,0 +1,120 @@
+{
+  "name": "cy+ja",
+  "localeConfig": false,
+  "steps": [
+    {
+      "step": "created",
+      "condition": {
+        "requestedLocales": "cy-GB,ja-JP",
+        "sdkInt": 37,
+        "sdkIntFull": 3700000,
+        "configuration": {
+          "locales": "ja-JP,cy-GB",
+          "mcc": 310,
+          "mnc": 260,
+          "grammaticalGender": 0,
+          "screenLayout": 268435810,
+          "smallestScreenWidthDp": 320,
+          "screenWidthDp": 320,
+          "screenHeightDp": 568,
+          "colorMode": 5,
+          "orientation": 1,
+          "uiMode": 17,
+          "densityDpi": 320,
+          "touchscreen": 3,
+          "keyboardHidden": 1,
+          "hardKeyboardHidden": 1,
+          "keyboard": 2,
+          "navigationHidden": 2,
+          "navigation": 1,
+          "widthPixels": 1080,
+          "heightPixels": 2400
+        }
+      },
+      "values": {
+        "string\/app_name": {
+          "string": "hydroid golden no locale"
+        },
+        "string\/where": {
+          "string": "default"
+        }
+      }
+    },
+    {
+      "step": "rotated",
+      "condition": {
+        "requestedLocales": "cy-GB,ja-JP",
+        "sdkInt": 37,
+        "sdkIntFull": 3700000,
+        "configuration": {
+          "locales": "ja-JP,cy-GB",
+          "mcc": 310,
+          "mnc": 260,
+          "grammaticalGender": 0,
+          "screenLayout": 268435810,
+          "smallestScreenWidthDp": 320,
+          "screenWidthDp": 568,
+          "screenHeightDp": 320,
+          "colorMode": 5,
+          "orientation": 2,
+          "uiMode": 17,
+          "densityDpi": 320,
+          "touchscreen": 3,
+          "keyboardHidden": 1,
+          "hardKeyboardHidden": 1,
+          "keyboard": 2,
+          "navigationHidden": 2,
+          "navigation": 1,
+          "widthPixels": 1080,
+          "heightPixels": 2400
+        }
+      },
+      "values": {
+        "string\/app_name": {
+          "string": "hydroid golden no locale"
+        },
+        "string\/where": {
+          "string": "default"
+        }
+      }
+    },
+    {
+      "step": "changed",
+      "condition": {
+        "requestedLocales": "ga-IE,ko-KR,ja-JP",
+        "sdkInt": 37,
+        "sdkIntFull": 3700000,
+        "configuration": {
+          "locales": "ko-KR,ga-IE,ja-JP",
+          "mcc": 310,
+          "mnc": 260,
+          "grammaticalGender": 0,
+          "screenLayout": 268435810,
+          "smallestScreenWidthDp": 320,
+          "screenWidthDp": 320,
+          "screenHeightDp": 568,
+          "colorMode": 5,
+          "orientation": 1,
+          "uiMode": 17,
+          "densityDpi": 320,
+          "touchscreen": 3,
+          "keyboardHidden": 1,
+          "hardKeyboardHidden": 1,
+          "keyboard": 2,
+          "navigationHidden": 2,
+          "navigation": 1,
+          "widthPixels": 1080,
+          "heightPixels": 2400
+        }
+      },
+      "values": {
+        "string\/app_name": {
+          "string": "hydroid golden no locale"
+        },
+        "string\/where": {
+          "string": "default"
+        }
+      }
+    }
+  ]
+}
