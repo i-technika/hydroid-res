@@ -1,0 +1,62 @@
+{
+  "name": "app de-DE,es-ES",
+  "localeConfig": false,
+  "steps": [
+    {
+      "step": "app locales",
+      "condition": {
+        "requestedLocales": "de-DE,es-ES,en-US",
+        "sdkInt": 37,
+        "sdkIntFull": 3700000,
+        "configuration": {
+          "locales": "de-DE,es-ES,en-US",
+          "mcc": 310,
+          "mnc": 260,
+          "grammaticalGender": 0,
+          "screenLayout": 354,
+          "smallestScreenWidthDp": 411,
+          "screenWidthDp": 411,
+          "screenHeightDp": 914,
+          "colorMode": 5,
+          "orientation": 1,
+          "uiMode": 17,
+          "densityDpi": 420,
+          "touchscreen": 3,
+          "keyboardHidden": 1,
+          "hardKeyboardHidden": 1,
+          "keyboard": 2,
+          "navigationHidden": 2,
+          "navigation": 1,
+          "widthPixels": 1080,
+          "heightPixels": 2400
+        }
+      },
+      "values": {
+        "string\/all": {
+          "string": "de"
+        },
+        "string\/app_name": {
+          "string": "hydroid golden locale config"
+        },
+        "string\/de": {
+          "string": "de"
+        },
+        "string\/es": {
+          "string": "default"
+        },
+        "string\/es_de": {
+          "string": "de"
+        },
+        "string\/fr_es": {
+          "string": "default"
+        },
+        "string\/mcc": {
+          "string": "default"
+        },
+        "string\/none": {
+          "string": "default"
+        }
+      }
+    }
+  ]
+}

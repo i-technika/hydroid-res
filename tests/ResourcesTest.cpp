@@ -854,8 +854,11 @@ TEST(ResourcesLocaleConfig, EachResourceTakesTheFirstLocaleItHas) {
   EXPECT_EQ(from(resources, table, "es"), "es");
   EXPECT_EQ(from(resources, table, "none"), "default");
 
-  // Without the default, one language for the whole table, the first it has.
+  // Without the default, one language for the whole table, the first it has, from the next update
+  // on: the locales are not those the configuration was left with, fr and es.
   resources.setLocaleConfig(localeConfig({"en-US", "fr", "es"}, nullptr));
+  EXPECT_EQ(chosen(resources), "fr-rFR");
+  resources.setConfiguration(Config{}, tags({"de-DE", "fr-FR", "es-ES"}));
   EXPECT_EQ(chosen(resources), "de-rDE");
   EXPECT_EQ(from(resources, table, "all"), "de");
   EXPECT_EQ(from(resources, table, "es"), "default");
@@ -938,12 +941,17 @@ TEST(ResourcesLocaleConfig, GenerationChangesWithWhatIsPicked) {
   ResourceTable table;
   addStrings(table, dir, {{"", {"x"}}, {"es", {"x"}}});
   Resources resources(table);
-  resources.setConfiguration(Config{}, tags({"fr-FR", "es-ES"}));
+  const std::vector<Config> frEs = tags({"fr-FR", "es-ES"});
+  resources.setConfiguration(Config{}, frEs);
   EXPECT_EQ(from(resources, table, "x"), "es");
   uint32_t before = resources.generation();
 
-  // fr and es are read in now: the configuration is fr's, and values/ is fr's too.
+  // A LocaleConfig changes nothing until the next update, as on Android.
   resources.setLocaleConfig(localeConfig({"fr", "es"}, "fr"));
+  EXPECT_EQ(resources.generation(), before);
+  EXPECT_EQ(from(resources, table, "x"), "es");
+  // Which reads in fr and es: the configuration is fr's, and values/ is fr's too.
+  resources.setConfiguration(Config{}, frEs);
   EXPECT_NE(resources.generation(), before);
   EXPECT_EQ(chosen(resources), "fr-rFR");
   EXPECT_EQ(from(resources, table, "x"), "default");
@@ -951,18 +959,21 @@ TEST(ResourcesLocaleConfig, GenerationChangesWithWhatIsPicked) {
   // Another default, with the same locales read in, picks otherwise.
   before = resources.generation();
   resources.setLocaleConfig(localeConfig({"fr", "es"}, "es"));
+  resources.setConfiguration(Config{}, frEs);
   EXPECT_NE(resources.generation(), before);
   EXPECT_EQ(from(resources, table, "x"), "es");
 
   // The same again changes nothing.
   before = resources.generation();
   resources.setLocaleConfig(localeConfig({"fr", "es"}, "es"));
+  resources.setConfiguration(Config{}, frEs);
   EXPECT_EQ(resources.generation(), before);
 
   // Nor does another default with one locale read in.
   resources.setConfiguration(Config{}, tags({"es-ES"}));
   before = resources.generation();
   resources.setLocaleConfig(localeConfig({"fr", "es"}, "fr"));
+  resources.setConfiguration(Config{}, tags({"es-ES"}));
   EXPECT_EQ(resources.generation(), before);
 }
 
@@ -1066,18 +1077,46 @@ TEST(ResourcesLocaleConfig, AChangedTableIsTakenInBeforeTheCall) {
   }
 }
 
-// A table that changes has the locales chosen again, by the app's default too.
+// A LocaleConfig given waits for setConfiguration, even where the table changes before it: the
+// locales are chosen again without one, as by a new ResourcesImpl.
+TEST(ResourcesLocaleConfig, AChangedTableTakesNotALocaleConfigGivenSince) {
+  TempDir dir;
+  ResourceTable table;
+  addStrings(table, dir, {{"", {"x"}}, {"es", {"x"}}});
+  Resources resources(table);
+  const std::vector<Config> frEs = tags({"fr-FR", "es-ES"});
+  resources.setConfiguration(Config{}, frEs);
+  EXPECT_EQ(chosen(resources), "es-rES");
+  resources.setLocaleConfig(localeConfig({"fr", "es"}, "es"));
+
+  // The table has fr now: fr is chosen of the two, alone, as without a LocaleConfig.
+  addPackage(table, dir, {"fr"}, "com.example.lib", 0x7e);
+  EXPECT_EQ(chosen(resources), "fr-rFR");
+  EXPECT_EQ(from(resources, table, "x"), "default");
+  // The next call takes it in: the same locales, now the configuration's, are all read in.
+  resources.setConfiguration(Config{}, frEs);
+  EXPECT_EQ(from(resources, table, "x"), "es");
+}
+
+// A table that changes has one locale chosen, as Android's new ResourcesImpl does, and the app's
+// default taken in again at the next call.
 TEST(ResourcesLocaleConfig, ChosenAgainForAChangedTable) {
   TempDir dir;
   ResourceTable table;
   addPackage(table, dir, {"night"});
   Resources resources(table);
   resources.setLocaleConfig(localeConfig({"fr", "es"}, "fr"));
-  resources.setConfiguration(Config{}, tags({"fr-FR", "es-ES"}));
+  const std::vector<Config> frEs = tags({"fr-FR", "es-ES"});
+  resources.setConfiguration(Config{}, frEs);
   EXPECT_EQ(chosen(resources), "fr-rFR");
 
-  // Without the default, the table's es would be chosen.
+  // A new ResourcesImpl, of the new assets, chooses before it has the LocaleConfig: es, the one
+  // the table has, alone (ResourcesManager, Resources.setImpl).
   addPackage(table, dir, {"es"}, "com.example.lib", 0x7e);
+  EXPECT_EQ(chosen(resources), "es-rES");
+  EXPECT_EQ(where(resources, table, "com.example.lib"), "es");
+  // The next call takes the LocaleConfig in: fr, es are not es, fr, so the supported of them.
+  resources.setConfiguration(Config{}, frEs);
   EXPECT_EQ(chosen(resources), "fr-rFR");
   EXPECT_EQ(where(resources, table, "com.example.lib"), "default");
 }

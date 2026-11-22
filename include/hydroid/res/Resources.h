@@ -76,22 +76,33 @@ class Resources {
   //     packages, if those have values of no language. Without any, the first locale it is. The
   //     choice is for the whole table and not for each resource: a resource that has no value
   //     for the chosen language takes its value without a language, not that of the user's next.
-  //     That is unless the app has a default locale (setLocaleConfig): then, of more than one
-  //     locale, those that one it supports matches by language and script are each read in, in
-  //     their order, and configuration() has the first. Each resource takes, of the values each
-  //     of them picks, the first that is of a locale, a value without one being of the default
-  //     where that matches the locale it was picked for; so a resource without a value of the
-  //     first language takes that of the next. One whose values are for an mcc or mnc the device
-  //     has comes before one that is not, whatever its locale (isBetterThanBeforeLocale). A
-  //     resource that has no value for one of those locales has none at all, as on Android. If
-  //     the app supports none of the locales, or the table has none but pseudo-locales, the
-  //     choice is as without a default; in the latter, every locale is read in as above. In the
-  //     former, Android puts the one chosen first in the configuration's locales, and an update
-  //     that leaves those as they are reads them all in. So if the one chosen is the first, the
-  //     next call that gives the same `locales` reads in all of them; if it is another, a call
-  //     that gives them with that one first and the others in order does, and one that gives
-  //     the same again chooses the same one again. A table that changes has the locales chosen
-  //     as if they were given afresh.
+  //     That is unless the app has a default locale (setLocaleConfig), when more than one locale
+  //     may be read in, as ResourcesImpl.updateConfiguration has it. It keeps the locales of its
+  //     configuration as each call leaves them, and compares `locales` with those:
+  //       - Others, of more than one: with a default, those that one the app supports matches by
+  //         language and script are read in, in their order, and become the configuration's,
+  //         if there are any. If not, or without a default, one is chosen for the whole table as
+  //         above, and the configuration's are `locales` with that one moved to the front. If
+  //         the table has no locales but pseudo-locales, they are `locales` as they are.
+  //       - The same, or one: with a default, all of the configuration's are read in, whether
+  //         the app supports them or not; without, the first.
+  //     So a Resources made for fr and es reads in fr alone, and, given a default, at the next
+  //     call of the same locales, fr and es; one made for de, fr and es, de being one the table
+  //     has, reads in de alone, and then de, fr and es. Android gives an app's LocaleConfig to the
+  //     Resources it makes after they have chosen, and only if they have more than one locale then
+  //     (ContextImpl.setResources), which a caller does by calling setConfiguration, then
+  //     setLocaleConfig. Each resource takes, of the values each of those read in picks, the first
+  //     that is of a locale, a value without one being of the default where that matches the locale
+  //     it was picked for; so a resource without a value of the first language takes that of the
+  //     next. One whose values are for an mcc or mnc the device has comes before one that is not,
+  //     whatever its locale (isBetterThanBeforeLocale). A resource that has no value for one of
+  //     those locales has none at all, as on Android. configuration() has the first of them. A
+  //     table that changes, as Android's new assets do, has a new ResourcesImpl choose for
+  //     `locales` as if given afresh and without the LocaleConfig, which it is given for the
+  //     next update: one locale is chosen for the whole table, and the next setConfiguration
+  //     takes the LocaleConfig in again.
+  //     golden/localeconfig/data holds what Android picked through such calls, and
+  //     GoldenLocaleConfigTest checks it.
   //   - A language that has an old code is given that code, which is the one Android's resources
   //     go by: he is iw, id is in, yi is ji. So values-iw/ is Hebrew, and values-he/ is not
   //     picked for it.
@@ -102,27 +113,27 @@ class Resources {
   //   - navHidden is Any, as Android tells its resources nothing of it.
   // The generation goes up if that changes what is picked (generation()). Each Resources looks for
   // the locales of the table in all its values once for each revision of it, and chooses the locale
-  // again only when `locales` or the table have changed, so a call that changes the rest of the
-  // device, as a window is resized, costs little however many values the table has.
+  // again only when `locales`, the table or the LocaleConfig have changed, so a call that changes
+  // the rest of the device, as a window is resized, costs little however many values the table
+  // has.
   HYDROID_RES_API void setConfiguration(const Config& device,
                                         const std::vector<Config>& locales = {});
 
   // Sets the locales the app says it has, as ResourcesImpl.setLocaleConfig, which Android gives
   // the LocaleConfig of the app's manifest (parseLocaleConfig reads its file): its default
-  // locale, if it has one, has the resources picked for each of the user's locales it supports,
-  // as setConfiguration says. The locales are chosen again for the locales setConfiguration was
-  // last given, and the generation goes up if that changes what is picked (generation()). An
-  // empty LocaleConfig, which a Resources starts with, is an app without one.
+  // locale, if it has one, has the resources read in more than one locale, as setConfiguration
+  // says. As on Android, it changes nothing until the next setConfiguration, which takes it in
+  // whatever it is given, and not a table that changes before that (setConfiguration). An empty
+  // LocaleConfig, which a Resources starts with, is an app without one.
   HYDROID_RES_API void setLocaleConfig(const LocaleConfig& config);
 
   // The configuration the values are picked for: the device's as setConfiguration made it, with
-  // the locale it chose, or the first of those it reads in, with a default locale.
+  // the locale it chose, or the first of those it reads in.
   HYDROID_RES_API Config configuration() const;
 
-  // A number that changes whenever what `candidate` returns may: when setConfiguration or
-  // setLocaleConfig changes the configurations the values are picked for, or, of more than one,
-  // the default locale they are read with, and when the table has changed. What is derived from
-  // the values can be
+  // A number that changes whenever what `candidate` returns may: when setConfiguration changes
+  // the configurations the values are picked for, or, of more than one, the default locale they
+  // are read with, and when the table has changed. What is derived from the values can be
   // kept by it: by the one `candidate` gives with them, or by one read before them, which at
   // worst is older than they are, and has them thrown away at the next look. Not by one read
   // after them: setConfiguration may have been called in between, on another thread, and the
