@@ -31,8 +31,9 @@ std::atomic<long> failing{-1};
 
 }  // namespace
 
-// Out of line: GCC's optimizer, having inlined them into a test, sees the malloc of one and the
-// free of the other meet a pointer and calls it a mismatch (-Wmismatched-new-delete, #258).
+// Out of line, as GCC's optimizer calls it a mismatch when it inlines one of them into a test
+// (-Wmismatched-new-delete, #258): a free there of what a call to operator new gave, or a call to
+// operator delete there of what a malloc gave. With neither inlined, it sees the calls pair up.
 #if defined(__GNUC__)
 #define HYDROID_OUT_OF_LINE __attribute__((noinline))
 #else
