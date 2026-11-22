@@ -76,7 +76,7 @@ disable-model-invocation: true
    ctest --preset debug
    ```
    바꾼 `*.h`, `*.cpp`에 clang-format 23.1.5 `--dry-run --Werror`(없으면 CI의 `clang-format` job에 맡긴다).
-   로케일이 없으면 `/fix-issue` 3단계와 같이 다룬다.
+   로케일이 없어 로케일 테스트가 `ctest`에서 실패하면 `/fix-issue` 3단계 2번과 같이 다룬다(여기서는 Debug만).
 4. 같은 실패를 세 번 고쳐도 안 되면 **질문 지점**: 접근 바꾸기 / 중단 / 실패를 PR에 적고 계속.
 5. 구현하면서 이번 단계에 넣지 않기로 한 것, 발견한 다른 문제는 **추가 이슈 목록**에 적어 둔다(7단계에서 등록).
 
