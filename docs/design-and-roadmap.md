@@ -1,63 +1,63 @@
-# Hydroid 리소스 시스템 설계 및 개발 로드맵
+# Hydroid resource system: design and development roadmap
 
 Nov 14, 2026 · @fmthead
 
-## 개요
+## Overview
 
-리소스 계층은 C++17 공유 라이브러리 `hydroid-res` 하나로 만들고, UIKit·GTK4·WinUI 3 쪽에는 현재 기기 조건을 넘겨주는 얇은 어댑터만 둔다. 같은 `res/` 폴더와 같은 기기 조건이면 세 플랫폼 모두 안드로이드와 똑같은 값을 골라야 한다.
+The resource layer is one shared C++17 library, `hydroid-res`, and UIKit, GTK4 and WinUI 3 each get only a thin adapter that passes it the current state of the device. For the same `res/` folder and the same device state, all three platforms must pick exactly the values Android picks.
 
-- **대상:** iOS(UIKit, Swift), 리눅스(GTK4, C++), 윈도우(WinUI 3, C++/WinRT)
-- **입력:** 안드로이드 소스 `res/` 폴더. 컴파일된 APK(`resources.arsc`, 바이너리 XML) 읽기는 범위 밖이며 나중에 추가한다.
-- **포함:** 리소스 테이블, 한정자 매칭, 참조·테마·스타일 해석, 인플레이터가 쓸 layout·drawable XML 트리
-- **제외:** 뷰 생성과 그리기, 애니메이션 실행. 리소스 계층은 값만 돌려준다.
-- **의존성:** XML 파서 pugixml 하나. 이미지 디코딩은 각 플랫폼 API에 맡긴다.
+- **Targets:** iOS (UIKit, Swift), Linux (GTK4, C++), Windows (WinUI 3, C++/WinRT)
+- **Input:** an Android source `res/` folder. Reading a compiled APK (`resources.arsc`, binary XML) is out of scope, to be added later.
+- **Included:** the resource table, qualifier matching, resolving references, themes and styles, and the layout and drawable XML trees an inflater uses
+- **Excluded:** creating and drawing views, running animations. The resource layer only returns values.
+- **Dependencies:** one XML parser, pugixml. Decoding images is left to each platform's API.
 
-## 모듈 구성
+## Modules
 
-![모듈 구성 · 어댑터 3개, 공유 코어, 빌드 도구](module-structure.svg)
+![Modules: three adapters, the shared core and the build tool](module-structure.svg)
 
-GTK4와 WinUI 3 어댑터는 C++ 코어를 직접 부르고, Swift는 안정적인 C API 래퍼를 거친다. 개발 중에는 코어가 `res/`를 직접 읽고, 배포할 때는 `hydroid-rc`가 미리 만든 바이너리 테이블을 읽는다.
+The GTK4 and WinUI 3 adapters call the C++ core directly, and Swift goes through a stable C API wrapper. During development the core reads `res/` directly; when shipped, it reads a binary table that `hydroid-rc` made beforehand.
 
-## 리소스 테이블 자료구조
+## Resource table data structures
 
-테이블은 안드로이드 `resources.arsc`와 같은 구조다. 패키지 → 타입 → 항목 3단이고, 항목마다 한정자별 후보 값 목록을 갖는다. ID도 안드로이드와 같은 `0xPPTTEEEE` 형식을 써서 디버깅할 때 aapt2 출력과 바로 비교할 수 있게 한다.
+The table has the structure of Android's `resources.arsc`: three levels, package → type → entry, and each entry holds a list of candidate values, one per set of qualifiers. Ids use Android's `0xPPTTEEEE` form too, so they can be compared directly with aapt2's output when debugging.
 
-- **패키지 ID:** 프레임워크(`android`)는 `0x01`, 앱은 `0x7f`. AppCompat 같은 라이브러리는 별도 패키지로 추가할 수 있게 둔다. 다른 패키지의 리소스는 `@패키지:타입/이름`으로 가리키고, 먼저 로드한 패키지에서 이름으로 찾는다(aapt2 link의 `-I`). 그 패키지가 `<public>`으로 연 것만 가리킬 수 있고, 나머지는 `@*` 같은 비공개 참조로만 가리킨다. 프레임워크 번들(6단계) 전에는 values의 `@android:` 참조가 "no package 'android' is loaded" 오류다(XML 파일의 `android:` 속성과 그 값 안의 @android: 참조는 건드리지 않는다).
-- **타입·항목 ID:** aapt2와 같게 배정한다. `<public id="">`가 준 ID는 타입 ID까지 그대로 둔다. 나머지 타입은 남은 가장 낮은 타입 ID를 1부터 `ResType` 순서(anim, animator, array, attr, …)로 받는다. 있는 타입만 받고, 런타임에는 없는 styleable도 ID 하나를 차지한다. 나머지 항목은 타입 안에서 남은 가장 낮은 항목 ID를 0부터 이름의 바이트 순서로 받는다. 같은 입력이면 항상 같은 ID가 나온다.
-- **이름 조회:** 인플레이터는 `@string/title`처럼 이름으로 찾으므로 `"패키지:타입/이름" → ResId` 해시맵을 둔다.
+- **Package ids:** the framework (`android`) is `0x01` and an app is `0x7f`. Libraries such as AppCompat can be added as packages of their own. A resource of another package is named `@package:type/name` and looked up by name in the packages loaded before (the `-I` of aapt2 link). Only what that package opened with `<public>` can be named so; the rest only through a private reference such as `@*`. Before the framework is bundled (step 6), an `@android:` reference in values is the error "no package 'android' is loaded" (the `android:` attributes of XML files, and the @android: references in their values, are left alone).
+- **Type and entry ids:** assigned as aapt2 assigns them. An id given by `<public id="">` is kept, type id included. The other types take the lowest type ids left, from 1, in the order of `ResType` (anim, animator, array, attr, …). Only the types that exist take one, and styleable, which does not exist at runtime, takes one too. The other entries take the lowest entry ids left within their type, from 0, in the byte order of their names. The same input always gives the same ids.
+- **Lookup by name:** an inflater looks resources up by name, as in `@string/title`, so there is a hash map of `"package:type/name" → ResId`.
 
 ```cpp
 using ResId = uint32_t;              // 0xPPTTEEEE
 
 enum class ValueKind : uint8_t {
   Null, Empty,                       // @null, @empty
-  Id,                                // id 리소스: <id name="..."/>, @+id/...
+  Id,                                // an id resource: <id name="..."/>, @+id/...
   Reference, AttrRef,                // @type/name, ?attr/name
-  String, StyledString,              // <b> 등 서식 있는 문자열은 span 목록 포함
+  String, StyledString,              // a string with markup such as <b> has a list of spans
   Color, Dimension, Fraction, Float, Int, Bool,
-  File,                              // layout/foo.xml, drawable/bg.png 같은 파일
+  File,                              // a file such as layout/foo.xml, drawable/bg.png
   Style, Array, Plurals, AttrDecl, StyleableDecl
 };
 
-// 팩토리(Value::color, Value::string, ...)로만 만들고, 접근자가 종류를 확인한다
+// Made only by the factories (Value::color, Value::string, ...); the accessors check the kind
 class Value {
  public:
   ValueKind kind() const;
   ResId    ref() const;              // Reference, AttrRef
   uint32_t argb() const;             // Color
   int32_t  intValue() const;         // Int
-  uint32_t complexData() const;      // Dimension, Fraction (Res_value 형식)
-  uint32_t index() const;            // 풀 위치: String, File, Style, Array, ...
+  uint32_t complexData() const;      // Dimension, Fraction (as in Res_value)
+  uint32_t index() const;            // place in a pool: String, File, Style, Array, ...
   // ...
 };
 
-struct Candidate { Config config; Value value; };  // Config는 다음 절
+struct Candidate { Config config; Value value; };  // Config is the next section
 
 struct Entry {
-  uint16_t id;                       // 항목 ID
+  uint16_t id;                       // entry id
   std::string name;
   bool isPublic;                     // <public>
-  std::vector<Candidate> candidates; // 설정마다 하나, compareConfigs 순서
+  std::vector<Candidate> candidates; // one per configuration, in compareConfigs order
 };
 
 struct TypeTable { ResType type; uint8_t id; std::vector<Entry> entries; };
@@ -65,7 +65,7 @@ struct TypeTable { ResType type; uint8_t id; std::vector<Entry> entries; };
 struct Package {
   uint8_t id; std::string name;
   std::vector<TypeTable> types;
-  // 값 종류마다 풀 하나. Value::index()가 그 안의 위치를 가리킨다
+  // One pool per kind of value. Value::index() is a place in it
   std::vector<std::string> strings;
   std::vector<StyledString> styledStrings;
   std::vector<FileRef> files;
@@ -77,54 +77,54 @@ struct Package {
 };
 ```
 
-문자열과 복합값은 값 종류마다 `Package`의 풀에 두고 `Value::index()`로 가리킨다.
+Strings and compound values are kept in the pools of the `Package`, one per kind of value, and `Value::index()` points into them.
 
-| 종류 | 저장 형태 |
+| Kind | How it is stored |
 | --- | --- |
-| style | 부모 ResId + (attr ResId, Value) 목록. attr ID로 정렬해 이진 탐색 |
-| array, string-array, integer-array | Value 목록 |
-| plurals | zero·one·two·few·many·other 6칸 |
-| attr 선언 | format 비트, 최솟값·최댓값, enum·flag 목록(이름의 id 리소스 ResId → 값, 이름 순서) |
-| declare-styleable | attr ResId 목록. 인플레이터가 obtainStyledAttributes에 넘김 |
-| color/ 상태 목록 | (상태 조건 목록, 색) 목록. 8단계에서 더한다. 지금은 files 풀의 FileRef(APK 안 경로와 파일 종류)뿐 |
-| layout·drawable·xml 파일 | 파싱된 XML 트리. 속성값은 미리 Value로 바꿔 둠. 8단계에서 더한다. 지금은 files 풀의 FileRef(APK 안 경로와 파일 종류)뿐 |
+| style | The parent's ResId + a list of (attr ResId, Value), sorted by attr id for binary search |
+| array, string-array, integer-array | A list of Values |
+| plurals | Six slots: zero, one, two, few, many, other |
+| attr declaration | The format bits, the minimum and maximum, and the list of enums or flags (the ResId of the name's id resource → value, in the order of the names) |
+| declare-styleable | A list of attr ResIds, which an inflater passes to obtainStyledAttributes |
+| color/ state list | A list of (list of state conditions, color). Added in step 8. For now only a FileRef in the files pool (the path inside the APK and the kind of file) |
+| layout, drawable and xml files | The parsed XML tree, with attribute values already turned into Values. Added in step 8. For now only a FileRef in the files pool (the path inside the APK and the kind of file) |
 
-문자열은 패키지의 strings 풀에 한 번만 저장한다. 배포용 바이너리 테이블(`.hrt`)은 이 구조를 포인터 대신 오프셋으로 직렬화해서, 파일을 mmap으로 한 번에 올려 바로 쓸 수 있게 한다.
+A string is stored once, in the strings pool of its package. The binary table for shipping (`.hrt`) serializes this structure with offsets in place of pointers, so that the file can be mapped with mmap in one go and used as it is.
 
-## Configuration(한정자) 모델
+## The Configuration (qualifier) model
 
-`Config` 하나로 폴더 이름의 한정자와 현재 기기 상태를 모두 표현한다. 값은 안드로이드 `AConfiguration`(`ResTable_config`)의 값과 같고, 0이면 "지정 안 됨"(폴더에 없거나 기기가 모름)이다. 폴더 이름은 `-`로 자른 뒤 토큰마다 아래 표 순서로 맞춰 본다. 순서가 뒤바뀌었거나 모르는 토큰이 있으면 aapt2처럼 `invalid configuration` 오류로 로드가 실패한다. aapt2가 숫자를 잘라 다른 값으로 받는 이름(`sw65536dp` 등), 바이트가 깨지는 `b+` 로케일, 어느 형식이든 문자·숫자가 아닌 글자가 든 로케일(`en-r+x`)은 일부러 거부한다(`ConfigParser.h`). 표의 순서는 `Config` 필드의 순서이자 매칭의 우선순위다(isBetterThan만 두 숨김 상태를 입력 방식·내비게이션 방식보다 먼저 본다).
+One `Config` expresses both the qualifiers of a folder name and the current state of a device. Its values are those of Android's `AConfiguration` (`ResTable_config`), and 0 means "not specified" (not in the folder name, or not known to the device). A folder name is split at each `-`, and each token is tried against the table below, in its order. Tokens out of order, or one that is not known, fail the load with the error `invalid configuration`, as in aapt2. Names in which aapt2 truncates a number into another value (`sw65536dp` and the like), `b+` locales whose bytes it garbles, and locales of either form with a character that is neither a letter nor a digit (`en-r+x`) are rejected on purpose (`ConfigParser.h`). The order of the table is the order of the fields of `Config` and the priority in matching (only isBetterThan looks at the two hidden states before the input method and the navigation method).
 
-| 순서 | 한정자 | 예 |
+| Order | Qualifier | Examples |
 | --- | --- | --- |
-| 1 | MCC·MNC | `mcc450`, `mcc450-mnc05` |
-| 2 | 언어·지역 | `ko`, `ko-rKR`, `b+sr+Latn`, `b+de+DE+1901` |
-| 3 | 문법적 성별 | `feminine`, `masculine`, `neuter` |
-| 4 | 레이아웃 방향 | `ldltr`, `ldrtl` |
-| 5 | 최소 너비 | `sw600dp` |
-| 6 | 가용 너비 | `w720dp` |
-| 7 | 가용 높이 | `h480dp` |
-| 8 | 화면 크기 | `small`, `normal`, `large`, `xlarge` |
-| 9 | 화면 비율 | `long`, `notlong` |
-| 10 | 둥근 화면 | `round`, `notround` |
-| 11 | 넓은 색역 | `widecg`, `nowidecg` |
+| 1 | MCC and MNC | `mcc450`, `mcc450-mnc05` |
+| 2 | Language and region | `ko`, `ko-rKR`, `b+sr+Latn`, `b+de+DE+1901` |
+| 3 | Grammatical gender | `feminine`, `masculine`, `neuter` |
+| 4 | Layout direction | `ldltr`, `ldrtl` |
+| 5 | Smallest width | `sw600dp` |
+| 6 | Available width | `w720dp` |
+| 7 | Available height | `h480dp` |
+| 8 | Screen size | `small`, `normal`, `large`, `xlarge` |
+| 9 | Screen aspect | `long`, `notlong` |
+| 10 | Round screen | `round`, `notround` |
+| 11 | Wide color gamut | `widecg`, `nowidecg` |
 | 12 | HDR | `highdr`, `lowdr` |
-| 13 | 방향 | `port`, `land`, `square` |
-| 14 | UI 모드 | `car`, `desk`, `television`, `appliance`, `watch`, `vrheadset` |
-| 15 | 야간 모드 | `night`, `notnight` |
-| 16 | 밀도 | `ldpi`\~`xxxhdpi`, `tvdpi`, `nodpi`, `anydpi`, `400dpi` |
-| 17 | 터치스크린 | `notouch`, `stylus`, `finger` |
-| 18 | 키보드 상태 | `keysexposed`, `keyshidden`, `keyssoft` |
-| 19 | 입력 방식 | `nokeys`, `qwerty`, `12key` |
-| 20 | 내비게이션 키 상태 | `navexposed`, `navhidden` |
-| 21 | 내비게이션 방식 | `nonav`, `dpad`, `trackball`, `wheel` |
-| 22 | 화면 픽셀 크기 | `640x480` (Android 3.2부터 폐기됐지만 aapt2는 읽는다) |
-| 23 | 플랫폼 버전 | `v21`, `v36.1` (항상 마지막) |
+| 13 | Orientation | `port`, `land`, `square` |
+| 14 | UI mode | `car`, `desk`, `television`, `appliance`, `watch`, `vrheadset` |
+| 15 | Night mode | `night`, `notnight` |
+| 16 | Density | `ldpi`\~`xxxhdpi`, `tvdpi`, `nodpi`, `anydpi`, `400dpi` |
+| 17 | Touchscreen | `notouch`, `stylus`, `finger` |
+| 18 | Keyboard state | `keysexposed`, `keyshidden`, `keyssoft` |
+| 19 | Input method | `nokeys`, `qwerty`, `12key` |
+| 20 | Navigation key state | `navexposed`, `navhidden` |
+| 21 | Navigation method | `nonav`, `dpad`, `trackball`, `wheel` |
+| 22 | Screen size in pixels | `640x480` (deprecated since Android 3.2, but aapt2 reads it) |
+| 23 | Platform version | `v21`, `v36.1` (always last) |
 
 ```cpp
-// 필드 순서 = 폴더 이름의 한정자 순서 = 우선순위. 열거형은 안드로이드와 같은 값이고 Any = 0
+// Field order = order of the qualifiers in a folder name = priority. The enums have Android's values, and Any = 0
 struct Config {
-  uint16_t mcc = 0, mnc = 0;                       // mnc0·mnc00·mnc000은 kMncZero
+  uint16_t mcc = 0, mnc = 0;                       // mnc0, mnc00 and mnc000 are kMncZero
   std::array<char, 4> lang{}, region{}, script{};  // "ko", "KR", "Latn"
   std::array<char, 8> variant{};                   // "posix", "1901"
   GrammaticalGender grammaticalGender{};
@@ -150,111 +150,111 @@ struct Config {
   uint16_t sdkVersion = 0, minorVersion = 0;       // v36.1
 };
 
-int compareConfigs(const Config& a, const Config& b);  // aapt2가 항목의 후보를 두는 순서
+int compareConfigs(const Config& a, const Config& b);  // the order aapt2 keeps an entry's candidates in
 std::string toString(const Config& config);            // "en-rUS-sw600dp-v13"
-bool matches(const Config& config, const Config& device);                   // 다음 절
-bool isBetterThan(const Config& a, const Config& b, const Config& device);  // 다음 절
+bool matches(const Config& config, const Config& device);                   // next section
+bool isBetterThan(const Config& a, const Config& b, const Config& device);  // next section
 ```
 
-- **지역 표기 두 가지:** `ko-rKR`(지역 앞에 `r`)과 BCP-47 형식 `b+ko+KR`을 모두 받는다. variant는 `b+` 형식으로만 줄 수 있고(`b+de+DE+1901`), aapt2처럼 별개의 설정이 된다.
-- **옛 언어 코드:** 안드로이드는 리소스를 옛 코드로 찾는다. 그래서 폴더 이름은 그대로 두고, 기기 로케일의 `he`·`id`·`yi`를 `iw`·`in`·`ji`로 바꾼다(`Resources::setConfiguration`). 히브리어는 `values-iw/`이고, `values-he/`는 어떤 기기에서도 선택되지 않는다(golden `locale_he-IL`).
-- **기기 Config:** 안드로이드가 리소스에 넘기는 모양으로 둔다. 로케일의 스크립트는 태그가 지정했을 때만 두고(`sr-Latn`), 나머지는 매칭이 언어와 지역으로 알아낸다. 화면 픽셀(`screenWidth`×`screenHeight`)은 기기를 어떻게 들든 긴 쪽이 너비다. `navHidden`은 안드로이드가 리소스에 넘기지 않으므로 비워 두고, 그래서 `values-navexposed/`·`values-navhidden/`은 어떤 기기에서도 선택되지 않는다. 소프트 키보드를 쓰는 기기의 `keysHidden`은 `keyssoft`다. 언어, 버전, 화면 픽셀, `navHidden`은 `Resources::setConfiguration`이 맞춰 준다.
-- **기기 sdkVersion:** 기기 Config에 버전이 없으면(`sdkVersion`과 `minorVersion`이 모두 0이면) Hydroid가 흉내 낼 API 레벨 **37**(Android 17)로 채운다(`Version.h`의 `kEmulatedSdkVersion`). 버전을 직접 준 기기(테스트 등)는 그대로 쓴다. 그래야 `-v21`, `-v26` 폴더가 최신 안드로이드처럼 선택된다. 비교 기준도 모두 이 레벨에 맞춘다: golden 덤프는 API 37.0 에뮬레이터, golden 앱은 compileSdk·targetSdk 37(AGP 9.5.1), aapt2 golden은 build-tools 37.0.0이 `platforms/android-37.0`에 link한 결과다. `@android:` 프레임워크 리소스도 번들할 때(6단계) android-37.0에서 가져온다. 지금은 `golden/aosp`에 android17-release의 폴더 목록만 있다. 매칭 코드(`ConfigMatch.cpp`, `LocaleData.cpp`)도 같은 릴리스에서 옮겼고, 로케일 표(`LocaleDataTables.inc`)는 `golden/aosp`와 같은 커밋에서 만든다(`scripts/gen_locale_data.py`의 BRANCH·COMMIT). 37은 이것들이 모두 나와 있는 가장 높은 레벨이다. 37.1이나 37.2가 아니라 37.0을 쓰는 것은 비교에 마이너 버전이 끼지 않게 하려는 것이다. 레벨을 올릴 때는 이들을 함께 올리고, 하나만 어긋나면 `SdkBaseline` 테스트가 실패한다(AGP 버전과 로케일 표의 내용은 검사하지 않는다).
-- **암묵적 버전:** aapt2는 일부 한정자에 최소 버전을 자동으로 붙인다(`hdpi`는 `hdpi-v4`, `anydpi`는 `anydpi-v21`, `feminine`은 `feminine-v34`). `parseConfig`도 같게 붙이므로 aapt2 출력과 같은 Config가 나온다.
-- **숫자 체계(#51):** 기기 로케일의 숫자 체계(`ar-EG-u-nu-latn`의 `nu-latn`)는 다루지 않는다. 폴더 이름으로는 줄 수 없어(aapt2 link가 `b+ar+u+nu+latn`을 거부) 리소스 후보는 모두 비어 있고, 안드로이드의 로케일 비교는 후보끼리 숫자 체계가 다를 때만 이 값을 쓴다.
+- **Two ways to write a region:** both `ko-rKR` (an `r` before the region) and the BCP 47 form `b+ko+KR` are accepted. A variant can be given only in the `b+` form (`b+de+DE+1901`), and makes a configuration of its own, as in aapt2.
+- **Old language codes:** Android looks resources up by the old codes. So folder names are kept as they are, and the `he`, `id` and `yi` of a device's locale are changed to `iw`, `in` and `ji` (`Resources::setConfiguration`). Hebrew is `values-iw/`, and `values-he/` is picked on no device (golden `locale_he-IL`).
+- **The device's Config:** kept in the shape Android passes to its resources. The script of the locale is set only when the tag gives it (`sr-Latn`); otherwise matching works it out from the language and region. Of the screen's pixels (`screenWidth`×`screenHeight`), the longer side is the width however the device is held. Android does not pass `navHidden` to its resources, so it is left empty, and so `values-navexposed/` and `values-navhidden/` are picked on no device. The `keysHidden` of a device with a soft keyboard is `keyssoft`. `Resources::setConfiguration` sees to the language, the version, the screen's pixels and `navHidden`.
+- **The device's sdkVersion:** if the device's Config has no version (`sdkVersion` and `minorVersion` both 0), it is filled with the API level Hydroid emulates, **37** (Android 17): `kEmulatedSdkVersion` in `Version.h`. A device that gives a version itself (in tests, for one) keeps it. That is what makes `-v21` and `-v26` folders picked as on the latest Android. Everything it is compared with is at this level too: the golden dump is of an API 37.0 emulator, the golden app has compileSdk and targetSdk 37 (AGP 9.5.1), and the aapt2 golden files are what build-tools 37.0.0 links against `platforms/android-37.0`. The `@android:` framework resources, when bundled (step 6), will come from android-37.0 too; for now `golden/aosp` has only the folder list of android17-release. The matching code (`ConfigMatch.cpp`, `LocaleData.cpp`) is ported from the same release, and the locale tables (`LocaleDataTables.inc`) are made from the same commit as `golden/aosp` (BRANCH and COMMIT in `scripts/gen_locale_data.py`). 37 is the highest level at which all of these exist. 37.0 is used, not 37.1 or 37.2, to keep a minor version out of the comparison. To raise the level, raise them all together; if one is out of step, the `SdkBaseline` tests fail (they do not check the AGP version or the contents of the locale tables).
+- **Implied versions:** aapt2 adds a minimum version to some qualifiers by itself (`hdpi` is `hdpi-v4`, `anydpi` is `anydpi-v21`, `feminine` is `feminine-v34`). `parseConfig` adds the same, so it gives the Config aapt2 prints.
+- **Numbering systems (#51):** the numbering system of a device's locale (the `nu-latn` of `ar-EG-u-nu-latn`) is not handled. A folder name cannot give one (aapt2 link rejects `b+ar+u+nu+latn`), so every resource candidate has none, and Android's locale comparison uses it only when the candidates differ in it.
 
-## 한정자 매칭 알고리즘
+## The qualifier matching algorithm
 
-안드로이드 런타임(android17-release의 `AssetManager2::FindEntry`와 `ResourceTypes.cpp`의 `ResTable_config::match`, `isBetterThan`)과 같은 2단계로 고른다. 기기와 모순되는 후보를 버리고, 남은 후보를 테이블 순서(`compareConfigs`)대로 보며 더 나은 것이 나오면 바꾼다. 항목당 후보가 몇 개뿐이라 선형 탐색으로 충분하다. 규칙은 API 37.0 에뮬레이터가 고른 값을 덤프한 golden(`GoldenMatchTest`)으로 확인한다.
+Values are picked in the two steps of the Android runtime (`AssetManager2::FindEntry` and, in `ResourceTypes.cpp`, `ResTable_config::match` and `isBetterThan`, of android17-release). The candidates that contradict the device are dropped, and the rest are gone through in the order of the table (`compareConfigs`), each replacing the one held if it is better. An entry has only a few candidates, so a linear search is enough. The rules are checked against golden data, the values an API 37.0 emulator picked (`GoldenMatchTest`).
 
 ```cpp
 // Resources.h
 const Candidate* bestCandidate(const Entry& e, const Config& device) {
   const Candidate* best = nullptr;
-  for (const Candidate& c : e.candidates) {      // compareConfigs 순서
+  for (const Candidate& c : e.candidates) {      // in compareConfigs order
     if (!matches(c.config, device)) continue;
     if (!best || isBetterThan(c.config, best->config, device)) best = &c;
   }
-  return best;   // nullptr → 맞는 값 없음
+  return best;   // nullptr → no value matches
 }
 
-class Resources {                                // 테이블 하나와 기기 설정 하나
+class Resources {                                // one table and one device configuration
  public:
   explicit Resources(const ResourceTable& table);
   void setConfiguration(const Config& device, const std::vector<Config>& locales = {});
-  Config configuration() const;                  // 언어를 고른 뒤의 기기 설정
-  uint32_t generation() const;                   // 결과가 바뀔 수 있을 때마다 오른다
+  Config configuration() const;                  // the device configuration, once the language is chosen
+  uint32_t generation() const;                   // goes up whenever the results may change
   const Candidate* candidate(ResId id, uint32_t* generation = nullptr) const;
 };
 ```
 
-**1단계 — match: 모순되는 후보 버리기.** 후보가 지정한 한정자가 하나라도 기기와 맞지 않으면 탈락이다. 지정하지 않은 한정자는 항상 통과한다.
+**Step 1, match: drop the candidates that contradict the device.** A candidate is out if any qualifier it specifies does not fit the device. A qualifier it does not specify always passes.
 
-- **같아야 통과:** MCC·MNC, 문법적 성별, 레이아웃 방향, 화면 비율, 둥근 화면, 넓은 색역, HDR, 방향, UI 모드, 야간 모드, 터치스크린, 키보드 상태, 입력 방식, 내비게이션 키 상태, 내비게이션 방식. 단 `keysexposed`는 `keyssoft` 기기에도 맞는다. 내비게이션 키 상태는 기기 쪽이 늘 비어 있어(앞 절의 "기기 Config") 지정한 후보가 늘 탈락한다.
-- **기기 값 이하이면 통과:** 최소 너비, 가용 너비·높이, 화면 크기, 화면 픽셀 크기, 플랫폼 버전(부 버전 포함)
-- **탈락시키지 않음:** 밀도. 어떤 밀도든 크기를 조정해 쓸 수 있으니 2단계에서만 비교한다.
-- **로케일:** 언어가 같고(`tl`과 `fil`은 같은 언어), 스크립트가 같아야 한다. 스크립트는 로케일이 지정한 것, 없으면 그 언어를 그 지역에서 주로 쓰는 글자다. `zh-rTW`는 Hant라서 zh-HK 기기에 맞고 `zh-rCN`은 맞지 않는다. `en-rGB`는 en-AU 기기에 맞는다. 지역과 variant로는 거르지 않는다. 스크립트를 알 수 없는 언어(사적 사용 언어 등)에서만 후보가 지정한 지역이 기기와 같아야 한다. 안드로이드 7 이전에는 지역으로 걸렀다.
+- **Must be equal:** MCC and MNC, grammatical gender, layout direction, screen aspect, round screen, wide color gamut, HDR, orientation, UI mode, night mode, touchscreen, keyboard state, input method, navigation key state, navigation method. But `keysexposed` fits a `keyssoft` device too. The device's navigation key state is always empty ("The device's Config" in the section before), so a candidate that specifies one is always out.
+- **Must be no more than the device's:** smallest width, available width and height, screen size, screen size in pixels, platform version (with the minor version)
+- **Never drops a candidate:** density. Any density can be scaled and used, so it is compared only in step 2.
+- **Locale:** the language must be the same (`tl` and `fil` are one language), and the script too. The script is the one the locale gives or, without one, the one that language is mostly written in in that region. `zh-rTW` is Hant, so it fits a zh-HK device and `zh-rCN` does not. `en-rGB` fits an en-AU device. Region and variant drop nothing. Only for a language whose script cannot be known (private-use languages and the like) must the region a candidate specifies be the device's. Before Android 7, the region did drop candidates.
 
-**2단계 — isBetterThan: 둘 중 나은 후보.** `Config` 필드 순서로(단 두 숨김 상태는 입력 방식·내비게이션 방식보다 먼저) 두 후보를 비교하다가 처음 차이 나는 한정자에서 결정한다. 단 로케일은 더 나은 쪽일 때만 거기서 결정하고, 더 나쁘면 다음 한정자로 넘어간다. 그래서 두 후보가 서로보다 나을 수 있고(한국어 태블릿에서 `ko`와 `sw600dp`), 결과는 후보를 보는 순서에 달려 있다. `bestCandidate`는 안드로이드처럼 후보를 `compareConfigs` 순서로 본다.
+**Step 2, isBetterThan: the better of two candidates.** The two are compared in the order of the fields of `Config` (but the two hidden states before the input method and the navigation method), and the first qualifier in which they differ decides. But the locale decides there only for the better side; for the worse, the comparison goes on to the next qualifier. So two candidates can each be better than the other (`ko` and `sw600dp` on a Korean tablet), and the result depends on the order the candidates are met in. `bestCandidate` meets them in `compareConfigs` order, as Android does.
 
-- 대부분: 한쪽만 지정했으면 지정한 쪽이 이긴다. 기기가 그 한정자 값을 모르면(0) 건너뛴다. 키보드 상태는 둘 다 지정했을 수 있는데(`keyssoft` 기기의 `keysexposed`와 `keyssoft`), 그때는 기기와 같은 쪽이 이긴다.
-- 최소 너비·버전: 큰 값. 가용 너비·높이와 화면 픽셀 크기: 둘을 함께 봐서 기기에 더 가까운 쪽.
-- 화면 크기: 큰 값. 기기 화면이 normal 이상이면 미지정을 normal로 본다.
-- 로케일: 언어를 지정한 쪽. 단 en-US 기기와 그에 가까운 영어 기기에서는 언어 미지정이 다른 영어(`en-rGB`)보다 낫다. 그다음 기기 로케일의 부모 트리에서 지역이 더 가까운 쪽(es-MX 기기에 `es-r419`), 그다음 variant가 같은 쪽이다.
-- 밀도는 아래 특례를 따른다.
+- Most qualifiers: if only one side specifies it, that side wins. If the device does not know the qualifier's value (0), it is passed over. The keyboard state may be specified by both (`keysexposed` and `keyssoft` on a `keyssoft` device); then the side that equals the device's wins.
+- Smallest width and version: the larger value. Available width and height, and screen size in pixels: the two taken together, the side closer to the device.
+- Screen size: the larger value. If the device's screen is normal or larger, an unspecified one counts as normal.
+- Locale: the side that specifies a language. But on an en-US device, and on English devices close to it, no language is better than another English (`en-rGB`). Then the side whose region is closer in the parent tree of the device's locale (`es-r419` on an es-MX device), then the side whose variant is the same.
+- Density follows the special rule below.
 
-**밀도 특례.** 밀도를 지정하지 않은 후보는 mdpi(160)로 보고, 기기 밀도가 없거나 `anydpi`여도 160으로 본다. `anydpi` 후보는 어떤 밀도보다 낫다. 그 밖에는 두 후보 중 높은 쪽이 기기 밀도와 같으면 높은 쪽, 둘 다 기기보다 높으면 기기에 가까운 낮은 쪽, 나머지(하나는 낮고 하나는 높거나, 둘 다 낮을 때)는 높은 쪽이다. 미지정과 `mdpi`처럼 같은 밀도로 보는 두 후보는 나중에 본 쪽(아래 `a`)을 높은 쪽으로 친다. 그래서 기기가 160 이상이면 나중에 본 쪽이, 160보다 낮으면 먼저 본 쪽이 이긴다. android17-release의 코드를 그대로 옮겼다.
+**The special rule for density.** A candidate that specifies no density counts as mdpi (160), and a device with no density, or with `anydpi`, counts as 160 too. An `anydpi` candidate is better than any density. Otherwise: if the higher of the two candidates equals the device's density, the higher; if both are higher than the device, the lower, which is closer to it; in the rest (one lower and one higher, or both lower), the higher. Of two candidates that count as the same density, such as an unspecified one and `mdpi`, the one met later (`a` below) is taken as the higher. So on a device of 160 or more the one met later wins, and below 160 the one met first. The code is ported from android17-release as it is.
 
 ```cpp
-// a, b: 두 후보의 밀도(미지정은 160), req: 기기 밀도(없거나 anydpi면 160). true면 a가 이긴다
+// a, b: the densities of two candidates (160 if unspecified), req: the device's (160 if none or anydpi). true if a wins
 bool densityBetter(int a, int b, int req) {
-  if (a == kDensityAny) return true;  // anydpi는 크기를 조정하지 않아도 된다
+  if (a == kDensityAny) return true;  // anydpi needs no scaling
   if (b == kDensityAny) return false;
   int h = std::max(a, b), l = std::min(a, b);
-  bool aBigger = a >= b;              // 같으면(미지정과 mdpi) a를 높은 쪽으로 본다
-  if (h == req) return aBigger;       // 높은 쪽이 기기와 같음
-  if (l >= req) return !aBigger;      // 둘 다 기기보다 높음 → 낮은 쪽
-  return aBigger;                     // 그 밖에는 높은 쪽(줄여서 쓴다)
+  bool aBigger = a >= b;              // if equal (unspecified and mdpi), a is taken as the higher
+  if (h == req) return aBigger;       // the higher equals the device's
+  if (l >= req) return !aBigger;      // both higher than the device → the lower
+  return aBigger;                     // otherwise the higher (to be scaled down)
 }
 ```
 
-예를 들어 기기가 xxhdpi(480)이고 후보가 xhdpi(320)와 xxxhdpi(640)뿐이면 640을 고른다. 크게 만든 이미지를 줄이는 쪽이 더 선명하기 때문이다.
+For example, if the device is xxhdpi (480) and the only candidates are xhdpi (320) and xxxhdpi (640), 640 is picked: an image made large and scaled down is sharper.
 
-**언어 선택.** 기기의 선호 언어 목록(예: ko-KR, en-US)을 앞에서부터 보며, 테이블(`android` 패키지 제외)에 그 언어와 스크립트의 리소스가 있는 첫 언어를 기기 언어로 정한 뒤 매칭한다(`Resources::setConfiguration`). `android` 밖의 패키지에 언어를 지정한 값이 없으면(의사 로케일 en-XA·ar-XB뿐이어도) `android` 패키지까지 보고 고른다. 영어(의사 로케일 en-XA 제외)는 리소스가 없어도 있는 것으로 친다. 안드로이드는 언어 미지정 리소스를 영어로 보기 때문이다. 안드로이드처럼 테이블의 `tl`은 `fil`로 바꿔 비교하고 기기의 `tl`은 그대로 두므로, `values-tl/`은 tl-PH를 고르는 근거가 되지 않는다(골라진 뒤의 매칭에서는 둘이 같은 언어다). 맞는 언어가 하나도 없거나 목록에 하나뿐이면 첫 언어다. 고르는 기준은 리소스별이 아니라 테이블 전체라서, 고른 언어의 값이 없는 리소스는 다음 언어가 아니라 언어 미지정 값(`values/`)을 쓴다. 부모 로케일 대체(es-MX → es-419 → es)는 위의 로케일 매칭이 맡는다. Android 15+에서 앱이 `LocaleConfig`로 기본 로케일을 선언했으면(`Resources::setLocaleConfig`) 이 규칙이 달라진다. 목록에서 앱이 지원하는 언어를 모두 순서대로 읽고, 리소스마다 그중 값이 있는 첫 언어의 값을 쓴다. 그래서 첫 언어의 값이 없는 리소스는 다음 언어의 값을 쓴다. 언어 미지정 값(`values/`)은 기본 로케일의 값으로 본다. 안드로이드처럼 `LocaleConfig`는 다음 `setConfiguration`부터 적용된다(golden `localeconfig`).
+**Choosing the language.** The device's list of preferred languages (say ko-KR, en-US) is gone through from the front, and the first language that the table (leaving out the `android` package) has resources of, in that language and script, becomes the device's language; then matching goes on (`Resources::setConfiguration`). If the packages other than `android` have no value that specifies a language (or only the pseudo-locales en-XA and ar-XB), the `android` package is looked at too. English (but not the pseudo-locale en-XA) counts as having resources even when it has none, because Android takes resources of no language to be English. As Android does, the `tl` of the table is compared as `fil` and the device's `tl` is left as it is, so `values-tl/` is no ground for choosing tl-PH (in the matching after the choice, the two are one language). If no language fits, or the list has only one, it is the first language. The choice is for the whole table and not for each resource, so a resource that has no value in the chosen language takes its value of no language (`values/`), not that of the next language. Falling back to a parent locale (es-MX → es-419 → es) is done by the locale matching above. From Android 15, if the app declares a default locale with its `LocaleConfig` (`Resources::setLocaleConfig`), this rule changes. All the languages of the list that the app supports are read in, in order, and each resource takes the value of the first of them that has one. So a resource that has no value in the first language takes that of the next. A value of no language (`values/`) counts as a value of the default locale. As on Android, the `LocaleConfig` takes effect from the next `setConfiguration` (golden `localeconfig`).
 
-**캐시.** `Resources`가 `ResId`마다 결과를 캐시하고, 세대 번호(`generation()`)가 바뀌면 버린다. 세대 번호는 `setConfiguration`이 기기 Config를 바꾸거나(회전·다크 모드·배율 변경) 테이블이 바뀔 때 오른다. 결과에서 만든 값도 이 번호로 캐시할 수 있다.
+**Cache.** `Resources` caches the result for each `ResId` and throws it away when the generation (`generation()`) changes. The generation goes up when `setConfiguration` changes the device's Config (rotation, dark mode, a change of scale) or when the table changes. Values made from the results can be cached by this number too.
 
-## 값 해석: 참조·테마·스타일
+## Resolving values: references, themes and styles
 
-후보를 고른 다음에는 참조를 끝까지 따라가고, 테마·스타일 규칙에 따라 속성값을 정한다. 이 부분이 안드로이드 `obtainStyledAttributes`와 같아야 뷰의 크기와 색이 안드로이드와 일치한다.
+Once a candidate is picked, references are followed to the end, and attribute values are decided by the rules of themes and styles. This part must equal Android's `obtainStyledAttributes` for the sizes and colors of views to be Android's.
 
-**참조 따라가기**
+**Following references**
 
-- `@type/name`: 테이블에서 다시 resolve한다. 참조가 또 참조를 가리킬 수 있으니 반복하되, 깊이 제한과 방문 집합으로 순환을 잡는다.
-- `@android:type/name`: 프레임워크 패키지(0x01)에서 찾는다.
-- `?attr/name`, `?android:attr/name`: 현재 Theme에서 찾고, 나온 값이 또 참조면 위 규칙을 반복한다.
-- `@null`은 빈 값, `@+id/name`은 로드 때 id 타입 항목으로 등록한다.
+- `@type/name`: resolved again in the table. A reference may point to another reference, so this repeats, with a depth limit and a visited set to catch cycles.
+- `@android:type/name`: looked up in the framework package (0x01).
+- `?attr/name`, `?android:attr/name`: looked up in the current Theme, and if the value found is another reference, the rules above repeat.
+- `@null` is an empty value, and `@+id/name` is registered as an entry of the id type at load.
 
-**프레임워크 리소스 번들.** 앱 리소스 대부분이 `@android:`와 `?android:attr/`에 기대므로, AOSP `frameworks/base/core/res/res`의 android-37.0 버전에서 필요한 부분(attrs.xml, themes, styles, colors, dimens)을 Hydroid에 같이 넣는다. AOSP는 Apache 2.0이라 번들할 수 있다. AppCompat·Material Components의 `app:` 속성과 테마는 별도 패키지로 나중에 추가한다.
+**The framework resource bundle.** Most of an app's resources lean on `@android:` and `?android:attr/`, so the parts needed (attrs.xml, themes, styles, colors, dimens) of AOSP's `frameworks/base/core/res/res`, at android-37.0, ship with Hydroid. AOSP is under Apache 2.0, so it can be bundled. The `app:` attributes and themes of AppCompat and Material Components are added later, as packages of their own.
 
-**스타일 상속**
+**Style inheritance**
 
-- `parent="@style/X"`가 있으면 그것이 부모다.
-- 없으면 점 이름 규칙을 쓴다. `Theme.App.Dark`의 부모는 `Theme.App`이며, 같은 패키지 안에서만 적용한다.
-- `parent=""`이면 부모가 없다.
-- 부모부터 자식 순으로 덮어써서 `attr → Value` 평탄화 맵을 만들고 캐시한다.
+- If there is a `parent="@style/X"`, that is the parent.
+- If not, the dotted-name rule applies: the parent of `Theme.App.Dark` is `Theme.App`, within the same package only.
+- With `parent=""` there is no parent.
+- A flattened map of `attr → Value` is made by overwriting from the parent down to the child, and cached.
 
-**Theme.** 적용한 스타일들(`applyStyle`, force 여부)을 순서대로 합친 평탄화 맵이다. 기기 Config가 바뀌면 다시 만든다.
+**Theme.** A flattened map of the styles applied (`applyStyle`, forced or not), merged in order. It is made again when the device's Config changes.
 
-**obtainStyledAttributes 우선순위.** 요청된 속성마다 위에서부터 처음 찾은 값을 쓴다.
+**The priority of obtainStyledAttributes.** For each attribute asked for, the first value found, from the top:
 
-1. 레이아웃 XML에 직접 쓴 속성
-2. 그 요소의 `style="@style/X"`
-3. defStyleAttr: 테마에서 그 속성(예: `?android:attr/textViewStyle`)이 가리키는 스타일
-4. defStyleRes: 3번이 0이거나 테마에 없을 때만
-5. 테마에 직접 들어 있는 같은 속성
+1. An attribute written directly in the layout XML
+2. The `style="@style/X"` of that element
+3. defStyleAttr: the style that attribute (say `?android:attr/textViewStyle`) points to in the theme
+4. defStyleRes: only when 3 is 0 or not in the theme
+5. The same attribute directly in the theme
 
-찾은 값이 `?attr`이면 테마로, `@`이면 테이블로 해석한 뒤 TypedArray에 담는다. `android:textAppearance`처럼 뷰가 따로 처리하는 속성은 직접 속성보다 낮은 우선순위로 뷰 쪽에서 구현한다.
+A value found is resolved through the theme if it is `?attr`, and through the table if it is `@`, and then put in the TypedArray. Attributes a view handles by itself, such as `android:textAppearance`, are implemented on the view's side, at a lower priority than direct attributes.
 
 ```cpp
 class Theme {
@@ -264,83 +264,83 @@ public:
 };
 
 TypedArray obtainStyledAttributes(const Theme& theme,
-                                  const XmlElement* element,      // 없으면 nullptr
-                                  const std::vector<ResId>& attrs, // declare-styleable 목록
+                                  const XmlElement* element,      // nullptr if none
+                                  const std::vector<ResId>& attrs, // the declare-styleable list
                                   ResId defStyleAttr, ResId defStyleRes);
 ```
 
-## 개발 스텝
+## Development steps
 
-저장소를 둘로 나눈다. `hydroid-res`는 UI 프레임워크에 전혀 의존하지 않는 C++ 라이브러리이고, `hydroid-view`(가칭)가 플랫폼별 뷰와 어댑터를 가진다. 경계는 "값과 트리까지는 res, 객체 생성과 그리기는 view"다.
+There are two repositories. `hydroid-res` is a C++ library that depends on no UI framework at all, and `hydroid-view` (a working name) has the views and adapters of each platform. The boundary: "values and trees are res; creating objects and drawing is view".
 
-### 경계: 누가 무엇을 맡나
+### The boundary: who does what
 
-| 기능 | hydroid-res | hydroid-view |
+| Feature | hydroid-res | hydroid-view |
 | --- | --- | --- |
-| 기기 Config | Config 구조체와 매칭 | 플랫폼에서 값 수집, 변경 감지 |
-| 이미지 | 밀도 버킷 선택, 파일 경로·바이트 반환 | 디코딩과 그리기 |
-| drawable XML | shape·selector·vector 등을 트리로 파싱 | 트리를 해석해 실제로 그림 |
-| layout XML | 파싱된 트리, obtainStyledAttributes | 뷰 객체 생성(LayoutInflater) |
-| 폰트 | font-family XML 해석, 파일 경로 | 폰트 로드와 텍스트 측정 |
-| 테마·스타일 | Theme, TypedArray | TypedArray 값을 뷰 속성에 적용 |
+| Device Config | The Config struct and matching | Collecting the values from the platform, noticing changes |
+| Images | Picking the density bucket, returning the file's path and bytes | Decoding and drawing |
+| Drawable XML | Parsing shape, selector, vector and so on into a tree | Interpreting the tree and drawing it |
+| Layout XML | The parsed tree, obtainStyledAttributes | Creating the view objects (LayoutInflater) |
+| Fonts | Resolving font-family XML, file paths | Loading fonts and measuring text |
+| Themes and styles | Theme, TypedArray | Applying TypedArray values to view properties |
 
-`hydroid-res`는 UIKit·GTK·WinRT 헤더를 하나도 include하지 않는다. 그래서 화면 없이 CI에서 전부 테스트할 수 있다.
+`hydroid-res` includes not one header of UIKit, GTK or WinRT. So all of it can be tested in CI, without a screen.
 
-### 두 프로젝트를 잇는 방법
+### How the two projects connect
 
-- **API 먼저:** R1에서 공개 C 헤더 초안을 확정한다. view는 그 헤더만 보고 개발한다.
-- **버전 고정:** res가 릴리스 태그(v0.1, v0.2 …)를 내면 view는 그 버전을 의존성으로 고정한다. iOS는 XCFramework를 담은 Swift Package, GTK4·WinUI 3는 CMake 패키지로 받는다.
-- **목 값:** res의 해당 버전이 나오기 전에는 view에서 하드코딩한 값으로 먼저 개발한다.
+- **API first:** R1 settles a draft of the public C header. view is developed against that header alone.
+- **Pinned versions:** when res puts out a release tag (v0.1, v0.2 …), view pins that version as its dependency. iOS takes it as a Swift Package holding an XCFramework; GTK4 and WinUI 3 as a CMake package.
+- **Mock values:** until the res version it needs is out, view is developed first with hard-coded values.
 
-### hydroid-res 단계
+### hydroid-res steps
 
-| 단계 | 내용 | 완료 기준 | 릴리스 |
+| Step | What | Done when | Release |
 | --- | --- | --- | --- |
-| R1 | 골격(CMake, pugixml, GoogleTest, 3개 OS CI), 공개 C API 초안, 골든 덤프 도구 | 세 OS에서 CI 통과 |  |
-| R2 | 기본 값 파서(color, dimen, integer, bool, fraction) | 색 4형식·단위 6종 테스트 통과 |  |
-| R3 | Config, 폴더 이름 파서 | AOSP 프레임워크 res/ 폴더 전부 파싱 |  |
-| R4 | 스캐너, values 파서, ResourceTable | `aapt2 dump resources`와 일치 |  |
-| R5 | 한정자 매칭, 언어 선택, 결과 캐시 | 조건 조합 골든 일치 | v0.1 · 값 조회 |
-| R6 | 참조 해석, 프레임워크 리소스 번들 | `@android:` 포함 골든 일치 |  |
-| R7 | 스타일·테마·obtainStyledAttributes | TextView·Button 속성 덤프 일치 | v0.2 · 스타일 |
-| R8 | 상태별 색 목록, plurals, layout·drawable·font XML 트리 | 트리 덤프가 원본 XML과 일치 | v0.3 · 트리 |
-| R9 | `hydroid-rc` 빌드 도구, `.hrt` 로더 | `.hrt` 결과가 res/ 직접 로드와 동일 | v0.4 · 바이너리 |
-| R10 | API 고정, 패키징(XCFramework·CMake), 문서 | view가 바이너리 의존성만으로 빌드됨 | v1.0 |
+| R1 | The skeleton (CMake, pugixml, GoogleTest, CI on three OSes), a draft of the public C API, the golden dump tool | CI passes on the three OSes |  |
+| R2 | Parsers of plain values (color, dimen, integer, bool, fraction) | The tests of the 4 color forms and 6 units pass |  |
+| R3 | Config, the parser of folder names | Every folder of AOSP's framework res/ parses |  |
+| R4 | The scanner, the values parser, ResourceTable | Equal to `aapt2 dump resources` |  |
+| R5 | Qualifier matching, the choice of language, the cache of results | Equal to the golden data over the combined conditions | v0.1 · value lookup |
+| R6 | Resolving references, the framework resource bundle | Equal to the golden data, `@android:` included |  |
+| R7 | Styles, themes, obtainStyledAttributes | Equal to the dump of TextView and Button attributes | v0.2 · styles |
+| R8 | Color state lists, plurals, the XML trees of layout, drawable and font | The dump of a tree equals the original XML | v0.3 · trees |
+| R9 | The `hydroid-rc` build tool, the `.hrt` loader | A `.hrt` gives the same as loading res/ directly | v0.4 · binary |
+| R10 | Freezing the API, packaging (XCFramework, CMake), documentation | view builds with binary dependencies alone | v1.0 |
 
-### hydroid-view 단계
+### hydroid-view steps
 
-| 단계 | 내용 | 필요한 res | 완료 기준 |
+| Step | What | res needed | Done when |
 | --- | --- | --- | --- |
-| V1 | iOS 뷰 보강: RTL, baseline 정렬, ConstraintLayout 등 README의 남은 항목 | 없음(목 값) | 코드로 만든 샘플이 안드로이드와 같은 배치 |
-| V2 | iOS 어댑터: Config 수집·변경 알림, Swift 래퍼 | v0.1 | 회전·다크 모드 때 값이 다시 해석됨 |
-| V3 | 비트맵·나인패치 drawable | v0.1 | 밀도별 이미지 선택·늘이기가 안드로이드와 같음 |
-| V4 | LayoutInflater(iOS) | v0.3 | 샘플 레이아웃 XML이 안드로이드와 같은 좌표로 배치됨 |
-| V5 | XML drawable(shape, selector, layer-list, vector), 상태별 색 반영 | v0.3 | 스크린샷 비교 일치 |
-| V6 | GTK4 뷰 계층과 어댑터 | v0.3 | V4·V5 샘플이 같은 결과 |
-| V7 | WinUI 3 뷰 계층과 어댑터 | v0.3 | V4·V5 샘플이 같은 결과 |
-| V8 | 배포 빌드를 `.hrt` 로딩으로 전환 | v0.4 | 세 플랫폼 시작 시간 측정 |
+| V1 | Filling in the iOS views: RTL, baseline alignment, ConstraintLayout and the other items left in the README | None (mock values) | A sample made in code is laid out as on Android |
+| V2 | The iOS adapter: collecting the Config, notifying of changes, the Swift wrapper | v0.1 | Values are resolved again on rotation and dark mode |
+| V3 | Bitmap and nine-patch drawables | v0.1 | Picking an image by density and stretching it are as on Android |
+| V4 | LayoutInflater (iOS) | v0.3 | A sample layout XML is laid out at the coordinates Android gives |
+| V5 | XML drawables (shape, selector, layer-list, vector), color state lists applied | v0.3 | Screenshots compare equal |
+| V6 | The GTK4 view hierarchy and adapter | v0.3 | The V4 and V5 samples give the same result |
+| V7 | The WinUI 3 view hierarchy and adapter | v0.3 | The V4 and V5 samples give the same result |
+| V8 | Switching shipped builds to loading `.hrt` | v0.4 | Startup time measured on the three platforms |
 
-R1\~R5와 V1은 동시에 진행할 수 있다. 그 뒤로는 view가 res 릴리스를 따라간다. GTK4와 WinUI 3는 둘 다 C++이므로, V6 전에 measure/layout 로직을 두 플랫폼이 공유하는 C++ 뷰 코어로 묶어 두면 V7이 훨씬 가벼진다.
+R1\~R5 and V1 can go on at the same time. After that, view follows the res releases. GTK4 and WinUI 3 are both C++, so gathering the measure/layout logic into a C++ view core the two platforms share, before V6, makes V7 much lighter.
 
-V2·V6·V7의 어댑터가 채울 기기 값과 출처는 다음과 같다.
+The device values the adapters of V2, V6 and V7 fill in, and where they come from:
 
-| 기기 값 | UIKit | GTK4 | WinUI 3 |
+| Device value | UIKit | GTK4 | WinUI 3 |
 | --- | --- | --- | --- |
-| 밀도(배율) | `traitCollection.displayScale` | `gdk_surface_get_scale` | `XamlRoot.RasterizationScale` |
-| 야간 모드 | `userInterfaceStyle` | `AdwStyleManager` 또는 `GtkSettings` | `ActualTheme` |
-| 언어 목록 | `Locale.preferredLanguages` | `g_get_language_names` | `GetUserPreferredUILanguages` |
-| 화면 크기(dp) | 창 bounds(pt) | 창 크기(논리 픽셀) | `XamlRoot.Size` |
-| 레이아웃 방향 | `effectiveUserInterfaceLayoutDirection` | `gtk_widget_get_direction` | `FlowDirection` |
-| 이미지 디코딩 | `UIImage` | `GdkTexture` | WIC / `BitmapImage` |
+| Density (scale) | `traitCollection.displayScale` | `gdk_surface_get_scale` | `XamlRoot.RasterizationScale` |
+| Night mode | `userInterfaceStyle` | `AdwStyleManager` or `GtkSettings` | `ActualTheme` |
+| Language list | `Locale.preferredLanguages` | `g_get_language_names` | `GetUserPreferredUILanguages` |
+| Screen size (dp) | The window's bounds (pt) | The window's size (logical pixels) | `XamlRoot.Size` |
+| Layout direction | `effectiveUserInterfaceLayoutDirection` | `gtk_widget_get_direction` | `FlowDirection` |
+| Image decoding | `UIImage` | `GdkTexture` | WIC / `BitmapImage` |
 
-## 테스트 전략
+## Test strategy
 
-정답은 언제나 실제 안드로이드다. 같은 `res/`와 같은 조건에서 안드로이드가 고른 값을 골든 데이터로 기록해 두고 Hydroid 결과와 비교한다.
+The right answer is always the real Android. The values Android picks for the same `res/` under the same conditions are recorded as golden data and compared with Hydroid's results.
 
-- **골든 데이터:** 테스트용 안드로이드 앱에 한정자 폴더를 많이 만든다. 계측 테스트에서 `createConfigurationContext`로 조건을 바꿔 가며 모든 리소스의 해석 결과를 JSON으로 덤프하고, Hydroid 결과와 항목별로 비교한다.
-- **조건 조합:** 밀도 7종, 언어(ko, en, 리소스가 없는 언어), 야간 on/off, 가로·세로, 최소 너비(sw320dp, sw600dp, sw720dp)를 조합한다.
-- **스타일 해석:** TextView·Button을 여러 테마에서 만들고 TypedArray 값을 덤프해 비교한다.
-- **테이블 검증:** `aapt2 dump resources` 출력과 항목 수·값을 비교한다.
-- **파서 퍼징:** 폴더 이름과 values XML을 무작위로 만들어 크래시가 없는지 확인한다.
-- **성능 측정:** 테이블 로드 시간, resolve 1회 비용, 메모리를 플랫폼별로 기록한다. 목표치는 첫 측정 후 정한다.
-- **CI:** 세 플랫폼 모두 같은 골든 테스트를 돌린다.
+- **Golden data:** an Android app for testing gets many qualifier folders. An instrumentation test changes the conditions with `createConfigurationContext`, dumps what every resource resolves to as JSON, and that is compared with Hydroid's results entry by entry.
+- **Combined conditions:** 7 densities, languages (ko, en, and one with no resources), night on and off, landscape and portrait, and smallest widths (sw320dp, sw600dp, sw720dp), combined.
+- **Style resolution:** TextView and Button are made under several themes, and the values of the TypedArray are dumped and compared.
+- **Checking the table:** the number of entries and their values are compared with the output of `aapt2 dump resources`.
+- **Fuzzing the parsers:** folder names and values XML are made at random, to check that nothing crashes.
+- **Measuring performance:** the time to load a table, the cost of one resolve, and memory are recorded for each platform. Targets are set after the first measurement.
+- **CI:** all three platforms run the same golden tests.

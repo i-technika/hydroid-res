@@ -2,7 +2,7 @@
 
 The Android resource system for Hydroid: a C++17 library that reads an Android `res/` folder and
 resolves values exactly as Android does, for UIKit, GTK4 and WinUI 3. Design and roadmap:
-[Hydroid 리소스 시스템 설계 및 개발 로드맵](docs/design-and-roadmap.md).
+[Hydroid resource system: design and development roadmap](docs/design-and-roadmap.md).
 
 ## Layout
 
