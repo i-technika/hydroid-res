@@ -45,6 +45,35 @@ gh run view <run id> --json jobs --jq '.jobs[] | "\(.name)\t\(.conclusion)"'
 CI는 오래 걸리므로 `gh pr checks <M> --watch` 또는 `gh run watch <run id> --exit-status`를 백그라운드로
 돌리고 끝날 때 알림을 받는다. 실패하면 `gh run view <id> --log-failed`로 원인을 본다.
 
+## Git Bash에서 `gh`에 넘기는 인자
+
+Bash 도구는 Git Bash(MSYS)라서, 네이티브 프로그램(`gh`, `git`, `python`)에 넘기는 인자가 `/` 하나로
+시작하면 Windows 경로로 바꾼다. `name=value`, `--opt=value` 꼴이면 `=` 뒤의 값이 `/`로 시작할 때도 바꾼다.
+스킬 이름(`/fix-issue`, `/open-ms`, `/close-ms`)으로 시작하는 제목이나 답글이 이렇게 망가진다(#273):
+
+| Bash에서 넘긴 인자 | `gh`가 받는 것 |
+| --- | --- |
+| `--title "/fix-issue에서 ..."` | `C:/Program Files/Git/fix-issue에서 ...` |
+| `-f body=/fix-issue ...`, `--title=/open-ms ...` | `body=C:/Program Files/Git/fix-issue ...`, `--title=C:/Program Files/Git/open-ms ...` |
+| `--title "R5: /fix-issue ..."`, ``-f 'body=`/fix-issue` ...'`` | 그대로(`/`가 맨 앞이 아님) |
+| `//fix-issue` | `/fix-issue`(MSYS가 `/` 하나를 떼어 낸다) |
+
+- 제목·코멘트·답글(`--title`, `--comment`, `--body`, `-f body=...`)이 `/`로 시작할 수 있으면 Bash에서 명령
+  앞에 `MSYS_NO_PATHCONV=1`을 붙이고 글은 작은따옴표로 감싼다(큰따옴표 안의 백틱과 `$`는 명령 치환·변수로
+  바뀐다). 이 변수를 붙이면 경로도 바뀌지 않으므로 같은 명령의 `--body-file`, `--input`은 슬래시로 쓴 Windows
+  경로(`C:/.../scratchpad/x.md`)로 넘긴다. `/c/...`는 그대로 `gh`에 가서 파일을 못 찾고, 역슬래시 경로는
+  따옴표 없이 쓰면 Bash가 역슬래시를 지운다(`C:\Users\x.md` → `C:Usersx.md`).
+- PowerShell 도구(5.1)에서 실행해도 `/`는 그대로 가지만, 큰따옴표 안의 백틱은 이스케이프로 사라지고
+  (`` "`/fix-issue`에서" `` → `/fix-issue에서`), 인자 안의 `"`는 작은따옴표로 감싸도 사라지며
+  (`'/fix-issue "a" b'` → `/fix-issue a b`), `"` 사이에 공백이 있으면 인자가 둘로 갈라진다
+  (`'x "a b" y'` → `x a`와 `b y`. `gh`는 `accepts 1 arg(s), received 2`로 실패한다). PowerShell에서는
+  작은따옴표로 쓰고, 글에 `"`가 있으면 위의 Bash 방법이나 파일로 넘긴다.
+- 본문은 `--body-file <파일>`(`gh api`는 `--input <json>`이나 `-F body=@<파일>`)로 넘기면 파일 안의 글은
+  바뀌지 않는다. 이때 경로(`/c/...`)는 MSYS가 Windows 경로로 바르게 바꿔 준다.
+- PR이나 이슈를 만들거나 제목을 고친 뒤 `gh pr view <M> --json title` / `gh issue view <N> --json title`로
+  제목에 `C:/`가 없는지 본다. `gh pr merge --merge`는 PR 제목을 머지 커밋에 쓰므로, 머지 전에 고쳐야 한다.
+  고치는 `gh pr edit <M> --title`, `gh issue edit <N> --title`도 같은 방법으로 넘긴다.
+
 ## 서브이슈 등록
 
 작업이나 리뷰에서 나온 문제를 메인 이슈 `<P>`의 서브이슈로 등록한다. 개발자에게 묻지 않고 등록한다.
@@ -75,8 +104,9 @@ CI는 오래 걸리므로 `gh pr checks <M> --watch` 또는 `gh run watch <run i
      [--blocked-by <먼저 끝나야 하는 열린 이슈 번호들>]
    ```
    다른 열린 이슈가 먼저 끝나야 고칠 수 있으면 `--blocked-by`를 붙인다(처리 순서에 쓰인다).
+   제목이 `/`로 시작할 수 있으면 공용 절차 **Git Bash에서 `gh`에 넘기는 인자**를 따른다.
 6. **프로젝트 필드**: `hgh copy-fields <P> <새 번호> --status Todo` (단계·영역·플랫폼·res 릴리스를 메인 이슈와 같게).
-7. **확인**: `hgh kind <새 번호>`가 `kind: "sub"`, parent `<P>`, 마일스톤이 맞는지 본다.
+7. **확인**: `hgh kind <새 번호>`가 `kind: "sub"`, parent `<P>`, 마일스톤이 맞고, `title`에 `C:/`가 없는지 본다.
 
 등록한 것은 `# / Type / label / 제목 / 출처` 표로 보고한다.
 

@@ -112,6 +112,11 @@ gh pr create --base <base> --head <branch> --title "<한국어 제목> (#<N>)" -
   --assignee i-technika --label <이슈의 label마다 하나씩> --milestone "<이슈의 마일스톤 제목>" \
   --project "Hydroid Project"
 ```
+제목이 `/`로 시작할 수 있으면(예: `/fix-issue`로 시작) 공용 절차 **Git Bash에서 `gh`에 넘기는 인자**대로
+Bash에서 `MSYS_NO_PATHCONV=1`을 붙이고 작은따옴표로 넘긴다(PowerShell은 글 안의 `"`를 떼어 내거나 인자를
+가르므로, `"`가 없는 글만). 6~8단계의 답글(`-f body=...`)이나 코멘트
+(`--comment`, `--body`)도 `/`로 시작하면 같다.
+
 이어서:
 1. 프로젝트 필드: `hgh copy-fields <N> <M>` (단계·영역·플랫폼·res 릴리스를 이슈와 같게. Status는 자동화에 맡긴다).
 2. **Development 연결 확인**: `hgh links <M>`의 `linkedIssues`에 `<N>`이 있어야 한다. 없으면 GitHub API로는
@@ -198,6 +203,7 @@ Resolve는 `gh api graphql -f query='mutation($id:ID!){resolveReviewThread(input
 | 작업 트리 깨끗함 | `git status --porcelain` 비어 있음 |
 | push됨 | 로컬 `HEAD` == `gh pr view <M> --json headRefOid` |
 | base | PR base가 2단계의 base와 같음 |
+| PR 제목 | `gh pr view <M> --json title`에 `C:/`가 없음(Git Bash가 `/`로 시작하는 인자를 경로로 바꾼 흔적. 있으면 `gh pr edit <M> --title`을 같은 공용 절차대로 넘겨 고친다) |
 | base와 충돌 없음, 뒤처지지 않음 | `gh pr view <M> --json mergeable,mergeStateStatus`: `MERGEABLE`이고 `DIRTY`/`BEHIND` 아님 |
 | 미해결 스레드 0 | 위 GraphQL에서 `isResolved: false` 없음 |
 | PR 메타데이터 | `gh pr view <M> --json assignees,labels,milestone,projectItems`: `i-technika`, 이슈와 같은 label·마일스톤, `Hydroid Project` |
