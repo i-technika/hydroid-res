@@ -446,12 +446,15 @@ TEST(ResourcesAllocations, AFailedAllocationAsAPackageLoadsThrows) {
     const uint64_t revision = table.revision();
     const std::optional<ResId> libWhere = table.find("com.example.lib:string/where");
     ASSERT_TRUE(libWhere);
+    const Package* libPackage = table.package(0x7e);
     try {
       allocationsOf([&] { table.addPackage(res, "com.example", kAppPackageId); }, failAt);
     } catch (const std::bad_alloc&) {
       threw++;
     }
     ASSERT_EQ(table.packages().size(), 1u);
+    // Where it was, so that a pointer into the table from before the call is one still.
+    EXPECT_EQ(table.package(0x7e), libPackage);
     EXPECT_EQ(table.packages()[0].name, "com.example.lib");
     EXPECT_EQ(table.revision(), revision);
     EXPECT_EQ(table.find("com.example.lib:string/where"), libWhere);

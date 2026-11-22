@@ -79,17 +79,17 @@ bool ResourceTable::addPackage(const std::filesystem::path& res, std::string_vie
     if (errors) errors->insert(errors->end(), diag.errors().begin(), diag.errors().end());
     return false;
   }
-  // What may run out of memory is done before the table changes, and what changes it is undone if
-  // it does, so that a std::bad_alloc leaves the table as it was too (#257): the names, and the
-  // room for the package, are made first. None of the names is in byName_ yet, as the package's
-  // name is new, so that taking out those put in takes out nothing else.
+  // What changes the table is undone if an allocation fails, so that a std::bad_alloc leaves it as
+  // it was too (#257): the names are made first, then put in, and the package is put in last, as
+  // a push_back that fails leaves packages_ where it was, and the pointers into it. None of the
+  // names is in byName_ yet, as the package's name is new, so that taking out those put in takes
+  // out nothing else.
   std::vector<std::pair<std::string, ResId>> names;
   for (const TypeTable& type : loaded->types) {
     for (const Entry& e : type.entries) {
       names.emplace_back(key(loaded->name, type.type, e.name), makeResId(id, type.id, e.id));
     }
   }
-  packages_.reserve(packages_.size() + 1);
   size_t added = 0;
   try {
     for (; added < names.size(); added++) byName_.insert(names[added]);
