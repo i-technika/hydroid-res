@@ -1,12 +1,14 @@
-# Fails unless hydroid-rc pick, given the app's LocaleConfig, prints what Android picked of
+# Fails unless hydroid-rc pick, given the app's LocaleConfig where Android was (not for the app's
+# own Resources of the "app ..." lifecycles, below), prints what Android picked of
 # golden/localeconfig's res/ through each lifecycle of golden/localeconfig/data (#268): its steps
 # one after another on the same Resources, the first as the qualifiers and --locales, each after
 # it by --then, and for each step the locale the configuration has first and the value of every
 # string, which says the folder it is in. The qualifiers of a step are only the mcc, mnc and
 # orientation of its Configuration, as the app's values have no other qualifier than a language
 # and an mcc. It also fails unless the LocaleConfig is what makes the second step of "fr+es" read
-# es too, unless a --then of no --locales keeps the languages of the device just before it, and
-# unless pick ends with an error for a LocaleConfig it cannot read or one given twice.
+# es too, unless a --then of no language keeps the languages of the device just before it, and
+# one of a language in its qualifiers has that one, and unless pick ends with an error for a
+# LocaleConfig it cannot read or one given twice.
 # RC is hydroid-rc, RES the app's res/ and GOLDEN golden/localeconfig/data, all from
 # tests/CMakeLists.txt.
 
@@ -180,6 +182,14 @@ expect_locale("${out}" 2 es-rES)
 pick(out fr-rFR-port --then land --then es-land)
 expect_locale("${out}" 1 fr-rFR)
 expect_locale("${out}" 2 es)
+# That of the device just before it, not of the first.
+pick(out fr-rFR-port --then es-land --then port)
+expect_locale("${out}" 2 es)
+# A language in the qualifiers of a --then drops the --locales before, as do those of the devices
+# after it.
+pick(out port --locales fr-FR,es-ES --then de-land --then port)
+expect_locale("${out}" 1 de)
+expect_locale("${out}" 2 de)
 
 # A LocaleConfig that cannot be read is an error, and one given twice a misuse.
 execute_process(COMMAND "${RC}" pick "${RES}" port --locale-config "${RES}/xml/no-such.xml"

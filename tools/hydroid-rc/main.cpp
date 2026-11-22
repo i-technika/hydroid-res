@@ -45,8 +45,9 @@ int usage() {
                "        after it may read them in more than one\n"
                "    --then  a device the same resources are then set to, of the languages of\n"
                "        the one before, its --locales and the locale of its qualifiers, unless\n"
-               "        it names others: pick prints the lines of each device in turn, each\n"
-               "        starting with its locale\n",
+               "        it names others: a language in its qualifiers, which drops the --locales\n"
+               "        before, or --locales. pick prints the lines of each device in turn,\n"
+               "        each starting with its locale\n",
                res::kEmulatedSdkVersion);
   return 2;
 }
@@ -249,19 +250,17 @@ int run(const std::vector<fs::path>& args) {
     for (const Step& step : steps) {
       std::optional<res::Config> device = deviceOf(step.qualifiers);
       if (!device) return 1;
-      // A device after another keeps the languages of that one, as a phone that is turned does:
-      // its --locales, unless it gives its own, and the locale of its qualifiers, unless they name
-      // a language. That locale counts only where there are no --locales, which replace it.
+      // A device after another whose qualifiers name no language keeps the languages of that one,
+      // as a phone that is turned does: its --locales, unless it gives its own, and the locale of
+      // its qualifiers. One whose qualifiers name a language has that one, and its --locales only.
       std::vector<res::Config> locales;
-      if (!devices.empty()) {
-        const res::Config& before = devices.back().config;
-        locales = devices.back().locales;
-        if (device->lang[0] == '\0') {
-          device->lang = before.lang;
-          device->region = before.region;
-          device->script = before.script;
-          device->variant = before.variant;
-        }
+      if (!devices.empty() && device->lang[0] == '\0') {
+        const Device& before = devices.back();
+        locales = before.locales;
+        device->lang = before.config.lang;
+        device->region = before.config.region;
+        device->script = before.config.script;
+        device->variant = before.config.variant;
       }
       if (step.tags) {
         std::optional<std::vector<res::Config>> parsed = localesOf(*step.tags);

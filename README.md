@@ -155,7 +155,8 @@ python scripts/golden/pull_golden.py --app localeconfig
 `Resources` the app's LocaleConfig after the first device, as Android does, if that has more than
 one language, and each `--then <qualifiers> [--locales <tag,...>]` sets the same `Resources` to
 another device, of the languages of the one before, its `--locales` and the locale of its
-qualifiers, unless it names others (`--locales`, or a language in its qualifiers). It prints the
+qualifiers, unless it names others: `--locales`, or a language in its qualifiers, which drops the
+`--locales` before too. It prints the
 lines of each device in turn, each starting with its locale. A `Resources` made for fr and es,
 then turned, reads `string/es` in es only at the turn:
 
