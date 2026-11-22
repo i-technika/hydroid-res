@@ -27,8 +27,9 @@ int usage() {
   std::fprintf(stderr,
                "usage: hydroid-rc --version\n"
                "       hydroid-rc dump <res-folder> [<package>]\n"
-               "       hydroid-rc pick <res-folder> <qualifiers> [--locales <tag,...>] "
-               "[<package>]\n"
+               "       hydroid-rc pick <res-folder> <qualifiers> [--locales <tag,...>]\n"
+               "                       [--locale-config <file>]\n"
+               "                       [--then <qualifiers> [--locales <tag,...>]]... [<package>]\n"
                "  dump  loads the folder as <package> (com.example by default), id 7f, and prints\n"
                "        it as `aapt2 dump resources` prints an APK\n"
                "  pick  loads it so too, and prints the value each resource has on the device\n"
@@ -37,7 +38,14 @@ int usage() {
                "        tags of --locales (ko-KR,en-US): first the locale it reads them in, then\n"
                "        a line for each resource, with the configuration of its value. Without a\n"
                "        version (v34) among the qualifiers, the device is of API %d; with one,\n"
-               "        of that one, even where a folder so named is of a later (night-v4)\n",
+               "        of that one, even where a folder so named is of a later (night-v4)\n"
+               "    --locale-config  the app's LocaleConfig (res/xml/locales_config.xml), which\n"
+               "        the resources are given after the first device, as Android gives it, if\n"
+               "        that has more than one language: with a default locale, the devices\n"
+               "        after it may read them in more than one\n"
+               "    --then  a device the same resources are then set to, of the languages of\n"
+               "        the one before unless --locales follows: pick prints the lines of each\n"
+               "        device in turn, each starting with its locale\n",
                res::kEmulatedSdkVersion);
   return 2;
 }
@@ -116,16 +124,17 @@ std::optional<std::vector<res::Config>> localesOf(std::string_view tags) {
   }
 }
 
-// What the device of `device` and `locales` picks of the table: the locale it chose, as
-// "locale (ko-rKR)", then for each resource of the folder its line of `dump`, PUBLIC and all,
-// followed by the configuration and the value it picked, or by "no value" if none matches. The
-// lines that follow a style, array, plurals or attribute are indented under it.
-int pick(const fs::path& folder, const std::string& package, const res::Config& device,
-         const std::vector<res::Config>& locales) {
-  const std::optional<res::ResourceTable> table = load(folder, package);
-  if (!table) return 1;
-  res::Resources resources(*table);
-  resources.setConfiguration(device, locales);
+// A device as setConfiguration takes it.
+struct Device {
+  res::Config config;
+  std::vector<res::Config> locales;
+};
+
+// Prints what `resources` pick of `table`: the locale they chose, as "locale (ko-rKR)", then for
+// each resource of the folder its line of `dump`, PUBLIC and all, followed by the configuration
+// and the value it picked, or by "no value" if none matches. The lines that follow a style,
+// array, plurals or attribute are indented under it.
+void print(const res::ResourceTable& table, const res::Resources& resources) {
   const res::Config configuration = resources.configuration();
   res::Config locale;
   locale.lang = configuration.lang;
@@ -133,7 +142,7 @@ int pick(const fs::path& folder, const std::string& package, const res::Config& 
   locale.script = configuration.script;
   locale.variant = configuration.variant;
   std::cout << "locale (" << res::toString(locale) << ")\n";
-  for (const res::Package& p : table->packages()) {
+  for (const res::Package& p : table.packages()) {
     for (const res::TypeTable& type : p.types) {
       if (type.type == res::ResType::Styleable) continue;  // left out of dump too
       for (const res::Entry& entry : type.entries) {
@@ -155,6 +164,24 @@ int pick(const fs::path& folder, const std::string& package, const res::Config& 
         std::cout << '\n';
       }
     }
+  }
+}
+
+// What one Resources of the table picks as it is set to each of `devices` in turn, printed for
+// each. As ContextImpl.setResources does, it is given `localeConfig`, if any, after the first,
+// and only if that has more than one locale: an app first shown in one language never reads its
+// resources in more, whatever the user adds later (golden/localeconfig's "fr then fr+es").
+int pick(const fs::path& folder, const std::string& package, const std::vector<Device>& devices,
+         const std::optional<res::LocaleConfig>& localeConfig) {
+  const std::optional<res::ResourceTable> table = load(folder, package);
+  if (!table) return 1;
+  res::Resources resources(*table);
+  for (size_t i = 0; i < devices.size(); i++) {
+    resources.setConfiguration(devices[i].config, devices[i].locales);
+    if (i == 0 && localeConfig && devices[i].locales.size() > 1) {
+      resources.setLocaleConfig(*localeConfig);
+    }
+    print(*table, resources);
   }
   return 0;
 }
@@ -183,37 +210,68 @@ int run(const std::vector<fs::path>& args) {
     return dump(args[2], package);
   }
   if (args.size() >= 4 && args[1] == "pick") {
-    // The qualifiers, then --locales and the package in either order.
-    std::vector<std::string> rest;
+    // The qualifiers, then --locales, --locale-config and the package in any order, then each
+    // --then with its qualifiers and the --locales of those. The file of --locale-config stays a
+    // path, as the folder does.
+    struct Step {
+      std::string qualifiers;
+      std::optional<std::string> tags;
+    };
+    std::vector<Step> steps;
+    std::optional<fs::path> localeConfigFile;
+    std::optional<std::string> package;
     try {
-      for (size_t i = 3; i < args.size(); i++) rest.push_back(utf8(args[i]));
+      steps.push_back({utf8(args[3]), std::nullopt});
+      for (size_t i = 4; i < args.size(); i++) {
+        const bool last = i + 1 == args.size();
+        if (args[i] == "--locale-config") {
+          if (localeConfigFile || last) return usage();
+          localeConfigFile = args[++i];
+          continue;
+        }
+        const std::string arg = utf8(args[i]);
+        if (arg == "--locales" && !steps.back().tags && !last) {
+          steps.back().tags = utf8(args[++i]);
+        } else if (arg == "--then" && !last) {
+          steps.push_back({utf8(args[++i]), std::nullopt});
+        } else if (arg != "--locales" && arg != "--then" && !package) {
+          package = arg;
+        } else {
+          return usage();
+        }
+      }
     } catch (const std::system_error&) {
       std::cerr << "error: an argument is not Unicode text\n";
       return 1;
     }
-    std::optional<std::string> tags;
-    std::optional<std::string> package;
-    for (size_t i = 1; i < rest.size(); i++) {
-      if (rest[i] == "--locales" && !tags && i + 1 < rest.size()) {
-        tags = rest[++i];
-      } else if (rest[i] != "--locales" && !package) {
-        package = rest[i];
-      } else {
-        return usage();
+    std::vector<Device> devices;
+    for (const Step& step : steps) {
+      const std::optional<res::Config> device = deviceOf(step.qualifiers);
+      if (!device) return 1;
+      // A device of no --locales after another has the languages of that one, as a phone that is
+      // turned keeps them.
+      std::vector<res::Config> locales;
+      if (!devices.empty()) locales = devices.back().locales;
+      if (step.tags) {
+        std::optional<std::vector<res::Config>> parsed = localesOf(*step.tags);
+        if (!parsed) {
+          std::cerr << "error: not a list of BCP 47 language tags: " << *step.tags << '\n';
+          return 1;
+        }
+        locales = std::move(*parsed);
       }
+      devices.push_back({*device, std::move(locales)});
     }
-    const std::optional<res::Config> device = deviceOf(rest[0]);
-    if (!device) return 1;
-    std::vector<res::Config> locales;
-    if (tags) {
-      std::optional<std::vector<res::Config>> parsed = localesOf(*tags);
-      if (!parsed) {
-        std::cerr << "error: not a list of BCP 47 language tags: " << *tags << '\n';
+    std::optional<res::LocaleConfig> localeConfig;
+    if (localeConfigFile) {
+      std::vector<res::Diagnostic> errors;
+      localeConfig = res::parseLocaleConfig(*localeConfigFile, &errors);
+      if (!localeConfig) {
+        for (const res::Diagnostic& e : errors) std::cerr << "error: " << e << '\n';
         return 1;
       }
-      locales = std::move(*parsed);
     }
-    return pick(args[2], package.value_or("com.example"), *device, locales);
+    return pick(args[2], package.value_or("com.example"), devices, localeConfig);
   }
   return usage();
 }
