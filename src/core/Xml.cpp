@@ -57,8 +57,11 @@ void setValue(pugi::xml_node node, const char* value, size_t size) {
   if (!node.set_value(value, size)) throw std::bad_alloc();
 }
 
+// Named after it is added, as append_attribute(name) gives an attribute with no name when there is
+// no memory for the name, and says nothing; an empty name needs none.
 void appendAttribute(pugi::xml_node element, const char* name, const char* value) {
-  if (!element.append_attribute(name).set_value(value)) throw std::bad_alloc();
+  pugi::xml_attribute attr = element.append_attribute("");
+  if (!attr || !attr.set_name(name) || !attr.set_value(value)) throw std::bad_alloc();
 }
 
 // The tree of what expat reads, as aapt2 gets it: the entities a DTD declares expanded, an

@@ -105,18 +105,20 @@ long pugiAllocationsOf(F&& f, long failAt = -1) {
   return pugiAllocations.load();
 }
 
-// Stops the test where the library allocates out of sight of the operator new above, as a DLL,
-// which has its own, does: what is counted would then be nothing, whatever the library did.
-#define REQUIRE_COUNTED(n)                                      \
-  do {                                                          \
-    if ((n) == 0) {                                             \
-      if constexpr (HYDROID_SHARED_LIBRARY) {                   \
-        GTEST_SKIP() << "the library has its own operator new"; \
-      } else {                                                  \
-        FAIL() << "the library's allocations are not counted";  \
-      }                                                         \
-    }                                                           \
+// Stops the test where the library allocates out of sight of what counts them, as a DLL does,
+// which has its own `what`, operator new or pugixml: what is counted would then be nothing,
+// whatever the library did.
+#define REQUIRE_COUNTED_BY(n, what)                            \
+  do {                                                         \
+    if ((n) == 0) {                                            \
+      if constexpr (HYDROID_SHARED_LIBRARY) {                  \
+        GTEST_SKIP() << "the library has its own " << (what);  \
+      } else {                                                 \
+        FAIL() << "the library's allocations are not counted"; \
+      }                                                        \
+    }                                                          \
   } while (0)
+#define REQUIRE_COUNTED(n) REQUIRE_COUNTED_BY(n, "operator new")
 
 // The checked iterators of MSVC's Debug library allocate in constructors that are noexcept, as an
 // empty vector's, so a failed allocation there ends the program, wherever it is made. The tests
@@ -366,22 +368,24 @@ TEST(ResourcesAllocations, AFailedAllocationAsXmlIsReadThrows) {
 
 // What pugixml has no memory for as expat reads a file, which it says by an empty node or false,
 // throws std::bad_alloc out of parseLocaleConfig too (#263), rather than give what it read of a
-// tree with an element or an attribute left out. A long attribute and text take more than one of
-// pugixml's pages. Not for a DLL, whose pugixml is not this program's.
+// tree with an element or an attribute left out. A long element name, attribute name, attribute
+// value and text each take an allocation of their own, past one of pugixml's pages. Not for a DLL,
+// whose pugixml is not this program's.
 TEST(ResourcesAllocations, PugixmlWithoutMemoryAsXmlIsReadThrows) {
   TempDir dir;
   const std::string filler(40000, 'x');
   dir.write("locales_config.xml",
             "<locale-config xmlns:android=\"http://schemas.android.com/apk/res/android\" "
-            "android:defaultLocale=\"ko\" note=\"" +
-                filler + "\">\n  <locale android:name=\"en-US\"/> " + filler +
-                " <![CDATA[ <cdata> ]]>\n  <locale android:name=\"ko\"/>\n</locale-config>");
+            "android:defaultLocale=\"ko\" " +
+                filler + "=\"name\" note=\"" + filler + "\">\n  <locale android:name=\"en-US\"/> " +
+                filler + " <![CDATA[ <cdata> ]]>\n  <" + filler +
+                "/>\n  <locale android:name=\"ko\"/>\n</locale-config>");
   const std::filesystem::path file = dir.path() / "locales_config.xml";
   std::optional<LocaleConfig> parsed;
   const long all = pugiAllocationsOf([&] { parsed = parseLocaleConfig(file); });
   ASSERT_TRUE(parsed);
   EXPECT_EQ(parsed->supported.size(), 2u);
-  REQUIRE_COUNTED(all);
+  REQUIRE_COUNTED_BY(all, "pugixml");
   for (long failAt = 0; failAt < all; failAt++) {
     SCOPED_TRACE(failAt);
     EXPECT_THROW(pugiAllocationsOf([&] { parseLocaleConfig(file); }, failAt), std::bad_alloc);
@@ -409,7 +413,7 @@ TEST(ResourcesAllocations, PugixmlWithoutMemoryFailsAddPackage) {
     ASSERT_TRUE(added);
     ASSERT_TRUE(table.find("com.example:id/text"));
   }
-  REQUIRE_COUNTED(all);
+  REQUIRE_COUNTED_BY(all, "pugixml");
   for (long failAt = 0; failAt < all; failAt++) {
     SCOPED_TRACE(failAt);
     ResourceTable table;
