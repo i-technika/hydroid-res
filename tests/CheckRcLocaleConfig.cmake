@@ -5,7 +5,8 @@
 # string, which says the folder it is in. The qualifiers of a step are only the mcc, mnc and
 # orientation of its Configuration, as the app's values have no other qualifier than a language
 # and an mcc. It also fails unless the LocaleConfig is what makes the second step of "fr+es" read
-# es too, and unless pick ends with an error for a LocaleConfig it cannot read or one given twice.
+# es too, unless a --then of no --locales keeps the languages of the device just before it, and
+# unless pick ends with an error for a LocaleConfig it cannot read or one given twice.
 # RC is hydroid-rc, RES the app's res/ and GOLDEN golden/localeconfig/data, all from
 # tests/CMakeLists.txt.
 
@@ -79,7 +80,16 @@ foreach(file IN LISTS lifecycles)
     endif()
     list(APPEND args "${qualifiers}" --locales "${requested}")
   endforeach()
-  pick(out ${args} --locale-config "${locale_config}")
+  # The app has its LocaleConfig, which pick gives as Android does: so for a lifecycle whose first
+  # step has one language, which Android was not given it for either ("fr then fr+es"). Not for
+  # the app's own Resources given languages by LocaleManager ("app ..."), whose first step has
+  # more, but which the golden says Android was not given it for.
+  string(JSON given GET "${golden}" localeConfig)
+  string(JSON first_requested GET "${steps}" 0 condition requestedLocales)
+  if(given OR NOT first_requested MATCHES ",")
+    list(APPEND args --locale-config "${locale_config}")
+  endif()
+  pick(out ${args})
 
   string(REGEX MATCHALL "\nlocale " locale_lines "${out}")
   list(LENGTH locale_lines printed)
@@ -154,6 +164,22 @@ if(NOT got STREQUAL "(es) \"es\"")
   message(FATAL_ERROR "with --locale-config, and a --then of no --locales, hydroid-rc pick "
     "prints string/es ${got} after the turn, not (es) \"es\"")
 endif()
+
+# A --then of no --locales has the languages of the device just before it, not of the first.
+function(expect_locale text index locale)
+  block_of("${text}" ${index} block)
+  string(REGEX MATCH "^\nlocale \\([^\n]*\\)" line "${block}")
+  if(NOT line STREQUAL "\nlocale (${locale})")
+    message(FATAL_ERROR "device ${index} (from 0) has '${line}', not locale (${locale}):\n${text}")
+  endif()
+endfunction()
+pick(out port --locales fr-FR,es-ES --then land --locales es-ES,fr-FR --then port)
+expect_locale("${out}" 2 es-rES)
+# And, after one of a locale in its qualifiers and no --locales, that locale, unless its own
+# qualifiers name a language.
+pick(out fr-rFR-port --then land --then es-land)
+expect_locale("${out}" 1 fr-rFR)
+expect_locale("${out}" 2 es)
 
 # A LocaleConfig that cannot be read is an error, and one given twice a misuse.
 execute_process(COMMAND "${RC}" pick "${RES}" port --locale-config "${RES}/xml/no-such.xml"

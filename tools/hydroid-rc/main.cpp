@@ -44,8 +44,9 @@ int usage() {
                "        that has more than one language: with a default locale, the devices\n"
                "        after it may read them in more than one\n"
                "    --then  a device the same resources are then set to, of the languages of\n"
-               "        the one before unless --locales follows: pick prints the lines of each\n"
-               "        device in turn, each starting with its locale\n",
+               "        the one before, its --locales and the locale of its qualifiers, unless\n"
+               "        it names others: pick prints the lines of each device in turn, each\n"
+               "        starting with its locale\n",
                res::kEmulatedSdkVersion);
   return 2;
 }
@@ -246,12 +247,22 @@ int run(const std::vector<fs::path>& args) {
     }
     std::vector<Device> devices;
     for (const Step& step : steps) {
-      const std::optional<res::Config> device = deviceOf(step.qualifiers);
+      std::optional<res::Config> device = deviceOf(step.qualifiers);
       if (!device) return 1;
-      // A device of no --locales after another has the languages of that one, as a phone that is
-      // turned keeps them.
+      // A device after another keeps the languages of that one, as a phone that is turned does:
+      // its --locales, unless it gives its own, and the locale of its qualifiers, unless they name
+      // a language. That locale counts only where there are no --locales, which replace it.
       std::vector<res::Config> locales;
-      if (!devices.empty()) locales = devices.back().locales;
+      if (!devices.empty()) {
+        const res::Config& before = devices.back().config;
+        locales = devices.back().locales;
+        if (device->lang[0] == '\0') {
+          device->lang = before.lang;
+          device->region = before.region;
+          device->script = before.script;
+          device->variant = before.variant;
+        }
+      }
       if (step.tags) {
         std::optional<std::vector<res::Config>> parsed = localesOf(*step.tags);
         if (!parsed) {
