@@ -3,7 +3,8 @@
 
 Usage: python scripts/golden/pull_golden.py [--serial SERIAL] [--skip-run] [--app APP]
 Needs adb on PATH (or ANDROID_HOME set) and a debuggable build of the golden app.
---app localeconfig dumps the app with a LocaleConfig into golden/localeconfig/data/ (#249).
+--app localeconfig dumps the app with a LocaleConfig into golden/localeconfig/data/ (#249), and
+--app nolocale the app with no locales but the pseudo-locales into golden/nolocale/data/ (#252).
 """
 
 import argparse
@@ -20,6 +21,8 @@ APPS = {
     "app": ("app", "com.itechnika.hydroid.golden", GOLDEN_PROJECT / "data"),
     "localeconfig": ("localeconfig", "com.itechnika.hydroid.golden.localeconfig",
                      GOLDEN_PROJECT / "localeconfig" / "data"),
+    "nolocale": ("nolocale", "com.itechnika.hydroid.golden.nolocale",
+                 GOLDEN_PROJECT / "nolocale" / "data"),
 }
 
 

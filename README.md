@@ -17,6 +17,7 @@ resolves values exactly as Android does, for UIKit, GTK4 and WinUI 3. Design and
 | `golden/` | Android test app + instrumentation test that dumps Android's answers |
 | `golden/data/` | The dumped golden JSON the C++ tests compare against |
 | `golden/localeconfig/` | A second app, with a LocaleConfig and a default locale, and `data/`, what Android picked for it ([Golden data](#golden-data)) |
+| `golden/nolocale/` | A third app, with no locales but the pseudo-locales, and `data/`, what Android picked for it |
 | `golden/table/res/` | A `res/` folder with every kind of value and file, for the table tests |
 | `golden/aapt2/` | What the SDK's aapt2 makes of literal values, resource folder names, strings and whole `res/` folders |
 | `golden/aosp/` | The folder names of AOSP's framework `res/`, which must all parse |
@@ -148,6 +149,22 @@ through `setConfiguration` and `setLocaleConfig`:
 
 ```sh
 python scripts/golden/pull_golden.py --app localeconfig
+```
+
+Of a list of languages, Android reads an app's resources in the first that the app has, and
+takes it to have English, which it keeps in `values/`; the golden app has `values-en*/`, so
+neither is seen there. The first step of a `golden/localeconfig` lifecycle chooses so, without
+the LocaleConfig, and that app has no English: `ko-KR,en-GB,ja-JP` reads in en-GB, and
+`ko-KR,en-XA,ja-JP` in ja, as en-XA is a pseudo-locale and no English (#252). An app with no
+locales but the pseudo-locales Android reads in the first the system's resources have.
+`golden/nolocale` is an app of its own for that, with `values-en-rXA/` and `values-ar-rXB/`,
+whose `NoLocaleDumpTest` dumps lifecycles as `LocaleConfigDumpTest` does into
+`golden/nolocale/data/`, which `GoldenNoLocaleTest` replays: `cy-GB,ja-JP` reads in ja, as the
+system has no Welsh. Both tests have in the table a package android of a folder for each locale
+of `golden/aosp/framework_res_dirs.txt`, which hydroid must leave out of the app's locales:
+
+```sh
+python scripts/golden/pull_golden.py --app nolocale
 ```
 
 The plugin (9.5.1) compiles values and most files (raw, layout, xml) with a compiler of its own,
