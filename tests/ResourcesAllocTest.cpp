@@ -31,13 +31,22 @@ std::atomic<long> failing{-1};
 
 }  // namespace
 
-void* operator new(std::size_t size) {
+// Out of line, as GCC's optimizer calls it a mismatch when it inlines one of them into a test
+// (-Wmismatched-new-delete, #258): a free there of what a call to operator new gave, or a call to
+// operator delete there of what a malloc gave. With neither inlined, it sees the calls pair up.
+#if defined(__GNUC__)
+#define HYDROID_OUT_OF_LINE __attribute__((noinline))
+#else
+#define HYDROID_OUT_OF_LINE
+#endif
+
+HYDROID_OUT_OF_LINE void* operator new(std::size_t size) {
   if (counting.load() && allocations.fetch_add(1) == failing.load()) throw std::bad_alloc();
   if (void* p = std::malloc(size == 0 ? 1 : size)) return p;
   throw std::bad_alloc();
 }
-void operator delete(void* p) noexcept { std::free(p); }
-void operator delete(void* p, std::size_t) noexcept { std::free(p); }
+HYDROID_OUT_OF_LINE void operator delete(void* p) noexcept { std::free(p); }
+HYDROID_OUT_OF_LINE void operator delete(void* p, std::size_t) noexcept { std::free(p); }
 
 namespace hydroid::res {
 namespace {
