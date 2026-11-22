@@ -72,7 +72,7 @@ add_test(NAME CApi.WorksFromC
 # delete is of a new. Not in the sanitizers' builds, as theirs would be replaced.
 if(NOT CMAKE_CXX_FLAGS MATCHES "-fsanitize=")
   add_executable(hydroid-res-alloc-tests ResourcesAllocTest.cpp)
-  target_link_libraries(hydroid-res-alloc-tests PRIVATE hydroid::res GTest::gtest_main)
+  target_link_libraries(hydroid-res-alloc-tests PRIVATE hydroid::res pugixml::pugixml GTest::gtest_main)
   # A DLL has its own operator new, so the tests skip what they cannot count there.
   target_compile_definitions(hydroid-res-alloc-tests PRIVATE
     "HYDROID_SHARED_LIBRARY=$<STREQUAL:$<TARGET_PROPERTY:hydroid-res,TYPE>,SHARED_LIBRARY>")
