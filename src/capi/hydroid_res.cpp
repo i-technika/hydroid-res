@@ -189,6 +189,8 @@ hydroid_res_value toC(const res::ResourceTable& table, res::ResId id, const res:
         const res::FileRef& file = package->files[value.index()];
         setString(out, file.path);
         out.format = static_cast<uint8_t>(file.type);
+        out.source = file.source.c_str();
+        out.source_length = file.source.size();
       }
       break;
     case ValueKind::Null:

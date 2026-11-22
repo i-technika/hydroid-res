@@ -114,10 +114,15 @@ enum class FileType : uint8_t {
   Png,    // a .png or .9.png outside raw/
 };
 
-// The value of a File: where the file is in the APK, "res/drawable-hdpi-v4/icon.png".
+// The value of a File: where the file is in the APK, "res/drawable-hdpi-v4/icon.png", and where
+// it is in the res/ folder addPackage read for the package that holds it, which the APK's path
+// does not say: aapt2 writes the folder's qualifiers its own way (drawable-hdpi/ is
+// drawable-hdpi-v4/) and gives the name what follows the file name's first '.' (raw/a.b.txt is
+// res/raw/a.b.b.txt).
 struct FileRef {
   std::string path;
   FileType type = FileType::Other;
+  std::string source;  // UTF-8, its folder and name in res/ with '/': "drawable-hdpi/icon.png"
 };
 
 // The value of a Style. Its items are in the order of their attribute ids; aapt2 keeps an

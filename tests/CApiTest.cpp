@@ -143,6 +143,11 @@ std::string text(const hydroid_res_value& v) {
   return v.string ? std::string(v.string, v.string_length) : std::string("(none)");
 }
 
+// Where the C value of a file says it is in res/.
+std::string source(const hydroid_res_value& v) {
+  return v.source ? std::string(v.source, v.source_length) : std::string("(none)");
+}
+
 // `got`, the C value of `want` of `package`, holds what `want` does.
 void expectSameValue(const Package& package, const Value& want, const hydroid_res_value& got,
                      const std::string& what) {
@@ -151,6 +156,7 @@ void expectSameValue(const Package& package, const Value& want, const hydroid_re
   uint32_t data = 0;
   uint8_t format = 0;
   const std::string* string = nullptr;
+  const std::string* source = nullptr;
   switch (want.kind()) {
     case ValueKind::Reference:
     case ValueKind::AttrRef: data = want.ref(); break;
@@ -175,19 +181,24 @@ void expectSameValue(const Package& package, const Value& want, const hydroid_re
     case ValueKind::File:
       string = &package.files[want.index()].path;
       format = static_cast<uint8_t>(package.files[want.index()].type);
+      source = &package.files[want.index()].source;
       break;
     default: break;
   }
   EXPECT_EQ(got.data, data);
   EXPECT_EQ(got.format, format);
-  if (string) {
-    ASSERT_NE(got.string, nullptr);
-    EXPECT_EQ(std::string(got.string, got.string_length), *string);
-    EXPECT_EQ(got.string[got.string_length], '\0');
-  } else {
-    EXPECT_EQ(got.string, nullptr);
-    EXPECT_EQ(got.string_length, 0u);
-  }
+  const auto expectText = [](const char* text, size_t length, const std::string* expected) {
+    if (expected) {
+      ASSERT_NE(text, nullptr);
+      EXPECT_EQ(std::string(text, length), *expected);
+      EXPECT_EQ(text[length], '\0');
+    } else {
+      EXPECT_EQ(text, nullptr);
+      EXPECT_EQ(length, 0u);
+    }
+  };
+  expectText(got.string, got.string_length, string);
+  expectText(got.source, got.source_length, source);
 }
 
 // The C table of the golden table/res, which must load.
@@ -404,13 +415,18 @@ TEST(CApi, GivesValuesAsTheHeaderSays) {
   EXPECT_EQ(v.kind, HYDROID_RES_VALUE_FILE);
   EXPECT_EQ(text(v), "res/drawable/icon.png");
   EXPECT_EQ(v.format, 2);
+  // And where it is in res/, which the APK's path does not say (#254).
+  EXPECT_EQ(source(v), "drawable/icon.png");
   v = value("@raw/data");
   EXPECT_EQ(text(v), "res/raw/data.bin");
   EXPECT_EQ(v.format, 0);
+  EXPECT_EQ(source(v), "raw/data.bin");
   v = value("@style/Base");
   EXPECT_EQ(v.kind, HYDROID_RES_VALUE_STYLE);
   EXPECT_EQ(v.data, 0u);
   EXPECT_EQ(v.string, nullptr);
+  EXPECT_EQ(v.source, nullptr);
+  EXPECT_EQ(v.source_length, 0u);
 }
 
 TEST(CApi, GivesTheValueForAnotherDensity) {
@@ -421,8 +437,10 @@ TEST(CApi, GivesTheValueForAnotherDensity) {
   hydroid_res_value v{};
   EXPECT_EQ(hydroid_res_resources_value_for_density(r.resources, icon, 240, &v, nullptr), 1);
   EXPECT_EQ(text(v), "res/drawable-hdpi-v4/icon.png");
+  EXPECT_EQ(source(v), "drawable-hdpi/icon.png");
   EXPECT_EQ(hydroid_res_resources_value_for_density(r.resources, icon, 0, &v, nullptr), 1);
   EXPECT_EQ(text(v), "res/drawable/icon.png");
+  EXPECT_EQ(source(v), "drawable/icon.png");
 }
 
 TEST(CApi, SaysWhenThereIsNoValue) {

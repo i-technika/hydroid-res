@@ -288,6 +288,8 @@ void scanResFolder(const fs::path& res, const std::string& package, ParsedFolder
     if (const size_t dot = fileName.find('.'); dot != std::string::npos) {
       ref.path += fileName.substr(dot);
     }
+    // Where it is in res/, as its folder and name were read: the same however res/ was named.
+    ref.source = path;
     if (xml) {
       ref.type = FileType::Xml;
       XmlDocument doc;
