@@ -2,7 +2,7 @@
 
 The Android resource system for Hydroid: a C++17 library that reads an Android `res/` folder and
 resolves values exactly as Android does, for UIKit, GTK4 and WinUI 3. Design and roadmap:
-[Hydroid 리소스 시스템 설계 및 개발 로드맵](https://claude.ai/artifact/8T6XejqMo8TRPPcT42UZfF).
+[Hydroid 리소스 시스템 설계 및 개발 로드맵](docs/design-and-roadmap.md).
 
 ## Layout
 
@@ -23,6 +23,7 @@ resolves values exactly as Android does, for UIKit, GTK4 and WinUI 3. Design and
 | `golden/aosp/` | The folder names of AOSP's framework `res/`, which must all parse |
 | `scripts/golden/` | Runs the dump on a device and pulls the JSON; runs aapt2 for `golden/aapt2/` |
 | `scripts/gen_locale_data.py` | Makes `src/core/LocaleDataTables.inc`, the locale tables matching goes by, from AOSP's `libs/androidfw/LocaleDataLookup.cpp` ([Locale tables](#locale-tables)) |
+| `docs/` | The design and roadmap, [design-and-roadmap.md](docs/design-and-roadmap.md), and its diagram |
 
 ## Build and test
 
