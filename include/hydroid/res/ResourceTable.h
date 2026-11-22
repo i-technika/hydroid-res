@@ -248,10 +248,11 @@ class ResourceTable {
   // Loads the res/ folder at `res` as the package `name` with the id `id`, after those already
   // here, which its references may name by their package name, as aapt2 link takes them with -I:
   // what such a package makes <public>, and anything else only by a private reference.
-  // On failure the table is left as it was, and the problems are added to `errors` if it is not
-  // null. Pointers into the table do not survive a call that adds a package. A name in the folder
-  // that is not Unicode text (on Windows) is read as aapt2 reads it: a folder of res/ so named has
-  // nothing in it, and a file or folder so named in a type folder is an error, "file not found".
+  // On failure the table is left as it was, as it is by a std::bad_alloc, and the problems are
+  // added to `errors` if it is not null. Pointers into the table do not survive a call that adds a
+  // package. A name in the folder that is not Unicode text (on Windows) is read as aapt2 reads it:
+  // a folder of res/ so named has nothing in it, and a file or folder so named in a type folder is
+  // an error, "file not found".
   // Nothing about the folder throws: a folder that cannot be opened or read, a file that cannot be
   // read, is an error in `errors` too, where aapt2 on Windows leaves a folder it cannot open out.
   HYDROID_RES_API bool addPackage(const std::filesystem::path& res, std::string_view name,
