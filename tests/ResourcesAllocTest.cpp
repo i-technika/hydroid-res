@@ -40,8 +40,7 @@ std::atomic<long> failing{-1};
 namespace {
 [[noreturn]] void printWhereAndAbort() {
   counting = false;
-  std::fprintf(stderr, "terminate with failing=%ld
-", failing.load());
+  std::fprintf(stderr, "terminate with failing=%ld\n", failing.load());
   void* frames[64];
   const int n = backtrace(frames, 64);
   backtrace_symbols_fd(frames, n, 2);
