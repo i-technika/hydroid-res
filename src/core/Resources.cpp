@@ -439,8 +439,9 @@ struct Resources::Impl {
   std::vector<Config> locales;  // as setConfiguration was given them
   LocaleConfig localeConfig;    // as setLocaleConfig was given it
   LocaleConfig chosenWith;      // the last choice was made with: none after a table change
-  // Whether setLocaleConfig has been called since setConfiguration last chose, which the next
-  // takes it in.
+  // Whether `localeConfig` may not be the LocaleConfig of the last choice, which the next
+  // setConfiguration takes in: as setLocaleConfig gives one, and as a table that changes has the
+  // locales chosen without the app's.
   bool stale = false;
   std::vector<Config> configLocales;      // Android's configuration's, as the last choice left them
   std::vector<Config> readIn;             // of the last choice, which the resources are read in
