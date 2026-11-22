@@ -21,6 +21,7 @@
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <iterator>
 #include <memory>
 #include <optional>
 #include <sstream>
@@ -335,6 +336,59 @@ TEST(ResourceTable, FillsValuesAndPools) {
   EXPECT_EQ(describe(p, ResType::Style, child),
             "(style) size=2 parent=style/Base (0x7f0b0000)\nmode(0x7f020000)=0\n"
             "size(0x7f020001)=2.000000dp");
+}
+
+// A file says where addPackage read it, which its path in the APK does not (#254): an absolute
+// path in UTF-8, however res/ was named, from which the file opens.
+TEST(ResourceTable, FileSaysWhereItWasRead) {
+  namespace fs = std::filesystem;
+  const TempDir dir;
+  // Under a folder of a Unicode name, which Windows gives in UTF-16.
+  const fs::path app = fs::u8path("\xec\x95\xb1");  // 앱
+  const fs::path res = dir.path() / app / "res";
+  struct File {
+    const char* name;    // of the resource
+    const char* folder;  // and file in res/
+    const char* apk;     // the path aapt2 link gives it
+  };
+  const std::vector<File> files = {
+      {"raw/a.b", "raw/a.b.txt", "res/raw/a.b.b.txt"},
+      {"drawable/icon", "drawable-hdpi/icon.png", "res/drawable-hdpi-v4/icon.png"},
+      {"raw/x", "raw-b+sr+Latn/x.txt", "res/raw-b+sr+Latn/x.txt"},
+  };
+  for (const File& f : files) {
+    const fs::path file = res / fs::u8path(f.folder);
+    fs::create_directories(file.parent_path());
+    std::ofstream(file, std::ios::binary) << f.folder;
+  }
+
+  // Named by an absolute path, and by one relative to the current folder.
+  const fs::path before = fs::current_path();
+  for (const bool relative : {false, true}) {
+    SCOPED_TRACE(relative ? "relative" : "absolute");
+    ResourceTable table;
+    std::vector<Diagnostic> errors;
+    if (relative) fs::current_path(dir.path());
+    const bool loaded =
+        table.addPackage(relative ? app / "res" : res, "com.example", kAppPackageId, &errors);
+    fs::current_path(before);
+    ASSERT_TRUE(loaded) << (errors.empty() ? "" : errors[0].message);
+    const Package& p = *table.package(kAppPackageId);
+    for (const File& f : files) {
+      SCOPED_TRACE(f.folder);
+      const Entry& entry = *table.entry(*table.find(std::string("com.example:") + f.name));
+      ASSERT_EQ(entry.candidates.size(), 1u);
+      const FileRef& file = p.files[entry.candidates[0].value.index()];
+      EXPECT_EQ(file.path, f.apk);
+      const fs::path source = fs::u8path(file.source);
+      EXPECT_TRUE(source.is_absolute());
+      EXPECT_EQ(source, (fs::absolute(res) / fs::u8path(f.folder)).lexically_normal());
+      std::ifstream in(source, std::ios::binary);
+      const std::string text((std::istreambuf_iterator<char>(in)),
+                             std::istreambuf_iterator<char>());
+      EXPECT_EQ(text, f.folder);
+    }
+  }
 }
 
 // A package may refer to one loaded before it, by its name, as an app does to android: to what
