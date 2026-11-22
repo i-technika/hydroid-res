@@ -27,7 +27,8 @@ enum class XmlExtent { Document, RootElement };
 class XmlDocument {
  public:
   // false if `text`, as far as `extent` reads it, is not well-formed XML or has no element, with
-  // what and the line where.
+  // what and the line where. An allocation that fails as expat reads throws std::bad_alloc from
+  // here, and not through expat, which is C (#256).
   bool load(std::string_view text, XmlExtent extent, std::string* error, int* errorLine);
   pugi::xml_node root() const { return doc_.document_element(); }
   // The line of `node`, from 1.

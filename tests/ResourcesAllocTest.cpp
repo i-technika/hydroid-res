@@ -282,10 +282,49 @@ TEST(ResourcesAllocations, AFailedChoiceForAChangedTableLeavesItToTheNextCall) {
 #endif
 }
 
-// The C API (#203), for each allocation its calls make but those of loading a package (#256),
-// failing it: no exception leaves a C function, and one that fails says so and leaves what it would
-// have written as it was. The table changes before each call that reads the configuration, so that
-// each takes the change in.
+// addPackage, for each allocation it makes, failing it: what fails as expat reads the XML throws
+// std::bad_alloc out of addPackage, and does not end the program, as it did on GCC when it unwound
+// through expat, which is C (#256). Every handler of expat is read: namespaces, elements with
+// attributes, text and CDATA, in values and in an XML file.
+TEST(ResourcesAllocations, AFailedAllocationAsXmlIsReadThrows) {
+#if HYDROID_NOEXCEPT_ALLOCATES
+  GTEST_SKIP() << "the checked iterators allocate where they cannot throw";
+#else
+  TempDir dir;
+  dir.write("res/values/strings.xml",
+            "<resources xmlns:tools=\"http://schemas.android.com/tools\">"
+            "<string name=\"a\" tools:ignore=\"x\">text<![CDATA[ <cdata> ]]></string>"
+            "<string name=\"b\">a <b>bold</b> word</string></resources>");
+  dir.write("res/layout/main.xml",
+            "<LinearLayout xmlns:android=\"http://schemas.android.com/apk/res/android\" "
+            "android:id=\"@+id/root\"><TextView android:text=\"@string/a\"/></LinearLayout>");
+  const std::filesystem::path res = dir.path() / "res";
+  long all = 0;
+  {
+    ResourceTable table;
+    bool added = false;
+    all = allocationsOf([&] { added = table.addPackage(res, "com.example", kAppPackageId); });
+    ASSERT_TRUE(added);
+  }
+  REQUIRE_COUNTED(all);
+  long threw = 0;
+  for (long failAt = 0; failAt < all; failAt++) {
+    SCOPED_TRACE(failAt);
+    ResourceTable table;
+    try {
+      allocationsOf([&] { table.addPackage(res, "com.example", kAppPackageId); }, failAt);
+    } catch (const std::bad_alloc&) {
+      threw++;
+    }
+  }
+  // Each allocation that fails is one addPackage does not recover from.
+  EXPECT_EQ(threw, all);
+#endif
+}
+
+// The C API (#203), for each allocation its calls make, failing it: no exception leaves a C
+// function, and one that fails says so and leaves what it would have written as it was. The
+// table changes before each call that reads the configuration, so that each takes the change in.
 TEST(ResourcesAllocations, NoExceptionLeavesTheCApi) {
 #if HYDROID_NOEXCEPT_ALLOCATES
   GTEST_SKIP() << "the checked iterators allocate where they cannot throw";
@@ -308,12 +347,8 @@ TEST(ResourcesAllocations, NoExceptionLeavesTheCApi) {
       failures++;
       return;
     }
-    // Not while a package loads: an allocation that fails in a callback of expat ends the program
-    // on GCC, as it cannot unwind through expat's C (#256).
     const auto add = [&](const std::string& res, const char* name, uint8_t id) {
-      counting = false;
       if (hydroid_res_table_add_package(table, res.c_str(), name, id) != 1) failures++;
-      counting = true;
     };
     add(app, "com.example", 0x7f);
     hydroid_res_resources* resources = hydroid_res_resources_create(table);

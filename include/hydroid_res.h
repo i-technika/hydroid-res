@@ -40,8 +40,8 @@ HYDROID_RES_API void hydroid_res_table_destroy(hydroid_res_table* table);
 /* Loads the res/ folder at `res` as the package `name` with the id `id` (0x7f for an app), after
  * those already loaded, as ResourceTable::addPackage does. 1 if it loaded; 0 if not, and the table
  * holds what it held, with the reasons in hydroid_res_table_error. Either way, the strings read
- * from the table before are gone. For now, memory that runs out as it reads XML can end the
- * program instead (#256), and the table may not be what it was after memory runs out (#257). */
+ * from the table before are gone. For now, the table may not be what it was after memory runs
+ * out (#257). */
 HYDROID_RES_API int hydroid_res_table_add_package(hydroid_res_table* table, const char* res,
                                                   const char* name, uint8_t id);
 
