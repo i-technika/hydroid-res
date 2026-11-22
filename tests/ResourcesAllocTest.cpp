@@ -4,6 +4,7 @@
 // operator new of the sanitizers, which checks that each delete is of a new.
 
 #include <gtest/gtest.h>
+#include <pugixml.hpp>
 
 #include <atomic>
 #include <cstddef>
@@ -28,6 +29,24 @@ namespace {
 std::atomic<bool> counting{false};
 std::atomic<long> allocations{0};
 std::atomic<long> failing{-1};
+
+// pugixml's allocations, which it makes with malloc but for these (#263): counted while
+// `counting`, apart from operator new's, and the one of the count `pugiFailing` given no memory,
+// which pugixml says by an empty node or false rather than by throwing.
+std::atomic<long> pugiAllocations{0};
+std::atomic<long> pugiFailing{-1};
+
+void* pugiAllocate(size_t size) {
+  if (counting.load() && pugiAllocations.fetch_add(1) == pugiFailing.load()) return nullptr;
+  return std::malloc(size);
+}
+void pugiDeallocate(void* p) { std::free(p); }
+
+// Before main, and before anything pugixml allocates, which pugiDeallocate frees all the same.
+[[maybe_unused]] const bool kPugiCounted = [] {
+  pugi::set_memory_management_functions(pugiAllocate, pugiDeallocate);
+  return true;
+}();
 
 }  // namespace
 
@@ -67,6 +86,23 @@ long allocationsOf(F&& f, long failAt = -1) {
   counting = true;
   f();
   return allocations.load();
+}
+
+// The allocations pugixml makes as `f` runs, of which the one `failAt` gets no memory, if it is
+// not -1; operator new fails none.
+template <typename F>
+long pugiAllocationsOf(F&& f, long failAt = -1) {
+  struct Stop {
+    ~Stop() {
+      counting = false;
+      pugiFailing = -1;
+    }
+  } stop;
+  pugiAllocations = 0;
+  pugiFailing = failAt;
+  counting = true;
+  f();
+  return pugiAllocations.load();
 }
 
 // Stops the test where the library allocates out of sight of the operator new above, as a DLL,
@@ -326,6 +362,65 @@ TEST(ResourcesAllocations, AFailedAllocationAsXmlIsReadThrows) {
   // parseLocaleConfig recovers from none.
   EXPECT_EQ(threw, all);
 #endif
+}
+
+// What pugixml has no memory for as expat reads a file, which it says by an empty node or false,
+// throws std::bad_alloc out of parseLocaleConfig too (#263), rather than give what it read of a
+// tree with an element or an attribute left out. A long attribute and text take more than one of
+// pugixml's pages. Not for a DLL, whose pugixml is not this program's.
+TEST(ResourcesAllocations, PugixmlWithoutMemoryAsXmlIsReadThrows) {
+  TempDir dir;
+  const std::string filler(40000, 'x');
+  dir.write("locales_config.xml",
+            "<locale-config xmlns:android=\"http://schemas.android.com/apk/res/android\" "
+            "android:defaultLocale=\"ko\" note=\"" +
+                filler + "\">\n  <locale android:name=\"en-US\"/> " + filler +
+                " <![CDATA[ <cdata> ]]>\n  <locale android:name=\"ko\"/>\n</locale-config>");
+  const std::filesystem::path file = dir.path() / "locales_config.xml";
+  std::optional<LocaleConfig> parsed;
+  const long all = pugiAllocationsOf([&] { parsed = parseLocaleConfig(file); });
+  ASSERT_TRUE(parsed);
+  EXPECT_EQ(parsed->supported.size(), 2u);
+  REQUIRE_COUNTED(all);
+  for (long failAt = 0; failAt < all; failAt++) {
+    SCOPED_TRACE(failAt);
+    EXPECT_THROW(pugiAllocationsOf([&] { parseLocaleConfig(file); }, failAt), std::bad_alloc);
+  }
+}
+
+// And addPackage does not take such a tree as the file (#263): a layout whose @+id are read out of
+// its attributes fails, rather than load without them. libstdc++ lists the folder with operator
+// new, which pugixml's allocations leave alone (#262).
+TEST(ResourcesAllocations, PugixmlWithoutMemoryFailsAddPackage) {
+  TempDir dir;
+  const std::string filler(40000, 'x');
+  dir.write("res/values/strings.xml",
+            "<resources><string name=\"s\">" + filler + "</string></resources>");
+  dir.write("res/layout/main.xml",
+            "<LinearLayout xmlns:android=\"http://schemas.android.com/apk/res/android\" "
+            "android:id=\"@+id/root\" android:tag=\"" +
+                filler + "\">\n  <TextView android:id=\"@+id/text\"/>\n</LinearLayout>");
+  const std::filesystem::path res = dir.path() / "res";
+  long all = 0;
+  {
+    ResourceTable table;
+    bool added = false;
+    all = pugiAllocationsOf([&] { added = table.addPackage(res, "com.example", 0x7f); });
+    ASSERT_TRUE(added);
+    ASSERT_TRUE(table.find("com.example:id/text"));
+  }
+  REQUIRE_COUNTED(all);
+  for (long failAt = 0; failAt < all; failAt++) {
+    SCOPED_TRACE(failAt);
+    ResourceTable table;
+    bool added = false;
+    try {
+      pugiAllocationsOf([&] { added = table.addPackage(res, "com.example", 0x7f); }, failAt);
+    } catch (const std::bad_alloc&) {
+    }
+    EXPECT_FALSE(added);
+    EXPECT_TRUE(table.packages().empty());
+  }
 }
 
 // The C API (#203), for each allocation its calls make but those of loading a package (#262),

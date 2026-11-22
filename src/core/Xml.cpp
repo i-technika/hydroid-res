@@ -7,6 +7,7 @@
 #include <cstring>
 #include <exception>
 #include <memory>
+#include <new>
 #include <optional>
 #include <utility>
 #include <vector>
@@ -37,6 +38,27 @@ std::string qualifiedName(const XML_Char* expanded) {
   const std::string_view local = name.substr(uriEnd + 1, localEnd - (uriEnd + 1));
   if (localEnd == std::string_view::npos) return std::string(local);
   return std::string(name.substr(localEnd + 1)) + ":" + std::string(local);
+}
+
+// pugixml says it has no memory for a node, an attribute or a string by giving an empty one or
+// false, not by throwing (#263): these throw std::bad_alloc then, rather than build a tree with a
+// piece left out, which a load would take as the whole file.
+pugi::xml_node appendChild(pugi::xml_node parent, pugi::xml_node_type type) {
+  pugi::xml_node node = parent.append_child(type);
+  if (!node) throw std::bad_alloc();
+  return node;
+}
+
+void setName(pugi::xml_node node, const char* name) {
+  if (!node.set_name(name)) throw std::bad_alloc();
+}
+
+void setValue(pugi::xml_node node, const char* value, size_t size) {
+  if (!node.set_value(value, size)) throw std::bad_alloc();
+}
+
+void appendAttribute(pugi::xml_node element, const char* name, const char* value) {
+  if (!element.append_attribute(name).set_value(value)) throw std::bad_alloc();
 }
 
 // The tree of what expat reads, as aapt2 gets it: the entities a DTD declares expanded, an
@@ -86,14 +108,13 @@ void XMLCALL startNamespace(void* data, const XML_Char* prefix, const XML_Char* 
 
 void XMLCALL startElement(void* data, const XML_Char* name, const XML_Char** attrs) {
   handle(data, [&](TreeBuilder& b) {
-    pugi::xml_node element = b.node.append_child(pugi::node_element);
-    element.set_name(qualifiedName(name).c_str());
-    for (const auto& [attr, uri] : b.namespaces) {
-      element.append_attribute(attr.c_str()).set_value(uri.c_str());
-    }
+    pugi::xml_node element = appendChild(b.node, pugi::node_element);
+    setName(element, qualifiedName(name).c_str());
+    for (const auto& [attr, uri] : b.namespaces)
+      appendAttribute(element, attr.c_str(), uri.c_str());
     b.namespaces.clear();
     for (; *attrs; attrs += 2) {
-      element.append_attribute(qualifiedName(attrs[0]).c_str()).set_value(attrs[1]);
+      appendAttribute(element, qualifiedName(attrs[0]).c_str(), attrs[1]);
     }
     b.add(element);
     b.node = element;
@@ -112,8 +133,8 @@ void XMLCALL endElement(void* data, const XML_Char*) {
 
 void XMLCALL characters(void* data, const XML_Char* s, int length) {
   handle(data, [&](TreeBuilder& b) {
-    pugi::xml_node text = b.node.append_child(b.inCdata ? pugi::node_cdata : pugi::node_pcdata);
-    text.set_value(s, static_cast<size_t>(length));
+    pugi::xml_node text = appendChild(b.node, b.inCdata ? pugi::node_cdata : pugi::node_pcdata);
+    setValue(text, s, static_cast<size_t>(length));
     b.add(text);
   });
 }
