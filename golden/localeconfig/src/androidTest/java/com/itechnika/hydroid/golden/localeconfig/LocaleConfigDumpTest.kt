@@ -113,7 +113,7 @@ class LocaleConfigDumpTest {
 
     @Test
     fun dumpAll() {
-        check(Build.VERSION.SDK_INT >= 35) { "needs API 35, which has the default locale" }
+        check(Build.VERSION.SDK_INT >= 36) { "needs API 36, which has SDK_INT_FULL" }
         val target = InstrumentationRegistry.getInstrumentation().targetContext
         val outDir = File(target.filesDir, "golden").apply {
             deleteRecursively()

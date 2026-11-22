@@ -160,8 +160,11 @@ locales but the pseudo-locales Android reads in the first the system's resources
 `golden/nolocale` is an app of its own for that, with `values-en-rXA/` and `values-ar-rXB/`,
 whose `NoLocaleDumpTest` dumps lifecycles as `LocaleConfigDumpTest` does into
 `golden/nolocale/data/`, which `GoldenNoLocaleTest` replays: `cy-GB,ja-JP` reads in ja, as the
-system has no Welsh. Both tests have in the table a package android of a folder for each locale
-of `golden/aosp/framework_res_dirs.txt`, which hydroid must leave out of the app's locales:
+system has no Welsh. It dumps the locales of the emulator's system resources too, into
+`golden/nolocale/data/system_locales.txt`, which has a few the AOSP folder list has not (en,
+en-XA, ar-XB) and has not some it has; both tests have in the table a package android of a
+folder for each, which hydroid must leave out of the app's locales. As the system has the
+pseudo-locales, whether the app's count with the system's the dump does not tell:
 
 ```sh
 python scripts/golden/pull_golden.py --app nolocale

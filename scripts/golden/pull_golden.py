@@ -71,12 +71,13 @@ def main() -> None:
     listing = subprocess.run(
         adb + ["shell", "run-as", package, "ls", "files/golden"],
         check=True, capture_output=True, text=True).stdout.split()
-    names = [n for n in listing if n.endswith(".json")]
+    # The JSON of the dump, and system_locales.txt of the app with no locales (#252).
+    names = [n for n in listing if n.endswith((".json", ".txt"))]
     if not names:
         sys.exit("no golden JSON on device; run the dump first")
 
     out_dir.mkdir(parents=True, exist_ok=True)
-    for old in out_dir.glob("*.json"):  # keep README.md and anything else checked in
+    for old in [*out_dir.glob("*.json"), *out_dir.glob("*.txt")]:  # keep README.md and the rest
         old.unlink()
     for name in names:
         data = subprocess.run(

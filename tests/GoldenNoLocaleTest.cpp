@@ -1,6 +1,7 @@
 // Golden check for an app with no locales but the pseudo-locales (#252): the lifecycles of
 // golden/nolocale/data, as GoldenLifecycle.h replays them. Android picks for it of the locales
-// the system's resources have, which the table has as GoldenLifecycle.h's package android.
+// the system's resources have, which the table has as GoldenLifecycle.h's package android, of
+// golden/nolocale/data/system_locales.txt.
 
 #include <gtest/gtest.h>
 
@@ -18,12 +19,14 @@ namespace {
 constexpr const char* kPackage = "com.itechnika.hydroid.golden.nolocale";
 
 TEST(GoldenNoLocale, PicksWhatAndroidPicked) {
-  // The lifecycles are of languages the system has and has not (NoLocaleDumpTest).
+  // The lifecycles are of languages the system has and has not (NoLocaleDumpTest). It has the
+  // pseudo-locales too, so whether the app's count with the system's the dump does not tell, only
+  // ResourcesLocale.ATableWithoutLocalesChoosesNothing and the like.
   const std::set<std::string> system = test::frameworkLocales();
-  for (const char* has : {"ja", "ko", "iw", "tl", "en-rGB"}) EXPECT_TRUE(system.count(has)) << has;
-  for (const char* hasNot : {"cy", "ga", "en-rXA", "ar-rXB"}) {
-    EXPECT_FALSE(system.count(hasNot)) << hasNot;
+  for (const char* has : {"ja", "ko", "iw", "tl", "en-rGB", "en-rXA", "ar-rXB"}) {
+    EXPECT_TRUE(system.count(has)) << has;
   }
+  for (const char* hasNot : {"cy", "ga"}) EXPECT_FALSE(system.count(hasNot)) << hasNot;
 
   test::TempDir dir;
   ResourceTable table;

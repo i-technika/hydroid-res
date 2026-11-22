@@ -24,31 +24,32 @@
 
 namespace hydroid::res::test {
 
-// The locales of the values folders of AOSP's framework res/ (golden/aosp/framework_res_dirs.txt),
-// as folder qualifiers: "ja", "iw", "zh-rHK", "b+sr+Latn".
+// The locales of the system's resources on the golden emulator, as folder qualifiers: "ja", "iw",
+// "zh-rHK", "b+sr+Latn". NoLocaleDumpTest dumps them, of AssetManager.getLocales, as
+// golden/nolocale/data/system_locales.txt. That gives Tagalog as Filipino
+// (ResTable_config::getBcp47Locale, canonicalizing), of the folder values-tl/ the framework has
+// (golden/aosp/framework_res_dirs.txt), so the folder is tl here, as on the device.
 inline std::set<std::string> frameworkLocales() {
-  std::ifstream in(HYDROID_AOSP_RES_DIRS);
-  EXPECT_TRUE(in) << "cannot open " << HYDROID_AOSP_RES_DIRS;
+  const std::filesystem::path file =
+      std::filesystem::path(HYDROID_GOLDEN_NOLOCALE_DIR) / "system_locales.txt";
+  std::ifstream in(file);
+  EXPECT_TRUE(in) << "cannot open " << file;
   std::set<std::string> locales;
   std::string line;
   while (std::getline(in, line)) {
     if (!line.empty() && line.back() == '\r') line.pop_back();
-    if (line.empty() || line[0] == '#') continue;
-    const std::optional<ResDir> dir = parseResDir(line);
-    EXPECT_TRUE(dir) << line;
-    if (!dir || dir->type != "values" || dir->config.lang[0] == '\0') continue;
-    Config locale;
-    locale.lang = dir->config.lang;
-    locale.region = dir->config.region;
-    locale.script = dir->config.script;
-    locale.variant = dir->config.variant;
-    locales.insert(toString(locale));
+    if (line.empty()) continue;
+    std::optional<Config> locale = parseLanguageTag(line);
+    EXPECT_TRUE(locale) << line;
+    if (!locale) continue;
+    if (std::string(locale->lang.data()) == "fil") locale->lang = {'t', 'l'};
+    locales.insert(toString(*locale));
   }
   return locales;
 }
 
 // Adds to `table` a package android with a folder of `dir` for each of frameworkLocales(), which
-// is all of the system's resources Resources picks a locale by, and the attributes the golden
+// is what of the system's resources Resources picks a locale by, and the attributes the golden
 // apps' XML files name of it, which are linked once a package android is loaded.
 inline void addFrameworkPackage(ResourceTable& table, const TempDir& dir) {
   dir.write("android/values/attrs.xml",

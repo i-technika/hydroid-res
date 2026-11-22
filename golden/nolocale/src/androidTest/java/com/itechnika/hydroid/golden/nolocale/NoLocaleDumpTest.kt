@@ -29,8 +29,8 @@ class NoLocaleDumpTest {
 
     class Lifecycle(val name: String, val steps: List<Step>)
 
-    // Welsh (cy) and Irish (ga) are languages the system has no resources of
-    // (golden/aosp/framework_res_dirs.txt), and Japanese and Korean ones it has.
+    // Welsh (cy) and Irish (ga) are languages the system has no resources of (system_locales.txt),
+    // and Japanese and Korean ones it has.
     private val lifecycles = listOf(
         // ja, which only the system has, after one neither has.
         Lifecycle("cy+ja", listOf(
@@ -44,7 +44,8 @@ class NoLocaleDumpTest {
         Lifecycle("cy+ga", listOf(Step("created", "cy-GB,ga-IE"))),
         // English, after one neither has.
         Lifecycle("cy+en", listOf(Step("created", "cy-GB,en-US"))),
-        // The app's own pseudo-locales, which count among the system's.
+        // Pseudo-locales, which the system has too: the app's of them count with the system's,
+        // where they are no locale of the app's, which this does not tell apart.
         Lifecycle("cy+en-XA+ja", listOf(Step("created", "cy-GB,en-XA,ja-JP"))),
         Lifecycle("cy+ar-XB+ja", listOf(Step("created", "cy-GB,ar-XB,ja-JP"))),
         // Languages the system's resources have under another code: iw, and tl.
@@ -54,7 +55,7 @@ class NoLocaleDumpTest {
 
     @Test
     fun dumpAll() {
-        check(Build.VERSION.SDK_INT >= 35) { "needs API 35, as the golden app" }
+        check(Build.VERSION.SDK_INT >= 36) { "needs API 36, which has SDK_INT_FULL" }
         val target = InstrumentationRegistry.getInstrumentation().targetContext
         val outDir = File(target.filesDir, "golden").apply {
             deleteRecursively()
@@ -63,6 +64,10 @@ class NoLocaleDumpTest {
         lifecycles.forEachIndexed { i, lifecycle ->
             File(outDir, "${fileName(lifecycle.name)}.json").writeText(dump(target, lifecycle, i).toString(2))
         }
+        // The locales the system's resources have, of framework-res.apk as the device has it,
+        // which the golden tests' table has as a package android (tests/GoldenLifecycle.h).
+        File(outDir, "system_locales.txt").writeText(
+            Resources.getSystem().assets.locales.sorted().joinToString("\n", postfix = "\n"))
     }
 
     private fun fileName(name: String) = name.replace(' ', '_').replace(',', '+')
