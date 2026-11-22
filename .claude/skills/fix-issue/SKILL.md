@@ -113,8 +113,8 @@ gh pr create --base <base> --head <branch> --title "<한국어 제목> (#<N>)" -
   --project "Hydroid Project"
 ```
 제목이 `/`로 시작할 수 있으면(예: `/fix-issue`로 시작) 공용 절차 **Git Bash에서 `gh`에 넘기는 인자**대로
-Bash에서 `MSYS_NO_PATHCONV=1`을 붙이고 작은따옴표로 넘긴다(PowerShell은 글 안의 `"`를 떼어 내므로, `"`가
-없는 글만). 6~8단계의 답글(`-f body=...`)이나 코멘트
+Bash에서 `MSYS_NO_PATHCONV=1`을 붙이고 작은따옴표로 넘긴다(PowerShell은 글 안의 `"`를 떼어 내거나 인자를
+가르므로, `"`가 없는 글만). 6~8단계의 답글(`-f body=...`)이나 코멘트
 (`--comment`, `--body`)도 `/`로 시작하면 같다.
 
 이어서:

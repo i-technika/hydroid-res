@@ -60,12 +60,14 @@ Bash 도구는 Git Bash(MSYS)라서, 네이티브 프로그램(`gh`, `git`, `pyt
 
 - 제목·코멘트·답글(`--title`, `--comment`, `--body`, `-f body=...`)이 `/`로 시작할 수 있으면 Bash에서 명령
   앞에 `MSYS_NO_PATHCONV=1`을 붙이고 글은 작은따옴표로 감싼다(큰따옴표 안의 백틱과 `$`는 명령 치환·변수로
-  바뀐다). 이 변수를 붙이면 경로도 바뀌지 않으므로 같은 명령의 `--body-file`, `--input`은 Windows 경로
-  (`C:\...\scratchpad\x.md`)로 넘긴다. `/c/...`는 그대로 `gh`에 가서 파일을 못 찾는다.
+  바뀐다). 이 변수를 붙이면 경로도 바뀌지 않으므로 같은 명령의 `--body-file`, `--input`은 슬래시로 쓴 Windows
+  경로(`C:/.../scratchpad/x.md`)로 넘긴다. `/c/...`는 그대로 `gh`에 가서 파일을 못 찾고, 역슬래시 경로는
+  따옴표 없이 쓰면 Bash가 역슬래시를 지운다(`C:\Users\x.md` → `C:Usersx.md`).
 - PowerShell 도구(5.1)에서 실행해도 `/`는 그대로 가지만, 큰따옴표 안의 백틱은 이스케이프로 사라지고
-  (`` "`/fix-issue`에서" `` → `/fix-issue에서`), 인자 안의 `"`는 작은따옴표로 감싸도 사라진다
-  (`'/fix-issue "a" b'` → `/fix-issue a b`). PowerShell에서는 작은따옴표로 쓰고, 글에 `"`가 있으면 위의 Bash
-  방법이나 파일로 넘긴다.
+  (`` "`/fix-issue`에서" `` → `/fix-issue에서`), 인자 안의 `"`는 작은따옴표로 감싸도 사라지며
+  (`'/fix-issue "a" b'` → `/fix-issue a b`), `"` 사이에 공백이 있으면 인자가 둘로 갈라진다
+  (`'x "a b" y'` → `x a`와 `b y`. `gh`는 `accepts 1 arg(s), received 2`로 실패한다). PowerShell에서는
+  작은따옴표로 쓰고, 글에 `"`가 있으면 위의 Bash 방법이나 파일로 넘긴다.
 - 본문은 `--body-file <파일>`(`gh api`는 `--input <json>`이나 `-F body=@<파일>`)로 넘기면 파일 안의 글은
   바뀌지 않는다. 이때 경로(`/c/...`)는 MSYS가 Windows 경로로 바르게 바꿔 준다.
 - PR이나 이슈를 만들거나 제목을 고친 뒤 `gh pr view <M> --json title` / `gh issue view <N> --json title`로
