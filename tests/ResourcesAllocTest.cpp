@@ -555,8 +555,12 @@ TEST(ResourcesAllocations, NoExceptionLeavesTheCApi) {
       failures++;
       return;
     }
+    // One that fails says why, and leaves the package out (#274).
     const auto add = [&](const std::string& res, const char* name, uint8_t id) {
-      if (hydroid_res_table_add_package(table, res.c_str(), name, id) != 1) failures++;
+      if (hydroid_res_table_add_package(table, res.c_str(), name, id) == 1) return;
+      failures++;
+      EXPECT_STREQ(hydroid_res_table_error(table), "out of memory\n");
+      EXPECT_EQ(hydroid_res_table_find(table, "@string/where", name), 0u) << name;
     };
     add(app, "com.example", 0x7f);
     hydroid_res_resources* resources = hydroid_res_resources_create(table);
@@ -613,6 +617,50 @@ TEST(ResourcesAllocations, NoExceptionLeavesTheCApi) {
   // Each call allocates, and one of them fails with each allocation that does.
   EXPECT_GT(failed, 0);
 #endif
+}
+
+// And hydroid_res_table_add_package, where pugixml has no memory (#274): 0, "out of memory", and
+// the table holds what it held, the package loaded before and none of the one that failed. Fails
+// none of operator new's allocations, so it runs in MSVC's Debug build too.
+TEST(ResourcesAllocations, PugixmlWithoutMemoryFailsTheCApi) {
+  TempDir dir;
+  const std::string lib = writePackage(dir, {}, "com.example.lib").u8string();
+  const std::string filler(40000, 'x');
+  dir.write("res/layout/main.xml",
+            "<LinearLayout xmlns:android=\"http://schemas.android.com/apk/res/android\" "
+            "android:id=\"@+id/root\" android:tag=\"" +
+                filler + "\">\n  <TextView android:id=\"@+id/text\"/>\n</LinearLayout>");
+  const std::string res = (dir.path() / "res").u8string();
+  long all = 0;
+  {
+    hydroid_res_table* table = hydroid_res_table_create();
+    ASSERT_NE(table, nullptr);
+    ASSERT_EQ(hydroid_res_table_add_package(table, lib.c_str(), "com.example.lib", 0x7e), 1);
+    int added = 0;
+    all = pugiAllocationsOf(
+        [&] { added = hydroid_res_table_add_package(table, res.c_str(), "com.example", 0x7f); });
+    EXPECT_EQ(added, 1);
+    EXPECT_NE(hydroid_res_table_find(table, "com.example:id/text", nullptr), 0u);
+    hydroid_res_table_destroy(table);
+  }
+  REQUIRE_COUNTED_BY(all, "pugixml");
+  for (long failAt = 0; failAt < all; failAt++) {
+    SCOPED_TRACE(failAt);
+    hydroid_res_table* table = hydroid_res_table_create();
+    ASSERT_NE(table, nullptr);
+    ASSERT_EQ(hydroid_res_table_add_package(table, lib.c_str(), "com.example.lib", 0x7e), 1);
+    const uint32_t where = hydroid_res_table_find(table, "com.example.lib:string/where", nullptr);
+    ASSERT_NE(where, 0u);
+    int added = 1;
+    pugiAllocationsOf(
+        [&] { added = hydroid_res_table_add_package(table, res.c_str(), "com.example", 0x7f); },
+        failAt);
+    EXPECT_EQ(added, 0);
+    EXPECT_STREQ(hydroid_res_table_error(table), "out of memory\n");
+    EXPECT_EQ(hydroid_res_table_find(table, "com.example:id/text", nullptr), 0u);
+    EXPECT_EQ(hydroid_res_table_find(table, "com.example.lib:string/where", nullptr), where);
+    hydroid_res_table_destroy(table);
+  }
 }
 
 }  // namespace

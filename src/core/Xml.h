@@ -29,8 +29,8 @@ class XmlDocument {
   // false if `text`, as far as `extent` reads it, is not well-formed XML or has no element, with
   // what and the line where. Memory that runs out in the handlers of expat, as they allocate with
   // operator new, throws std::bad_alloc from here, and not through expat, which is C, however expat
-  // was built (#256); in expat's own allocations it is "out of memory", and in pugixml's it is not
-  // seen yet (#263).
+  // was built (#256); in expat's own allocations it is "out of memory", and where pugixml has none,
+  // which it says by an empty node or false, this throws std::bad_alloc too (#263).
   bool load(std::string_view text, XmlExtent extent, std::string* error, int* errorLine);
   pugi::xml_node root() const { return doc_.document_element(); }
   // The line of `node`, from 1.
