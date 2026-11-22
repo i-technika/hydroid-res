@@ -338,12 +338,12 @@ TEST(ResourceTable, FillsValuesAndPools) {
             "size(0x7f020001)=2.000000dp");
 }
 
-// A file says where addPackage read it, which its path in the APK does not (#254): an absolute
-// path in UTF-8, however res/ was named, from which the file opens.
-TEST(ResourceTable, FileSaysWhereItWasRead) {
+// A file says where it is in res/, which its path in the APK does not (#254): its folder and name
+// in UTF-8, the same however res/ was named, which opens the file joined to res/.
+TEST(ResourceTable, FileSaysWhereItIsInRes) {
   namespace fs = std::filesystem;
   const TempDir dir;
-  // Under a folder of a Unicode name, which Windows gives in UTF-16.
+  // Under a folder of a Unicode name, as are some files, which Windows gives in UTF-16.
   const fs::path app = fs::u8path("\xec\x95\xb1");  // 앱
   const fs::path res = dir.path() / app / "res";
   struct File {
@@ -355,6 +355,7 @@ TEST(ResourceTable, FileSaysWhereItWasRead) {
       {"raw/a.b", "raw/a.b.txt", "res/raw/a.b.b.txt"},
       {"drawable/icon", "drawable-hdpi/icon.png", "res/drawable-hdpi-v4/icon.png"},
       {"raw/x", "raw-b+sr+Latn/x.txt", "res/raw-b+sr+Latn/x.txt"},
+      {"raw/\xea\xb0\x80", "raw/\xea\xb0\x80.txt", "res/raw/\xea\xb0\x80.txt"},  // 가
   };
   for (const File& f : files) {
     const fs::path file = res / fs::u8path(f.folder);
@@ -380,10 +381,8 @@ TEST(ResourceTable, FileSaysWhereItWasRead) {
       ASSERT_EQ(entry.candidates.size(), 1u);
       const FileRef& file = p.files[entry.candidates[0].value.index()];
       EXPECT_EQ(file.path, f.apk);
-      const fs::path source = fs::u8path(file.source);
-      EXPECT_TRUE(source.is_absolute());
-      EXPECT_EQ(source, (fs::absolute(res) / fs::u8path(f.folder)).lexically_normal());
-      std::ifstream in(source, std::ios::binary);
+      EXPECT_EQ(file.source, f.folder);
+      std::ifstream in(res / fs::u8path(file.source), std::ios::binary);
       const std::string text((std::istreambuf_iterator<char>(in)),
                              std::istreambuf_iterator<char>());
       EXPECT_EQ(text, f.folder);

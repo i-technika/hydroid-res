@@ -143,15 +143,9 @@ std::string text(const hydroid_res_value& v) {
   return v.string ? std::string(v.string, v.string_length) : std::string("(none)");
 }
 
-// Where the C value of a file says it was read, as a path.
-std::filesystem::path source(const hydroid_res_value& v) {
-  return v.source ? std::filesystem::u8path(std::string(v.source, v.source_length))
-                  : std::filesystem::path();
-}
-
-// The file `folder` of the golden table/res, as an absolute path.
-std::filesystem::path tableFile(const char* folder) {
-  return (std::filesystem::absolute(HYDROID_TABLE_RES_DIR) / folder).lexically_normal();
+// Where the C value of a file says it is in res/.
+std::string source(const hydroid_res_value& v) {
+  return v.source ? std::string(v.source, v.source_length) : std::string("(none)");
 }
 
 // `got`, the C value of `want` of `package`, holds what `want` does.
@@ -421,12 +415,12 @@ TEST(CApi, GivesValuesAsTheHeaderSays) {
   EXPECT_EQ(v.kind, HYDROID_RES_VALUE_FILE);
   EXPECT_EQ(text(v), "res/drawable/icon.png");
   EXPECT_EQ(v.format, 2);
-  // And where it was read, which the APK's path does not say (#254).
-  EXPECT_EQ(source(v), tableFile("drawable/icon.png"));
+  // And where it is in res/, which the APK's path does not say (#254).
+  EXPECT_EQ(source(v), "drawable/icon.png");
   v = value("@raw/data");
   EXPECT_EQ(text(v), "res/raw/data.bin");
   EXPECT_EQ(v.format, 0);
-  EXPECT_EQ(source(v), tableFile("raw/data.bin"));
+  EXPECT_EQ(source(v), "raw/data.bin");
   v = value("@style/Base");
   EXPECT_EQ(v.kind, HYDROID_RES_VALUE_STYLE);
   EXPECT_EQ(v.data, 0u);
@@ -443,10 +437,10 @@ TEST(CApi, GivesTheValueForAnotherDensity) {
   hydroid_res_value v{};
   EXPECT_EQ(hydroid_res_resources_value_for_density(r.resources, icon, 240, &v, nullptr), 1);
   EXPECT_EQ(text(v), "res/drawable-hdpi-v4/icon.png");
-  EXPECT_EQ(source(v), tableFile("drawable-hdpi/icon.png"));
+  EXPECT_EQ(source(v), "drawable-hdpi/icon.png");
   EXPECT_EQ(hydroid_res_resources_value_for_density(r.resources, icon, 0, &v, nullptr), 1);
   EXPECT_EQ(text(v), "res/drawable/icon.png");
-  EXPECT_EQ(source(v), tableFile("drawable/icon.png"));
+  EXPECT_EQ(source(v), "drawable/icon.png");
 }
 
 TEST(CApi, SaysWhenThereIsNoValue) {

@@ -51,17 +51,13 @@ int main(int argc, char** argv) {
   check(value.string_length == 6, "string_length");
   check(value.source == NULL && value.source_length == 0, "no source");
 
-  /* A file, and where it was read. */
+  /* A file, and where it is in res/. */
   id = hydroid_res_table_find(table, "@raw/data", package);
   check(id != 0, "find a file");
   check(hydroid_res_resources_value(resources, id, &value, NULL) == 1, "value of a file");
   check(value.kind == HYDROID_RES_VALUE_FILE, "kind of a file");
-  check(value.source != NULL && strlen(value.source) == value.source_length, "source");
-  /* .../raw/data.bin, or ...\raw\data.bin on Windows. */
-  check(value.source_length > 12 &&
-            strcmp(value.source + value.source_length - 8, "data.bin") == 0 &&
-            strncmp(value.source + value.source_length - 12, "raw", 3) == 0,
-        "source of raw/data.bin");
+  check(value.source != NULL && strcmp(value.source, "raw/data.bin") == 0, "source");
+  check(value.source_length == 12, "source_length");
 
   hydroid_res_resources_destroy(resources);
   hydroid_res_table_destroy(table);
