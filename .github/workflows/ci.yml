@@ -7,17 +7,17 @@ on:
   workflow_dispatch:
     inputs:
       scope:
-        description: "full: every job; quick: core (ubuntu-24.04), its shared and its Clang job, and clang-format only"
+        description: "full: every job; quick: core (ubuntu-24.04), its shared, release and Clang jobs, and clang-format only"
         type: choice
         options: [full, quick]
         default: full
 
 # Two scopes. A pull request into a milestone's step<k>/ branch, which /fix-issue makes for each
-# sub-issue, runs the quick one, all on Linux: GCC, static and shared; Clang with ASan and UBSan;
-# and clang-format. Pushes to main, pull requests into main (a milestone's own, from /open-ms) and
-# a dispatch with scope=full (/close-ms) run every job. Each job the quick scope leaves out repeats
-# the test below in its `if:`, and core and shared, which it narrows to Linux, in their matrix, as
-# `if:` and `strategy:` cannot read `env`:
+# sub-issue, runs the quick one, all on Linux: GCC, static, shared and release; Clang with ASan
+# and UBSan; and clang-format. Pushes to main, pull requests into main (a milestone's own, from
+# /open-ms) and a dispatch with scope=full (/close-ms) run every job. Each job the quick scope
+# leaves out repeats the test below in its `if:`, and core, shared and release, which it narrows to
+# Linux, in their matrix, as `if:` and `strategy:` cannot read `env`:
 #   github.event_name == 'push' || github.base_ref == 'main' || inputs.scope == 'full'
 
 # A new push to a pull request makes the run still going for the old head pointless.
@@ -297,16 +297,18 @@ jobs:
 
   # The four below come on top of the 11 runners above, to look where none of those does.
 
+  # ubuntu-24.04 in the quick scope too, as -Werror turns a warning only the optimizer gives into
+  # a failed build: one a sub-issue merged unseen stopped the milestone's full run (#258, #264).
   release:
     name: core (${{ matrix.os }}, release)
-    if: github.event_name == 'push' || github.base_ref == 'main' || inputs.scope == 'full'
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        # The optimizer brings warnings of its own (GCC's -Wmaybe-uninitialized, MSVC's C4702) that
-        # the Debug builds never see, and NDEBUG drops every assert the tests lean on.
-        os: [ubuntu-24.04, windows-2022]
+        # The optimizer brings warnings of its own (GCC's -Wmaybe-uninitialized and
+        # -Wmismatched-new-delete, MSVC's C4702) that the Debug builds never see, and NDEBUG drops
+        # every assert the tests lean on.
+        os: ${{ fromJSON((github.event_name == 'push' || github.base_ref == 'main' || inputs.scope == 'full') && '["ubuntu-24.04", "windows-2022"]' || '["ubuntu-24.04"]') }}
     steps:
       - uses: actions/checkout@v5
       - name: Name the dependency cache after the runner image and CMake
