@@ -67,16 +67,17 @@ gh issue develop <N> --base <base> --name fix/<N>-<slug> --checkout
    cmake --build --preset debug --parallel
    ctest --preset debug
    ```
-   이어서 Release로 한 번 더(CI의 `release` job과 같음):
+   이어서 Release로 한 번 더(CI의 `release` job과 같은 명령):
    ```
    cmake --preset release -DHYDROID_RES_REQUIRE_LOCALE_TESTS=ON
    cmake --build --preset release --parallel
    ctest --preset release
    ```
    quick 범위의 `core (ubuntu-24.04, release)`는 GCC만 보고, `core (windows-2022, release)`는 full 범위에서만
-   돈다. MSVC `/O2`에서만 나는 경고(C4702 등)도 `/WX`로 빌드를 멈추므로, 서브이슈 단계에서 그것을 보는 곳은
-   이 PC(Windows, MSVC)의 Release 빌드뿐이다(#258, #267). 빌드 디렉터리가 다르므로(`build/debug`,
-   `build/release`) 서로를 덮지 않는다.
+   돈다. MSVC `/O2`에서만 나는 경고(C4702 등)도 `/WX`로 빌드를 멈추므로, 서브이슈 단계에서 그것을 볼 수 있는
+   곳은 이 PC(Windows, MSVC)의 Release 빌드뿐이다(#258, #267). 다만 이 PC의 MSVC는 CI의 windows-2022(VS 2022)와
+   버전이 다를 수 있어, 한쪽 버전에서만 나는 경고는 여전히 단계 PR의 full CI에서야 드러날 수 있다. 빌드
+   디렉터리가 다르므로(`build/debug`, `build/release`) 서로를 덮지 않는다.
    decimal-comma 로케일이 이 PC에 없어서 configure가 실패하면 `-DHYDROID_RES_REQUIRE_LOCALE_TESTS=ON`만
    빼고 다시 하고, PR의 테스트 항목에 그렇게 적는다.
 3. 바꾼 `*.h`, `*.cpp`에 clang-format 23.1.5(`.clang-format`)로 `--dry-run --Werror`를 돌린다.

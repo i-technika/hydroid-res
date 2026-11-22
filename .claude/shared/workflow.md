@@ -33,8 +33,9 @@ full의 16개: 기존 11개 — `core (ubuntu-24.04 / macos-15 / windows-2022)`,
 android.googlesource.com에서 내려받으므로 네트워크 문제로 실패할 수 있다).
 
 quick 범위의 release는 Linux(GCC)뿐이다. MSVC 최적화 빌드에서만 나는 경고는 `/fix-issue` 3단계의 로컬
-Release 빌드(`cmake --preset release`)가 잡는다. 이 PC가 Windows(MSVC)라 PR마다 Windows 러너 시간을 쓰지
-않아도 된다(#267).
+Release 빌드(`cmake --preset release`)가 서브이슈 단계에서 본다. 이 PC가 Windows(MSVC)라 PR마다 Windows 러너
+시간을 쓰지 않아도 된다(#267). 이 PC의 MSVC는 CI의 windows-2022(VS 2022)와 버전이 다를 수 있으므로, 한쪽
+버전에서만 나는 경고는 여전히 full 범위의 `core (windows-2022, release)`에서야 드러날 수 있다.
 
 full 실행 결과를 확인할 때는 job 이름과 수가 위 목록과 맞는지 본다(빠진 job이 있으면 범위가 quick으로
 돈 것이다):
