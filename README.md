@@ -164,7 +164,8 @@ system has no Welsh. It dumps the locales of the emulator's system resources too
 `golden/nolocale/data/system_locales.txt`, which has a few the AOSP folder list has not (en,
 en-XA, ar-XB) and has not some it has; both tests have in the table a package android of a
 folder for each, which hydroid must leave out of the app's locales. As the system has the
-pseudo-locales, whether the app's count with the system's the dump does not tell:
+pseudo-locales, whether the app's count with the system's the dump does not tell, only
+`ResourcesLocale.TheAppsPseudoLocalesCountWithTheSystems`:
 
 ```sh
 python scripts/golden/pull_golden.py --app nolocale

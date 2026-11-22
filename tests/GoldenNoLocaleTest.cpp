@@ -21,7 +21,7 @@ constexpr const char* kPackage = "com.itechnika.hydroid.golden.nolocale";
 TEST(GoldenNoLocale, PicksWhatAndroidPicked) {
   // The lifecycles are of languages the system has and has not (NoLocaleDumpTest). It has the
   // pseudo-locales too, so whether the app's count with the system's the dump does not tell, only
-  // ResourcesLocale.ATableWithoutLocalesChoosesNothing and the like.
+  // ResourcesLocale.TheAppsPseudoLocalesCountWithTheSystems.
   const std::set<std::string> system = test::frameworkLocales();
   for (const char* has : {"ja", "ko", "iw", "tl", "en-rGB", "en-rXA", "ar-rXB"}) {
     EXPECT_TRUE(system.count(has)) << has;
