@@ -73,6 +73,10 @@ if(NOT CMAKE_CXX_FLAGS MATCHES "-fsanitize=")
   target_compile_definitions(hydroid-res-alloc-tests PRIVATE
     "HYDROID_SHARED_LIBRARY=$<STREQUAL:$<TARGET_PROPERTY:hydroid-res,TYPE>,SHARED_LIBRARY>")
   hydroid_set_warnings(hydroid-res-alloc-tests)
+  # DIAGNOSTIC (#256), to be removed: names in the backtrace of the tests.
+  if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    target_link_options(hydroid-res-alloc-tests PRIVATE -rdynamic)
+  endif()
   gtest_discover_tests(hydroid-res-alloc-tests DISCOVERY_MODE PRE_TEST)
 endif()
 

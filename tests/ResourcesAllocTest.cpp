@@ -6,6 +6,7 @@
 #include <gtest/gtest.h>
 
 #include <atomic>
+#include <exception>
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
@@ -30,6 +31,25 @@ std::atomic<long> allocations{0};
 std::atomic<long> failing{-1};
 
 }  // namespace
+
+// DIAGNOSTIC (#256), to be removed: where an exception that nothing can catch is thrown. When the
+// search for a handler fails, std::terminate is called from the throw, so the stack is still there.
+#if defined(__GLIBC__)
+#include <execinfo.h>
+#include <cstdio>
+namespace {
+[[noreturn]] void printWhereAndAbort() {
+  counting = false;
+  std::fprintf(stderr, "terminate with failing=%ld
+", failing.load());
+  void* frames[64];
+  const int n = backtrace(frames, 64);
+  backtrace_symbols_fd(frames, n, 2);
+  std::abort();
+}
+[[maybe_unused]] const bool installed = (std::set_terminate(printWhereAndAbort), true);
+}  // namespace
+#endif
 
 void* operator new(std::size_t size) {
   if (counting.load() && allocations.fetch_add(1) == failing.load()) throw std::bad_alloc();
