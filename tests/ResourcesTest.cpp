@@ -854,8 +854,11 @@ TEST(ResourcesLocaleConfig, EachResourceTakesTheFirstLocaleItHas) {
   EXPECT_EQ(from(resources, table, "es"), "es");
   EXPECT_EQ(from(resources, table, "none"), "default");
 
-  // Without the default, one language for the whole table, the first it has.
+  // Without the default, one language for the whole table, the first it has, from the next update
+  // on: the locales are not those the configuration was left with, fr and es.
   resources.setLocaleConfig(localeConfig({"en-US", "fr", "es"}, nullptr));
+  EXPECT_EQ(chosen(resources), "fr-rFR");
+  resources.setConfiguration(Config{}, tags({"de-DE", "fr-FR", "es-ES"}));
   EXPECT_EQ(chosen(resources), "de-rDE");
   EXPECT_EQ(from(resources, table, "all"), "de");
   EXPECT_EQ(from(resources, table, "es"), "default");
@@ -938,12 +941,17 @@ TEST(ResourcesLocaleConfig, GenerationChangesWithWhatIsPicked) {
   ResourceTable table;
   addStrings(table, dir, {{"", {"x"}}, {"es", {"x"}}});
   Resources resources(table);
-  resources.setConfiguration(Config{}, tags({"fr-FR", "es-ES"}));
+  const std::vector<Config> frEs = tags({"fr-FR", "es-ES"});
+  resources.setConfiguration(Config{}, frEs);
   EXPECT_EQ(from(resources, table, "x"), "es");
   uint32_t before = resources.generation();
 
-  // fr and es are read in now: the configuration is fr's, and values/ is fr's too.
+  // A LocaleConfig changes nothing until the next update, as on Android.
   resources.setLocaleConfig(localeConfig({"fr", "es"}, "fr"));
+  EXPECT_EQ(resources.generation(), before);
+  EXPECT_EQ(from(resources, table, "x"), "es");
+  // Which reads in fr and es: the configuration is fr's, and values/ is fr's too.
+  resources.setConfiguration(Config{}, frEs);
   EXPECT_NE(resources.generation(), before);
   EXPECT_EQ(chosen(resources), "fr-rFR");
   EXPECT_EQ(from(resources, table, "x"), "default");
@@ -951,18 +959,21 @@ TEST(ResourcesLocaleConfig, GenerationChangesWithWhatIsPicked) {
   // Another default, with the same locales read in, picks otherwise.
   before = resources.generation();
   resources.setLocaleConfig(localeConfig({"fr", "es"}, "es"));
+  resources.setConfiguration(Config{}, frEs);
   EXPECT_NE(resources.generation(), before);
   EXPECT_EQ(from(resources, table, "x"), "es");
 
   // The same again changes nothing.
   before = resources.generation();
   resources.setLocaleConfig(localeConfig({"fr", "es"}, "es"));
+  resources.setConfiguration(Config{}, frEs);
   EXPECT_EQ(resources.generation(), before);
 
   // Nor does another default with one locale read in.
   resources.setConfiguration(Config{}, tags({"es-ES"}));
   before = resources.generation();
   resources.setLocaleConfig(localeConfig({"fr", "es"}, "fr"));
+  resources.setConfiguration(Config{}, tags({"es-ES"}));
   EXPECT_EQ(resources.generation(), before);
 }
 
