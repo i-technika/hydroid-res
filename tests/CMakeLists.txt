@@ -148,6 +148,14 @@ if(TARGET hydroid-rc)
       "-DGOLDEN=${PROJECT_SOURCE_DIR}/golden/data"
       "-DTABLE=${PROJECT_SOURCE_DIR}/golden/table/res"
       -P ${CMAKE_CURRENT_SOURCE_DIR}/CheckRcPick.cmake)
+  # And, given the app's LocaleConfig, what Android picked through each lifecycle of
+  # golden/localeconfig/data (#268).
+  add_test(NAME HydroidRc.PicksWhatAndroidPickedWithLocaleConfig
+    COMMAND ${CMAKE_COMMAND}
+      "-DRC=$<TARGET_FILE:hydroid-rc>"
+      "-DRES=${PROJECT_SOURCE_DIR}/golden/localeconfig/src/main/res"
+      "-DGOLDEN=${PROJECT_SOURCE_DIR}/golden/localeconfig/data"
+      -P ${CMAKE_CURRENT_SOURCE_DIR}/CheckRcLocaleConfig.cmake)
   # And ends with an error, not an abort, on an argument with no UTF-8, which only Windows passes.
   if(WIN32)
     add_test(NAME HydroidRc.FailsOnNonUnicodeArgument
