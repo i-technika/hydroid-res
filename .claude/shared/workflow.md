@@ -32,6 +32,10 @@ full의 16개: 기존 11개 — `core (ubuntu-24.04 / macos-15 / windows-2022)`,
 `locale tables`(`scripts/gen_locale_data.py`로 `src/core/LocaleDataTables.inc`를 다시 만들어 비교.
 android.googlesource.com에서 내려받으므로 네트워크 문제로 실패할 수 있다).
 
+quick 범위의 release는 Linux(GCC)뿐이다. MSVC 최적화 빌드에서만 나는 경고는 `/fix-issue` 3단계의 로컬
+Release 빌드(`cmake --preset release`)가 잡는다. 이 PC가 Windows(MSVC)라 PR마다 Windows 러너 시간을 쓰지
+않아도 된다(#267).
+
 full 실행 결과를 확인할 때는 job 이름과 수가 위 목록과 맞는지 본다(빠진 job이 있으면 범위가 quick으로
 돈 것이다):
 ```
