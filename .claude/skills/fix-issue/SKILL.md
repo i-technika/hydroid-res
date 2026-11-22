@@ -106,7 +106,7 @@ PR 본문(한국어, 기존 PR과 같은 구성):
   `> base가 기본 브랜치가 아니라서 머지해도 #<N>은 자동으로 닫히지 않습니다.`를 넣는다.
 - `## 변경`: 파일별로 무엇을 바꿨는지.
 - `## 테스트`: 실제로 돌린 것만 `- [x]`로. 돌리지 못한 것은 `- [ ]`와 이유. CI는 quick 범위(Linux의 GCC
-  static, shared, Clang ASan·UBSan, clang-format)만 돈다고 적는다.
+  static, shared, release, Clang ASan·UBSan, clang-format)만 돈다고 적는다.
 - 하네스가 알려 준 PR attribution 줄로 끝낸다.
 
 ### 질문 지점: 개발자 문의
@@ -187,7 +187,7 @@ Resolve는 `gh api graphql -f query='mutation($id:ID!){resolveReviewThread(input
 | Development | `hgh links <M>`에 `<N>` 있음 (없으면 4단계의 안내를 다시 하고 표에 ❌로 둔다) |
 | 이슈 담당자 | `hgh kind <N>`의 `assignees`에 `i-technika` |
 | 로컬 빌드·테스트 | HEAD에서 3단계의 빌드와 `ctest` 통과 |
-| CI (quick) | `gh pr checks <M> --watch`(백그라운드). `core (ubuntu-24.04)`, `core (ubuntu-24.04, shared)`, `core (Clang, ASan and UBSan)`, `clang-format` 네 개 통과 |
+| CI (quick) | `gh pr checks <M> --watch`(백그라운드). `core (ubuntu-24.04)`, `core (ubuntu-24.04, shared)`, `core (ubuntu-24.04, release)`, `core (Clang, ASan and UBSan)`, `clang-format` 다섯 개 통과 |
 
 - CI가 실패하면 로그(`gh run view <id> --log-failed`)를 보고, 이 PR 때문이면 고쳐서 push하고 다시 확인한다.
   러너나 네트워크 같은 외부 원인으로 보이면 **질문 지점**: 다시 돌릴지(`gh run rerun --failed`), 중단할지 묻는다.

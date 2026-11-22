@@ -22,7 +22,7 @@
 
 | 범위 | 언제 | job |
 | --- | --- | --- |
-| quick (4) | `main`이 아닌 브랜치로 가는 PR (서브이슈 PR) | `core (ubuntu-24.04)`, `core (ubuntu-24.04, shared)`, `core (Clang, ASan and UBSan)`, `clang-format` |
+| quick (5) | `main`이 아닌 브랜치로 가는 PR (서브이슈 PR) | `core (ubuntu-24.04)`, `core (ubuntu-24.04, shared)`, `core (ubuntu-24.04, release)`, `core (Clang, ASan and UBSan)`, `clang-format` |
 | full (16) | `main`으로 가는 PR, `main` push, `gh workflow run ci.yml -f scope=full` | 아래 전부 |
 
 full의 16개: 기존 11개 — `core (ubuntu-24.04 / macos-15 / windows-2022)`, 같은 세 OS의 `, shared`,
