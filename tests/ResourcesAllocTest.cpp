@@ -15,6 +15,7 @@
 #include <new>
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "TempDir.h"
@@ -403,14 +404,15 @@ TEST(ResourcesAllocations, AFailedAllocationAsXmlIsReadThrows) {
 
 // addPackage, for each allocation it makes, failing it: the std::bad_alloc leaves it, on GCC as
 // well, where an allocation that failed in libstdc++'s directory_iterator, as the folders of res/
-// were listed, ended the program (#262). The package has values, an XML file whose ids are read
-// and a file copied as it is. Each call is to a table of its own, as one that fails may yet leave
-// a name in the table (#257).
+// were listed, ended the program (#262), and leaves the table as it was, with none of the names of
+// the package it did not load (#257), and those of the package it held. The same call again loads
+// the package. It has values, an XML file whose ids are read and a file copied as it is.
 TEST(ResourcesAllocations, AFailedAllocationAsAPackageLoadsThrows) {
 #if HYDROID_NOEXCEPT_ALLOCATES
   GTEST_SKIP() << "the checked iterators allocate where they cannot throw";
 #else
   TempDir dir;
+  const std::filesystem::path lib = writePackage(dir, {}, "com.example.lib");
   const std::filesystem::path res = writePackage(dir, {"ko", "night"}, "com.example");
   std::filesystem::create_directories(res / "layout");
   std::ofstream(res / "layout" / "main.xml", std::ios::binary)
@@ -420,21 +422,44 @@ TEST(ResourcesAllocations, AFailedAllocationAsAPackageLoadsThrows) {
   std::ofstream(res / "raw" / "data.bin", std::ios::binary) << "data";
   bool added = false;
   long all = 0;
+  // The names of the package, with their ids.
+  std::vector<std::pair<std::string, ResId> > names;
   {
     ResourceTable table;
+    ASSERT_TRUE(table.addPackage(lib, "com.example.lib", 0x7e));
     all = allocationsOf([&] { added = table.addPackage(res, "com.example", kAppPackageId); });
+    ASSERT_TRUE(added);
+    for (const TypeTable& type : table.package(kAppPackageId)->types) {
+      for (const Entry& e : type.entries) {
+        const ResId id = makeResId(kAppPackageId, type.id, e.id);
+        names.emplace_back(*table.nameOf(id), id);
+      }
+    }
   }
-  ASSERT_TRUE(added);
   REQUIRE_COUNTED(all);
+  ASSERT_GT(names.size(), 3u);  // so that some fail as the names are put in
   long threw = 0;
   for (long failAt = 0; failAt < all; failAt++) {
     SCOPED_TRACE(failAt);
     ResourceTable table;
+    ASSERT_TRUE(table.addPackage(lib, "com.example.lib", 0x7e));
+    const uint64_t revision = table.revision();
+    const std::optional<ResId> libWhere = table.find("com.example.lib:string/where");
+    ASSERT_TRUE(libWhere);
     try {
       allocationsOf([&] { table.addPackage(res, "com.example", kAppPackageId); }, failAt);
     } catch (const std::bad_alloc&) {
       threw++;
     }
+    ASSERT_EQ(table.packages().size(), 1u);
+    EXPECT_EQ(table.packages()[0].name, "com.example.lib");
+    EXPECT_EQ(table.revision(), revision);
+    EXPECT_EQ(table.find("com.example.lib:string/where"), libWhere);
+    for (const auto& [name, id] : names) EXPECT_FALSE(table.find(name)) << name;
+
+    ASSERT_TRUE(table.addPackage(res, "com.example", kAppPackageId));
+    EXPECT_EQ(table.revision(), revision + 1);
+    for (const auto& [name, id] : names) EXPECT_EQ(table.find(name), id) << name;
   }
   // addPackage recovers from none.
   EXPECT_EQ(threw, all);
@@ -501,10 +526,10 @@ TEST(ResourcesAllocations, PugixmlWithoutMemoryFailsAddPackage) {
   }
 }
 
-// The C API (#203), for each allocation its calls make but those of loading a package (#257),
-// failing it: no exception leaves a C function, and one that fails says so and leaves what it would
-// have written as it was. The table changes before each call that reads the configuration, so that
-// each takes the change in.
+// The C API (#203), for each allocation its calls make, failing it: no exception leaves a C
+// function, and one that fails says so and leaves what it would have written as it was. The table
+// changes before each call that reads the configuration, so that each takes the change in, if the
+// package loaded.
 TEST(ResourcesAllocations, NoExceptionLeavesTheCApi) {
 #if HYDROID_NOEXCEPT_ALLOCATES
   GTEST_SKIP() << "the checked iterators allocate where they cannot throw";
@@ -527,12 +552,8 @@ TEST(ResourcesAllocations, NoExceptionLeavesTheCApi) {
       failures++;
       return;
     }
-    // Not while a package loads: one that fails may leave the name of a package that is not there
-    // in the table (#257), which the calls after it would look in.
     const auto add = [&](const std::string& res, const char* name, uint8_t id) {
-      counting = false;
       if (hydroid_res_table_add_package(table, res.c_str(), name, id) != 1) failures++;
-      counting = true;
     };
     add(app, "com.example", 0x7f);
     hydroid_res_resources* resources = hydroid_res_resources_create(table);
