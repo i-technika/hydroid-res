@@ -279,9 +279,9 @@ struct Resources::Impl {
     matchConfigs.reserve(spareMatchConfigs.size());
   }
 
-  // Makes those prepare() made what the values are picked for, with the default locale of
-  // `localeConfig`. That changes what is picked if the configurations, or the default locale
-  // they are read with, are not those already, or the table has changed since.
+  // Makes those prepare() made what the values are picked for, with the default locale
+  // `newDefault`. That changes what is picked if the configurations, or the default locale they
+  // are read with, are not those already, or the table has changed since.
   void commit(const std::optional<Config>& newDefault, uint64_t revision) noexcept {
     const bool sameDefault = newDefault == defaultLocale || spareConfigs.size() == 1;
     defaultLocale = newDefault;
@@ -359,28 +359,29 @@ struct Resources::Impl {
     return {configLocales.data(), 1};
   }
 
-  // Makes `c` the choice, once prepare() has made its configurations; `with`, if given, the
-  // LocaleConfig it was made with, which setLocaleConfig has given since the choice before.
-  void commitChoice(Choice& c, uint64_t revision, LocaleConfig* with) noexcept {
+  // Makes `c` the choice, made with the LocaleConfig `with`, once prepare() has made its
+  // configurations.
+  void commitChoice(Choice& c, uint64_t revision, LocaleConfig& with) noexcept {
     configLocales.swap(c.configLocales);
     readIn.swap(c.readIn);
-    if (with != nullptr) {
-      chosenWith.supported.swap(with->supported);
-      chosenWith.defaultLocale = with->defaultLocale;
-      stale = false;
-    }
+    chosenWith.supported.swap(with.supported);
+    chosenWith.defaultLocale = with.defaultLocale;
     commit(defaultLocaleOf(chosenWith), revision);
   }
 
   // Takes in what the table has changed since the last call, as the packages it has added: what
-  // was picked from it is gone, and the locales are chosen again, as if given afresh, with the
-  // LocaleConfig of the choice before: one given since waits for setConfiguration, as on Android.
+  // was picked from it is gone. Android makes a new ResourcesImpl for new assets, which chooses
+  // for the locales asked for as if given afresh and before it has a LocaleConfig, and is given
+  // the app's after (ResourcesManager, Resources.setImpl), for the next update. So here: one
+  // locale is chosen for the whole table, and the LocaleConfig waits for setConfiguration.
   void syncWithTable() {
     const uint64_t revision = table.revision();
     if (revision == tableRevision) return;
-    Choice c = choose(locales, configLocales, /*changed=*/true, revision, chosenWith);
+    LocaleConfig none;
+    Choice c = choose(locales, {}, /*changed=*/true, revision, none);
     prepare(c.readIn.data(), c.readIn.size(), device);
-    commitChoice(c, revision, nullptr);
+    commitChoice(c, revision, none);
+    stale = localeConfig.defaultLocale.has_value() || !localeConfig.supported.empty();
   }
 
   void clearCaches() {
@@ -437,13 +438,13 @@ struct Resources::Impl {
   Config device;                // as setConfiguration was given it
   std::vector<Config> locales;  // as setConfiguration was given them
   LocaleConfig localeConfig;    // as setLocaleConfig was given it
-  LocaleConfig chosenWith;      // as it was when setConfiguration last chose
+  LocaleConfig chosenWith;      // the last choice was made with: none after a table change
   // Whether setLocaleConfig has been called since setConfiguration last chose, which the next
   // takes it in.
   bool stale = false;
   std::vector<Config> configLocales;      // Android's configuration's, as the last choice left them
   std::vector<Config> readIn;             // of the last choice, which the resources are read in
-  std::optional<Config> defaultLocale;    // defaultLocaleOf(localeConfig), as it was then
+  std::optional<Config> defaultLocale;    // defaultLocaleOf(chosenWith), which they are read with
   std::vector<Config> configs;            // effectiveConfig of those read in, one at least
   std::vector<Config> matchConfigs;       // withScript of each, which the values are picked by
   std::vector<Config> spareConfigs;       // as prepare() made them, or those before `configs`
@@ -489,7 +490,8 @@ void Resources::setConfiguration(const Config& device, const std::vector<Config>
   impl_->prepare(c.readIn.data(), c.readIn.size(), device);
   impl_->locales.swap(copy);
   impl_->device = device;
-  impl_->commitChoice(c, tableRevision, &with);
+  impl_->commitChoice(c, tableRevision, with);
+  impl_->stale = false;
 }
 
 void Resources::setLocaleConfig(const LocaleConfig& config) {

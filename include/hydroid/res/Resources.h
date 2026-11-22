@@ -97,7 +97,10 @@ class Resources {
   //     next. One whose values are for an mcc or mnc the device has comes before one that is not,
   //     whatever its locale (isBetterThanBeforeLocale). A resource that has no value for one of
   //     those locales has none at all, as on Android. configuration() has the first of them. A
-  //     table that changes has the locales chosen as if `locales` were others.
+  //     table that changes, as Android's new assets do, has a new ResourcesImpl choose for
+  //     `locales` as if given afresh and without the LocaleConfig, which it is given for the
+  //     next update: one locale is chosen for the whole table, and the next setConfiguration
+  //     takes the LocaleConfig in again.
   //     golden/localeconfig/data holds what Android picked through such calls, and
   //     GoldenLocaleConfigTest checks it.
   //   - A language that has an old code is given that code, which is the one Android's resources
@@ -120,9 +123,8 @@ class Resources {
   // the LocaleConfig of the app's manifest (parseLocaleConfig reads its file): its default
   // locale, if it has one, has the resources read in more than one locale, as setConfiguration
   // says. As on Android, it changes nothing until the next setConfiguration, which takes it in
-  // whatever it is given: a table that changes before that has the locales chosen with the
-  // LocaleConfig before. An empty LocaleConfig, which a Resources starts with, is an app without
-  // one.
+  // whatever it is given, and not a table that changes before that (setConfiguration). An empty
+  // LocaleConfig, which a Resources starts with, is an app without one.
   HYDROID_RES_API void setLocaleConfig(const LocaleConfig& config);
 
   // The configuration the values are picked for: the device's as setConfiguration made it, with
