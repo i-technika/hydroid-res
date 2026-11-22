@@ -175,6 +175,36 @@ TEST(ResourcesAllocations, OnlyTheDeviceChangingAllocatesNothingForSeveralLocale
   EXPECT_EQ(chosen(resources), "fr-rFR-night");
 }
 
+// The same once the table has changed and been taken in: without a LocaleConfig, nothing is left
+// for the next call to choose; with one, the next call takes it in again, and those after it
+// allocate nothing (#249).
+TEST(ResourcesAllocations, OnlyTheDeviceChangingAllocatesNothingAfterATableChange) {
+  for (const bool withLocaleConfig : {false, true}) {
+    SCOPED_TRACE(withLocaleConfig);
+    TempDir dir;
+    ResourceTable table;
+    REQUIRE_COUNTED(addPackage(table, dir, {"ko", "night"}));
+    Resources resources(table);
+    if (withLocaleConfig) {
+      LocaleConfig app;
+      app.supported = tags({"fr", "ko"});
+      app.defaultLocale = app.supported[0];
+      resources.setLocaleConfig(app);
+    }
+    const std::vector<Config> frKo = tags({"fr-FR", "ko-KR"});
+    const Config night = dev("night");
+    const Config day = dev("land-notnight");
+    resources.setConfiguration(night, frKo);
+    addPackage(table, dir, {"ja"}, "com.example.lib", 0x7e);
+    EXPECT_GT(allocationsOf([&] { resources.generation(); }), 0);
+    if (withLocaleConfig) {
+      EXPECT_GT(allocationsOf([&] { resources.setConfiguration(day, frKo); }), 0);
+    }
+    EXPECT_EQ(allocationsOf([&] { resources.setConfiguration(night, frKo); }), 0);
+    EXPECT_EQ(allocationsOf([&] { resources.setConfiguration(day, frKo); }), 0);
+  }
+}
+
 // For each allocation of a setConfiguration that chooses a locale, a call in which it fails:
 // what Resources answers is as before, it keeps not the device of the call, and the same call
 // again chooses.

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- German, which the app has values of but does not say it supports. -->
+<resources>
+    <string name="all">de</string>
+    <string name="es_de">de</string>
+    <string name="de">de</string>
+</resources>

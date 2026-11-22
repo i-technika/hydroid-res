@@ -1,0 +1,174 @@
+{
+  "name": "fr then fr+es",
+  "localeConfig": false,
+  "steps": [
+    {
+      "step": "created",
+      "condition": {
+        "requestedLocales": "fr-FR",
+        "sdkInt": 37,
+        "sdkIntFull": 3700000,
+        "configuration": {
+          "locales": "fr-FR",
+          "mcc": 310,
+          "mnc": 260,
+          "grammaticalGender": 0,
+          "screenLayout": 268435810,
+          "smallestScreenWidthDp": 320,
+          "screenWidthDp": 320,
+          "screenHeightDp": 568,
+          "colorMode": 5,
+          "orientation": 1,
+          "uiMode": 17,
+          "densityDpi": 320,
+          "touchscreen": 3,
+          "keyboardHidden": 1,
+          "hardKeyboardHidden": 1,
+          "keyboard": 2,
+          "navigationHidden": 2,
+          "navigation": 1,
+          "widthPixels": 1080,
+          "heightPixels": 2400
+        }
+      },
+      "values": {
+        "string\/all": {
+          "string": "fr"
+        },
+        "string\/app_name": {
+          "string": "hydroid golden locale config"
+        },
+        "string\/de": {
+          "string": "default"
+        },
+        "string\/es": {
+          "string": "default"
+        },
+        "string\/es_de": {
+          "string": "default"
+        },
+        "string\/fr_es": {
+          "string": "fr"
+        },
+        "string\/mcc": {
+          "string": "fr"
+        },
+        "string\/none": {
+          "string": "default"
+        }
+      }
+    },
+    {
+      "step": "changed",
+      "condition": {
+        "requestedLocales": "fr-FR,es-ES",
+        "sdkInt": 37,
+        "sdkIntFull": 3700000,
+        "configuration": {
+          "locales": "fr-FR,es-ES",
+          "mcc": 310,
+          "mnc": 260,
+          "grammaticalGender": 0,
+          "screenLayout": 268435810,
+          "smallestScreenWidthDp": 320,
+          "screenWidthDp": 320,
+          "screenHeightDp": 568,
+          "colorMode": 5,
+          "orientation": 1,
+          "uiMode": 17,
+          "densityDpi": 320,
+          "touchscreen": 3,
+          "keyboardHidden": 1,
+          "hardKeyboardHidden": 1,
+          "keyboard": 2,
+          "navigationHidden": 2,
+          "navigation": 1,
+          "widthPixels": 1080,
+          "heightPixels": 2400
+        }
+      },
+      "values": {
+        "string\/all": {
+          "string": "fr"
+        },
+        "string\/app_name": {
+          "string": "hydroid golden locale config"
+        },
+        "string\/de": {
+          "string": "default"
+        },
+        "string\/es": {
+          "string": "default"
+        },
+        "string\/es_de": {
+          "string": "default"
+        },
+        "string\/fr_es": {
+          "string": "fr"
+        },
+        "string\/mcc": {
+          "string": "fr"
+        },
+        "string\/none": {
+          "string": "default"
+        }
+      }
+    },
+    {
+      "step": "rotated",
+      "condition": {
+        "requestedLocales": "fr-FR,es-ES",
+        "sdkInt": 37,
+        "sdkIntFull": 3700000,
+        "configuration": {
+          "locales": "fr-FR,es-ES",
+          "mcc": 310,
+          "mnc": 260,
+          "grammaticalGender": 0,
+          "screenLayout": 268435810,
+          "smallestScreenWidthDp": 320,
+          "screenWidthDp": 568,
+          "screenHeightDp": 320,
+          "colorMode": 5,
+          "orientation": 2,
+          "uiMode": 17,
+          "densityDpi": 320,
+          "touchscreen": 3,
+          "keyboardHidden": 1,
+          "hardKeyboardHidden": 1,
+          "keyboard": 2,
+          "navigationHidden": 2,
+          "navigation": 1,
+          "widthPixels": 1080,
+          "heightPixels": 2400
+        }
+      },
+      "values": {
+        "string\/all": {
+          "string": "fr"
+        },
+        "string\/app_name": {
+          "string": "hydroid golden locale config"
+        },
+        "string\/de": {
+          "string": "default"
+        },
+        "string\/es": {
+          "string": "default"
+        },
+        "string\/es_de": {
+          "string": "default"
+        },
+        "string\/fr_es": {
+          "string": "fr"
+        },
+        "string\/mcc": {
+          "string": "fr"
+        },
+        "string\/none": {
+          "string": "default"
+        }
+      }
+    }
+  ]
+}
