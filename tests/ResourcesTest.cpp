@@ -798,5 +798,406 @@ TEST(ResourcesLocale, KeepsTheScriptAndVariantOfTheChosen) {
   EXPECT_EQ(where(resources, table), "sr");
 }
 
+// ---- the app's default locale (LocaleConfig) -------------------------------------------------
+
+// A package of strings, each with a value in each folder that names it, by the qualifiers of the
+// folder ("" for values/): the value is those qualifiers, or "default".
+using Folders = std::vector<std::pair<std::string, std::vector<std::string>>>;
+
+void addStrings(ResourceTable& table, const TempDir& dir, const Folders& folders) {
+  const std::filesystem::path res = dir.path() / "res";
+  for (const auto& [qualifiers, names] : folders) {
+    const std::string folder = qualifiers.empty() ? "values" : "values-" + qualifiers;
+    std::filesystem::create_directories(res / folder);
+    std::ofstream out(res / folder / "strings.xml", std::ios::binary);
+    out << "<resources>";
+    for (const std::string& name : names) {
+      out << "<string name=\"" << name << "\">" << (qualifiers.empty() ? "default" : qualifiers)
+          << "</string>";
+    }
+    out << "</resources>";
+  }
+  std::vector<Diagnostic> errors;
+  ASSERT_TRUE(table.addPackage(res, "com.example", kAppPackageId, &errors))
+      << (errors.empty() ? "" : errors[0].message);
+}
+
+// The value Resources takes for the string `name`, as addStrings made it.
+std::string from(const Resources& resources, const ResourceTable& table, const std::string& name,
+                 uint16_t density = 0) {
+  const std::optional<ResId> id = table.find("com.example", ResType::String, name);
+  if (!id) return "no resource";
+  const Candidate* c = resources.candidateForDensity(*id, density);
+  if (c == nullptr) return "none";
+  return table.package("com.example")->strings.at(c->value.index());
+}
+
+LocaleConfig localeConfig(const std::vector<const char*>& supported, const char* defaultLocale) {
+  LocaleConfig config;
+  config.supported = tags(supported);
+  if (defaultLocale != nullptr) config.defaultLocale = tags({defaultLocale})[0];
+  return config;
+}
+
+TEST(ResourcesLocaleConfig, EachResourceTakesTheFirstLocaleItHas) {
+  TempDir dir;
+  ResourceTable table;
+  addStrings(
+      table, dir,
+      {{"", {"all", "es", "none"}}, {"fr", {"all"}}, {"es", {"all", "es"}}, {"de", {"all"}}});
+  Resources resources(table);
+  resources.setLocaleConfig(localeConfig({"en-US", "fr", "es"}, "en-US"));
+  // de is not one the app supports, so fr and es are read in, fr first.
+  resources.setConfiguration(Config{}, tags({"de-DE", "fr-FR", "es-ES"}));
+  EXPECT_EQ(chosen(resources), "fr-rFR");
+  EXPECT_EQ(from(resources, table, "all"), "fr");
+  EXPECT_EQ(from(resources, table, "es"), "es");
+  EXPECT_EQ(from(resources, table, "none"), "default");
+
+  // Without the default, one language for the whole table, the first it has.
+  resources.setLocaleConfig(localeConfig({"en-US", "fr", "es"}, nullptr));
+  EXPECT_EQ(chosen(resources), "de-rDE");
+  EXPECT_EQ(from(resources, table, "all"), "de");
+  EXPECT_EQ(from(resources, table, "es"), "default");
+}
+
+TEST(ResourcesLocaleConfig, ValuesWithoutALanguageAreOfTheDefault) {
+  TempDir dir;
+  ResourceTable table;
+  addStrings(table, dir, {{"", {"es"}}, {"es", {"es"}}});
+  Resources resources(table);
+  resources.setLocaleConfig(localeConfig({"en-US", "fr", "es"}, "en-US"));
+  // values/ is of en-US, which comes before es in the list.
+  resources.setConfiguration(Config{}, tags({"fr-FR", "en-US", "es-ES"}));
+  EXPECT_EQ(from(resources, table, "es"), "default");
+  // Not so when English comes after.
+  resources.setConfiguration(Config{}, tags({"fr-FR", "es-ES", "en-US"}));
+  EXPECT_EQ(from(resources, table, "es"), "es");
+
+  // A default under a new code is that of the locale read in under the old one: he is iw.
+  TempDir hebrewDir;
+  ResourceTable hebrew;
+  addStrings(hebrew, hebrewDir, {{"", {"x"}}, {"fr", {"x"}}});
+  Resources ofHebrew(hebrew);
+  ofHebrew.setLocaleConfig(localeConfig({"he", "fr"}, "he"));
+  ofHebrew.setConfiguration(Config{}, tags({"he-IL", "fr-FR"}));
+  EXPECT_EQ(chosen(ofHebrew), "iw-rIL");
+  EXPECT_EQ(from(ofHebrew, hebrew, "x"), "default");
+}
+
+TEST(ResourcesLocaleConfig, NoValueForOneLocaleIsNoValue) {
+  TempDir dir;
+  ResourceTable table;
+  addStrings(table, dir, {{"fr", {"fr"}}});
+  Resources resources(table);
+  resources.setLocaleConfig(localeConfig({"fr", "es"}, "fr"));
+  // AssetManager2::FindEntry gives up as soon as one locale finds nothing.
+  resources.setConfiguration(Config{}, tags({"fr-FR", "es-ES"}));
+  EXPECT_EQ(from(resources, table, "fr"), "none");
+  // With fr alone the app supports, as a single locale is read, fr it is.
+  resources.setConfiguration(Config{}, tags({"fr-FR", "de-DE"}));
+  EXPECT_EQ(from(resources, table, "fr"), "fr");
+}
+
+TEST(ResourcesLocaleConfig, AnMccComesBeforeTheLocale) {
+  TempDir dir;
+  ResourceTable table;
+  addStrings(table, dir, {{"", {"x"}}, {"fr", {"x"}}, {"mcc310-es", {"x"}}});
+  Resources resources(table);
+  resources.setLocaleConfig(localeConfig({"fr", "es"}, "fr"));
+  Config device = dev("mcc310");
+  resources.setConfiguration(device, tags({"fr-FR", "es-ES"}));
+  EXPECT_EQ(from(resources, table, "x"), "mcc310-es");
+  // A device of another mcc has values-fr/.
+  device.mcc = 208;
+  resources.setConfiguration(device, tags({"fr-FR", "es-ES"}));
+  EXPECT_EQ(from(resources, table, "x"), "fr");
+}
+
+TEST(ResourcesLocaleConfig, AsWithoutADefaultWhereNoneTheAppSupportsIsThere) {
+  TempDir dir;
+  ResourceTable table;
+  addStrings(table, dir, {{"", {"x"}}, {"es", {"x"}}});
+  Resources resources(table);
+  resources.setLocaleConfig(localeConfig({"en-US"}, "en-US"));
+  // The app supports none of these, so one is chosen for the whole table: the first it has.
+  resources.setConfiguration(Config{}, tags({"fr-FR", "es-ES"}));
+  EXPECT_EQ(chosen(resources), "es-rES");
+  EXPECT_EQ(from(resources, table, "x"), "es");
+  // Or the first if it has none.
+  resources.setConfiguration(Config{}, tags({"fr-FR", "ja-JP"}));
+  EXPECT_EQ(chosen(resources), "fr-rFR");
+  EXPECT_EQ(from(resources, table, "x"), "default");
+  // And a single locale is taken as it is.
+  resources.setConfiguration(Config{}, tags({"ja-JP"}));
+  EXPECT_EQ(chosen(resources), "ja-rJP");
+}
+
+TEST(ResourcesLocaleConfig, GenerationChangesWithWhatIsPicked) {
+  TempDir dir;
+  ResourceTable table;
+  addStrings(table, dir, {{"", {"x"}}, {"es", {"x"}}});
+  Resources resources(table);
+  resources.setConfiguration(Config{}, tags({"fr-FR", "es-ES"}));
+  EXPECT_EQ(from(resources, table, "x"), "es");
+  uint32_t before = resources.generation();
+
+  // fr and es are read in now: the configuration is fr's, and values/ is fr's too.
+  resources.setLocaleConfig(localeConfig({"fr", "es"}, "fr"));
+  EXPECT_NE(resources.generation(), before);
+  EXPECT_EQ(chosen(resources), "fr-rFR");
+  EXPECT_EQ(from(resources, table, "x"), "default");
+
+  // Another default, with the same locales read in, picks otherwise.
+  before = resources.generation();
+  resources.setLocaleConfig(localeConfig({"fr", "es"}, "es"));
+  EXPECT_NE(resources.generation(), before);
+  EXPECT_EQ(from(resources, table, "x"), "es");
+
+  // The same again changes nothing.
+  before = resources.generation();
+  resources.setLocaleConfig(localeConfig({"fr", "es"}, "es"));
+  EXPECT_EQ(resources.generation(), before);
+
+  // Nor does another default with one locale read in.
+  resources.setConfiguration(Config{}, tags({"es-ES"}));
+  before = resources.generation();
+  resources.setLocaleConfig(localeConfig({"fr", "es"}, "fr"));
+  EXPECT_EQ(resources.generation(), before);
+}
+
+// ResourcesImpl.updateConfiguration, which, having chosen one locale for the whole table though
+// the app has a default, puts it first in the configuration's locales, and reads in all of them
+// at an update that leaves them as they are (ResourcesImpl.java 564-598, Configuration.updateFrom).
+TEST(ResourcesLocaleConfig, OneLocaleChosenFirstWithADefaultIsWidenedByTheNextCall) {
+  TempDir dir;
+  ResourceTable table;
+  addStrings(table, dir, {{"", {"x", "y"}}, {"es", {"x"}}, {"fr", {"y"}}});
+  Resources resources(table);
+  resources.setLocaleConfig(localeConfig({"en-US"}, "en-US"));
+  const std::vector<Config> list = tags({"fr-FR", "de-DE", "es-ES"});
+  // The app supports none of these, and the first the table has is fr, the first of them.
+  resources.setConfiguration(Config{}, list);
+  EXPECT_EQ(chosen(resources), "fr-rFR");
+  EXPECT_EQ(from(resources, table, "x"), "default");
+  const uint32_t before = resources.generation();
+
+  // A call of the same locales, the device's rotated, reads in fr, de, es.
+  resources.setConfiguration(dev("land"), list);
+  EXPECT_NE(resources.generation(), before);
+  EXPECT_EQ(chosen(resources), "fr-rFR-land");
+  EXPECT_EQ(from(resources, table, "x"), "es");
+  EXPECT_EQ(from(resources, table, "y"), "fr");
+  // And so on after it.
+  resources.setConfiguration(dev("port"), list);
+  EXPECT_EQ(from(resources, table, "x"), "es");
+
+  // Other locales are chosen afresh.
+  resources.setConfiguration(Config{}, tags({"de-DE", "es-ES"}));
+  EXPECT_EQ(chosen(resources), "es-rES");
+  EXPECT_EQ(from(resources, table, "y"), "default");
+}
+
+TEST(ResourcesLocaleConfig, OneLocaleChosenLaterWithADefaultIsWidenedByTheLocalesItLeft) {
+  TempDir dir;
+  ResourceTable table;
+  addStrings(table, dir, {{"", {"x", "y"}}, {"es", {"x"}}, {"fr", {"y"}}});
+  Resources resources(table);
+  resources.setLocaleConfig(localeConfig({"en-US"}, "en-US"));
+  // fr is chosen, not the first: Android makes the configuration's locales fr, de, es.
+  const std::vector<Config> list = tags({"de-DE", "fr-FR", "es-ES"});
+  resources.setConfiguration(Config{}, list);
+  EXPECT_EQ(chosen(resources), "fr-rFR");
+  EXPECT_EQ(from(resources, table, "x"), "default");
+  // So the same locales again are a change to it, and fr is chosen again, alone.
+  resources.setConfiguration(dev("land"), list);
+  EXPECT_EQ(chosen(resources), "fr-rFR-land");
+  EXPECT_EQ(from(resources, table, "x"), "default");
+  resources.setConfiguration(dev("port"), list);
+  EXPECT_EQ(from(resources, table, "x"), "default");
+  // And those it made are none, and all of them are read in.
+  resources.setConfiguration(dev("port"), tags({"fr-FR", "de-DE", "es-ES"}));
+  EXPECT_EQ(chosen(resources), "fr-rFR-port");
+  EXPECT_EQ(from(resources, table, "x"), "es");
+  EXPECT_EQ(from(resources, table, "y"), "fr");
+}
+
+// The locales a choice left are those of that choice: once the table has changed and they are
+// chosen afresh, the ones it left before are a change like any other.
+TEST(ResourcesLocaleConfig, AChangedTableForgetsTheLocalesItLeft) {
+  TempDir dir;
+  ResourceTable table;
+  addStrings(table, dir, {{"", {"x", "y"}}, {"es", {"x"}}, {"fr", {"y"}}});
+  Resources resources(table);
+  resources.setLocaleConfig(localeConfig({"en-US"}, "en-US"));
+  // fr, not the first, is chosen: Android would leave fr, de, es.
+  resources.setConfiguration(Config{}, tags({"de-DE", "fr-FR", "es-ES"}));
+  EXPECT_EQ(chosen(resources), "fr-rFR");
+  // Now the table has de, so de, the first, is chosen afresh, and leaves them as they are.
+  addPackage(table, dir, {"de"}, "com.example.lib", 0x7e);
+  EXPECT_EQ(chosen(resources), "de-rDE");
+  // fr, de, es are then a change, of which fr, the first, is chosen alone: x is not es's.
+  resources.setConfiguration(Config{}, tags({"fr-FR", "de-DE", "es-ES"}));
+  EXPECT_EQ(chosen(resources), "fr-rFR");
+  EXPECT_EQ(from(resources, table, "x"), "default");
+}
+
+// Whether a call that reads comes between, the next call after the table has changed is the
+// same: the table is taken in first.
+TEST(ResourcesLocaleConfig, AChangedTableIsTakenInBeforeTheCall) {
+  TempDir dir;
+  ResourceTable table;
+  addStrings(table, dir, {{"", {"x"}}, {"es", {"x"}}});
+  Resources read(table);
+  Resources unread(table);
+  const std::vector<Config> list = tags({"fr-FR", "es-ES"});
+  for (Resources* resources : {&read, &unread}) {
+    resources->setLocaleConfig(localeConfig({"en-US"}, "en-US"));
+    resources->setConfiguration(Config{}, list);
+    EXPECT_EQ(chosen(*resources), "es-rES");
+  }
+  // Now the table has fr, the first of the locales, which is chosen anew, alone.
+  addPackage(table, dir, {"fr"}, "com.example.lib", 0x7e);
+  EXPECT_EQ(chosen(read), "fr-rFR");
+  for (Resources* resources : {&read, &unread}) {
+    resources->setConfiguration(Config{}, list);
+    EXPECT_EQ(chosen(*resources), "fr-rFR");
+    EXPECT_EQ(from(*resources, table, "x"), "es");
+  }
+}
+
+// A table that changes has the locales chosen again, by the app's default too.
+TEST(ResourcesLocaleConfig, ChosenAgainForAChangedTable) {
+  TempDir dir;
+  ResourceTable table;
+  addPackage(table, dir, {"night"});
+  Resources resources(table);
+  resources.setLocaleConfig(localeConfig({"fr", "es"}, "fr"));
+  resources.setConfiguration(Config{}, tags({"fr-FR", "es-ES"}));
+  EXPECT_EQ(chosen(resources), "fr-rFR");
+
+  // Without the default, the table's es would be chosen.
+  addPackage(table, dir, {"es"}, "com.example.lib", 0x7e);
+  EXPECT_EQ(chosen(resources), "fr-rFR");
+  EXPECT_EQ(where(resources, table, "com.example.lib"), "default");
+}
+
+TEST(ResourcesLocaleConfig, ADensityForEachLocale) {
+  TempDir dir;
+  ResourceTable table;
+  addStrings(table, dir, {{"", {"x"}}, {"es", {"x"}}, {"es-hdpi", {"x"}}});
+  Resources resources(table);
+  resources.setLocaleConfig(localeConfig({"fr", "es"}, "es"));
+  resources.setConfiguration(dev("mdpi"), tags({"fr-FR", "es-ES"}));
+  EXPECT_EQ(from(resources, table, "x"), "es");
+  EXPECT_EQ(from(resources, table, "x", 240), "es-hdpi");
+}
+
+// ---- parseLocaleConfig -----------------------------------------------------------------------
+
+std::filesystem::path writeFile(const TempDir& dir, const std::string& text) {
+  const std::filesystem::path file = dir.path() / "locales_config.xml";
+  std::ofstream(file, std::ios::binary) << text;
+  return file;
+}
+
+constexpr const char* kAndroid = "xmlns:android=\"http://schemas.android.com/apk/res/android\"";
+
+TEST(ParseLocaleConfig, ReadsTheLocalesAndTheDefault) {
+  TempDir dir;
+  const std::string text = std::string("<locale-config ") + kAndroid +
+                           " android:defaultLocale=\"en-US\">"
+                           "<locale android:name=\"en-US\"/><locale android:name=\"fr\"/>"
+                           "<other><locale android:name=\"de\"/></other>"
+                           "<locale android:name=\"fr\"/><locale android:name=\"zh-Hant-TW\"/>"
+                           "</locale-config>";
+  std::vector<Diagnostic> errors;
+  const std::optional<LocaleConfig> config = parseLocaleConfig(writeFile(dir, text), &errors);
+  ASSERT_TRUE(config) << (errors.empty() ? "" : errors[0].message);
+  // Of the root's own <locale>s, each once.
+  ASSERT_EQ(config->supported.size(), 3u);
+  EXPECT_EQ(toString(config->supported[0]), "en-rUS");
+  EXPECT_EQ(toString(config->supported[1]), "fr");
+  EXPECT_EQ(toString(config->supported[2]), "b+zh+Hant+TW");
+  ASSERT_TRUE(config->defaultLocale);
+  EXPECT_EQ(toString(*config->defaultLocale), "en-rUS");
+
+  const std::optional<LocaleConfig> none =
+      parseLocaleConfig(writeFile(dir, std::string("<locale-config ") + kAndroid +
+                                           "><locale android:name=\"fr\"/></locale-config>"));
+  ASSERT_TRUE(none);
+  EXPECT_FALSE(none->defaultLocale);
+}
+
+TEST(ParseLocaleConfig, ReadsANameAsLocaleForLanguageTagDoes) {
+  TempDir dir;
+  // Up to the first subtag that is not well-formed; nothing of a name with no language, or of no
+  // name, which LocaleConfig keeps its default with all the same.
+  const std::string text = std::string("<locale-config ") + kAndroid +
+                           " android:defaultLocale=\"fr-FR-ab\"><locale/>"
+                           "<locale android:name=\"not a tag\"/><locale android:name=\"fr-FR-ab\"/>"
+                           "<locale android:name=\"de-DE-1996-x\"/></locale-config>";
+  std::vector<Diagnostic> errors;
+  const std::optional<LocaleConfig> config = parseLocaleConfig(writeFile(dir, text), &errors);
+  ASSERT_TRUE(config) << (errors.empty() ? "" : errors[0].message);
+  EXPECT_TRUE(errors.empty());
+  ASSERT_EQ(config->supported.size(), 2u);
+  EXPECT_EQ(toString(config->supported[0]), "fr-rFR");
+  EXPECT_EQ(toString(config->supported[1]), "b+de+DE+1996");
+  ASSERT_TRUE(config->defaultLocale);
+  EXPECT_EQ(toString(*config->defaultLocale), "fr-rFR");
+
+  // A default of no language is und, as ResourcesImpl gives it.
+  const std::optional<LocaleConfig> und = parseLocaleConfig(
+      writeFile(dir, std::string("<locale-config ") + kAndroid +
+                         " android:defaultLocale=\"not a tag\"><locale android:name=\"not a tag\"/>"
+                         "<locale android:name=\"fr\"/></locale-config>"));
+  ASSERT_TRUE(und);
+  ASSERT_TRUE(und->defaultLocale);
+  EXPECT_EQ(toString(*und->defaultLocale), "und");
+
+  // A name of several, as LocaleConfig joins the names with ',' and LocaleList splits them, each
+  // locale once; the default is still the name as written.
+  std::vector<Diagnostic> commaErrors;
+  const std::optional<LocaleConfig> several = parseLocaleConfig(
+      writeFile(dir, std::string("<locale-config ") + kAndroid +
+                         " android:defaultLocale=\"fr\"><locale android:name=\"fr,de-DE\"/>"
+                         "<locale android:name=\"de-DE\"/><locale android:name=\"fr\"/>"
+                         "</locale-config>"),
+      &commaErrors);
+  ASSERT_TRUE(several) << (commaErrors.empty() ? "" : commaErrors[0].message);
+  ASSERT_EQ(several->supported.size(), 2u);
+  EXPECT_EQ(toString(several->supported[0]), "fr");
+  EXPECT_EQ(toString(several->supported[1]), "de-rDE");
+  EXPECT_FALSE(parseLocaleConfig(writeFile(
+      dir, std::string("<locale-config ") + kAndroid +
+               " android:defaultLocale=\"fr\"><locale android:name=\"fr,de\"/></locale-config>")));
+}
+
+TEST(ParseLocaleConfig, FailsAsLocaleConfigDoes) {
+  TempDir dir;
+  const std::string open = std::string("<locale-config ") + kAndroid;
+  for (const std::string& text : {
+           // A default that is not, as written, one of the names.
+           open +
+               " android:defaultLocale=\"en-us\"><locale android:name=\"en-US\"/></locale-config>",
+           open + " android:defaultLocale=\"de\"><locale android:name=\"fr\"/></locale-config>",
+           // Another root.
+           std::string("<locales ") + kAndroid + "><locale android:name=\"fr\"/></locales>",
+           // No XML.
+           std::string("<locale-config"),
+       }) {
+    SCOPED_TRACE(text);
+    std::vector<Diagnostic> errors;
+    EXPECT_FALSE(parseLocaleConfig(writeFile(dir, text), &errors));
+    ASSERT_EQ(errors.size(), 1u);
+    EXPECT_FALSE(errors[0].message.empty());
+  }
+  std::vector<Diagnostic> errors;
+  EXPECT_FALSE(parseLocaleConfig(dir.path() / "missing.xml", &errors));
+  ASSERT_EQ(errors.size(), 1u);
+  EXPECT_EQ(errors[0].message, "failed to open file");
+}
+
 }  // namespace
 }  // namespace hydroid::res
