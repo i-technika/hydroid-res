@@ -61,12 +61,24 @@ gh issue develop <N> --base <base> --name fix/<N>-<slug> --checkout
 
 1. 이슈의 재현 조건과 완료 기준을 코드에서 확인하고 고친다. 회귀를 막는 테스트를 함께 넣는다.
    주변 코드의 주석 밀도, 이름, 관용구를 따른다.
-2. 빌드와 테스트(CI의 `core` job과 같음):
+2. 빌드와 테스트(CI의 `core` job과 같은 preset. CI는 `-DHYDROID_RES_REQUIRE_NDK_TESTS=ON`도 붙인다):
    ```
    cmake --preset debug -DHYDROID_RES_REQUIRE_LOCALE_TESTS=ON
    cmake --build --preset debug --parallel
    ctest --preset debug
    ```
+   이어서 Release로 한 번 더(CI의 `release` job과 같은 preset. NDK 플래그는 위와 같다):
+   ```
+   cmake --preset release -DHYDROID_RES_REQUIRE_LOCALE_TESTS=ON
+   cmake --build --preset release --parallel
+   ctest --preset release
+   ```
+   quick 범위의 `core (ubuntu-24.04, release)`는 GCC만 보고, `core (windows-2022, release)`는 full 범위에서만
+   돈다. MSVC `/O2`에서만 나는 경고(C4702 등)도 `/WX`로 빌드를 멈추므로, 서브이슈 단계에서 그것을 볼 수 있는
+   곳은 이 PC(Windows, MSVC)의 Release 빌드뿐이다(#258, #267). 다만 이 PC의 MSVC는 CI의 windows-2022(VS 2022)와
+   버전이 다를 수 있어, CI의 VS 2022에서만 나는 경고는 여전히 단계 PR의 full CI에서야 드러날 수 있다. 이
+   PC의 MSVC에서만 나는 경고도 `/WX`로 빌드를 멈추므로 CI에서 나지 않더라도 고친다. 빌드
+   디렉터리가 다르므로(`build/debug`, `build/release`) 서로를 덮지 않는다.
    decimal-comma 로케일이 이 PC에 없어서 configure가 실패하면 `-DHYDROID_RES_REQUIRE_LOCALE_TESTS=ON`만
    빼고 다시 하고, PR의 테스트 항목에 그렇게 적는다.
 3. 바꾼 `*.h`, `*.cpp`에 clang-format 23.1.5(`.clang-format`)로 `--dry-run --Werror`를 돌린다.
@@ -105,8 +117,8 @@ PR 본문(한국어, 기존 PR과 같은 구성):
 - `## 요약`: 이슈 번호와 무엇이 문제였는지. base가 기본 브랜치가 아니면
   `> base가 기본 브랜치가 아니라서 머지해도 #<N>은 자동으로 닫히지 않습니다.`를 넣는다.
 - `## 변경`: 파일별로 무엇을 바꿨는지.
-- `## 테스트`: 실제로 돌린 것만 `- [x]`로. 돌리지 못한 것은 `- [ ]`와 이유. CI는 quick 범위(Linux의 GCC
-  static, shared, release, Clang ASan·UBSan, clang-format)만 돈다고 적는다.
+- `## 테스트`: 실제로 돌린 것만 `- [x]`로(로컬 Debug와 Release는 따로 적는다). 돌리지 못한 것은 `- [ ]`와
+  이유. CI는 quick 범위(Linux의 GCC static, shared, release, Clang ASan·UBSan, clang-format)만 돈다고 적는다.
 - 하네스가 알려 준 PR attribution 줄로 끝낸다.
 
 ### 질문 지점: 개발자 문의
@@ -186,7 +198,7 @@ Resolve는 `gh api graphql -f query='mutation($id:ID!){resolveReviewThread(input
 | PR 메타데이터 | `gh pr view <M> --json assignees,labels,milestone,projectItems`: `i-technika`, 이슈와 같은 label·마일스톤, `Hydroid Project` |
 | Development | `hgh links <M>`에 `<N>` 있음 (없으면 4단계의 안내를 다시 하고 표에 ❌로 둔다) |
 | 이슈 담당자 | `hgh kind <N>`의 `assignees`에 `i-technika` |
-| 로컬 빌드·테스트 | HEAD에서 3단계의 빌드와 `ctest` 통과 |
+| 로컬 빌드·테스트 | HEAD에서 3단계의 Debug와 Release 빌드, 두 `ctest` 통과 |
 | CI (quick) | `gh pr checks <M> --watch`(백그라운드). `core (ubuntu-24.04)`, `core (ubuntu-24.04, shared)`, `core (ubuntu-24.04, release)`, `core (Clang, ASan and UBSan)`, `clang-format` 다섯 개 통과 |
 
 - CI가 실패하면 로그(`gh run view <id> --log-failed`)를 보고, 이 PR 때문이면 고쳐서 push하고 다시 확인한다.
