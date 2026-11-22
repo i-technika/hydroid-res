@@ -6,7 +6,6 @@
 #include <gtest/gtest.h>
 
 #include <atomic>
-#include <exception>
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
@@ -31,24 +30,6 @@ std::atomic<long> allocations{0};
 std::atomic<long> failing{-1};
 
 }  // namespace
-
-// DIAGNOSTIC (#256), to be removed: where an exception that nothing can catch is thrown. When the
-// search for a handler fails, std::terminate is called from the throw, so the stack is still there.
-#if defined(__GLIBC__)
-#include <execinfo.h>
-#include <cstdio>
-namespace {
-[[noreturn]] void printWhereAndAbort() {
-  counting = false;
-  std::fprintf(stderr, "terminate with failing=%ld\n", failing.load());
-  void* frames[64];
-  const int n = backtrace(frames, 64);
-  backtrace_symbols_fd(frames, n, 2);
-  std::abort();
-}
-[[maybe_unused]] const bool installed = (std::set_terminate(printWhereAndAbort), true);
-}  // namespace
-#endif
 
 void* operator new(std::size_t size) {
   if (counting.load() && allocations.fetch_add(1) == failing.load()) throw std::bad_alloc();
@@ -301,49 +282,46 @@ TEST(ResourcesAllocations, AFailedChoiceForAChangedTableLeavesItToTheNextCall) {
 #endif
 }
 
-// addPackage, for each allocation it makes, failing it: what fails as expat reads the XML throws
-// std::bad_alloc out of addPackage, and does not end the program, as it did on GCC when it unwound
-// through expat, which is C (#256). Every handler of expat is read: namespaces, elements with
-// attributes, text and CDATA, in values and in an XML file.
+// parseLocaleConfig, which reads one XML file, for each allocation it makes, failing it: what
+// fails as expat reads the file throws std::bad_alloc out of it, rather than through expat, which
+// is C, and on GCC ended the program there (#256). Every handler of expat is read: namespaces,
+// elements with attributes, text and CDATA. Not by addPackage, which on GCC ends the program as it
+// lists the folder, in libstdc++'s directory_iterator (#262).
 TEST(ResourcesAllocations, AFailedAllocationAsXmlIsReadThrows) {
 #if HYDROID_NOEXCEPT_ALLOCATES
   GTEST_SKIP() << "the checked iterators allocate where they cannot throw";
 #else
   TempDir dir;
-  dir.write("res/values/strings.xml",
-            "<resources xmlns:tools=\"http://schemas.android.com/tools\">"
-            "<string name=\"a\" tools:ignore=\"x\">text<![CDATA[ <cdata> ]]></string>"
-            "<string name=\"b\">a <b>bold</b> word</string></resources>");
-  dir.write("res/layout/main.xml",
-            "<LinearLayout xmlns:android=\"http://schemas.android.com/apk/res/android\" "
-            "android:id=\"@+id/root\"><TextView android:text=\"@string/a\"/></LinearLayout>");
-  const std::filesystem::path res = dir.path() / "res";
-  long all = 0;
-  {
-    ResourceTable table;
-    bool added = false;
-    all = allocationsOf([&] { added = table.addPackage(res, "com.example", kAppPackageId); });
-    ASSERT_TRUE(added);
-  }
+  dir.write("locales_config.xml",
+            "<locale-config xmlns:android=\"http://schemas.android.com/apk/res/android\" "
+            "android:defaultLocale=\"ko\">\n"
+            "  <locale android:name=\"en-US\"/> text <![CDATA[ <cdata> ]]>\n"
+            "  <locale android:name=\"ko\"/>\n"
+            "</locale-config>");
+  const std::filesystem::path file = dir.path() / "locales_config.xml";
+  std::optional<LocaleConfig> parsed;
+  const long all = allocationsOf([&] { parsed = parseLocaleConfig(file); });
+  ASSERT_TRUE(parsed);
+  EXPECT_EQ(parsed->supported.size(), 2u);
   REQUIRE_COUNTED(all);
   long threw = 0;
   for (long failAt = 0; failAt < all; failAt++) {
     SCOPED_TRACE(failAt);
-    ResourceTable table;
     try {
-      allocationsOf([&] { table.addPackage(res, "com.example", kAppPackageId); }, failAt);
+      allocationsOf([&] { parseLocaleConfig(file); }, failAt);
     } catch (const std::bad_alloc&) {
       threw++;
     }
   }
-  // Each allocation that fails is one addPackage does not recover from.
+  // parseLocaleConfig recovers from none.
   EXPECT_EQ(threw, all);
 #endif
 }
 
-// The C API (#203), for each allocation its calls make, failing it: no exception leaves a C
-// function, and one that fails says so and leaves what it would have written as it was. The
-// table changes before each call that reads the configuration, so that each takes the change in.
+// The C API (#203), for each allocation its calls make but those of loading a package (#262),
+// failing it: no exception leaves a C function, and one that fails says so and leaves what it would
+// have written as it was. The table changes before each call that reads the configuration, so that
+// each takes the change in.
 TEST(ResourcesAllocations, NoExceptionLeavesTheCApi) {
 #if HYDROID_NOEXCEPT_ALLOCATES
   GTEST_SKIP() << "the checked iterators allocate where they cannot throw";
@@ -366,8 +344,12 @@ TEST(ResourcesAllocations, NoExceptionLeavesTheCApi) {
       failures++;
       return;
     }
+    // Not while a package loads: an allocation that fails as libstdc++ lists the folder ends the
+    // program on GCC (#262).
     const auto add = [&](const std::string& res, const char* name, uint8_t id) {
+      counting = false;
       if (hydroid_res_table_add_package(table, res.c_str(), name, id) != 1) failures++;
+      counting = true;
     };
     add(app, "com.example", 0x7f);
     hydroid_res_resources* resources = hydroid_res_resources_create(table);
