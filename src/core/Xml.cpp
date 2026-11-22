@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <climits>
 #include <cstring>
+#include <exception>
 #include <memory>
 #include <optional>
 #include <utility>
@@ -52,53 +53,78 @@ struct TreeBuilder {
   // xmlns attributes for the next element, which expat reports before it.
   std::vector<std::pair<std::string, std::string>> namespaces{};
   bool inCdata = false;
+  // What a handler threw, which load() throws again once XML_Parse is back (#256).
+  std::exception_ptr error{};
 
   void add(pugi::xml_node added) {
     (*lines)[added.internal_object()] = static_cast<int>(XML_GetCurrentLineNumber(parser));
   }
 };
 
-TreeBuilder& builder(void* data) { return *static_cast<TreeBuilder*>(data); }
-
-void XMLCALL startNamespace(void* data, const XML_Char* prefix, const XML_Char* uri) {
-  builder(data).namespaces.emplace_back(prefix ? "xmlns:" + std::string(prefix) : "xmlns",
-                                        uri ? uri : "");
-}
-
-void XMLCALL startElement(void* data, const XML_Char* name, const XML_Char** attrs) {
-  TreeBuilder& b = builder(data);
-  pugi::xml_node element = b.node.append_child(pugi::node_element);
-  element.set_name(qualifiedName(name).c_str());
-  for (const auto& [attr, uri] : b.namespaces) {
-    element.append_attribute(attr.c_str()).set_value(uri.c_str());
-  }
-  b.namespaces.clear();
-  for (; *attrs; attrs += 2) {
-    element.append_attribute(qualifiedName(attrs[0]).c_str()).set_value(attrs[1]);
-  }
-  b.add(element);
-  b.node = element;
-}
-
-void XMLCALL endElement(void* data, const XML_Char*) {
-  TreeBuilder& b = builder(data);
-  b.node = b.node.parent();
-  // XmlExtent::RootElement: past the root's end tag, expat reads no more.
-  if (b.extent == XmlExtent::RootElement && b.node.type() == pugi::node_document) {
+// Runs `f` on the TreeBuilder of a handler. No exception leaves a handler, as it would have to
+// unwind through expat, which is C and says nothing of C++ exceptions: an expat built without
+// unwind tables, as a system one may be, would end the program there. The expat of CI's GCC builds
+// has them, and let them through before as well (#256). What `f` throws, as std::bad_alloc, is
+// kept, and the parser stopped; a handler that expat still calls after that does nothing.
+template <typename F>
+void handle(void* data, F&& f) {
+  TreeBuilder& b = *static_cast<TreeBuilder*>(data);
+  if (b.error) return;
+  try {
+    f(b);
+  } catch (...) {
+    b.error = std::current_exception();
     XML_StopParser(b.parser, XML_FALSE);
   }
 }
 
-void XMLCALL characters(void* data, const XML_Char* s, int length) {
-  TreeBuilder& b = builder(data);
-  pugi::xml_node text = b.node.append_child(b.inCdata ? pugi::node_cdata : pugi::node_pcdata);
-  text.set_value(s, static_cast<size_t>(length));
-  b.add(text);
+void XMLCALL startNamespace(void* data, const XML_Char* prefix, const XML_Char* uri) {
+  handle(data, [&](TreeBuilder& b) {
+    b.namespaces.emplace_back(prefix ? "xmlns:" + std::string(prefix) : "xmlns", uri ? uri : "");
+  });
 }
 
-void XMLCALL startCdata(void* data) { builder(data).inCdata = true; }
+void XMLCALL startElement(void* data, const XML_Char* name, const XML_Char** attrs) {
+  handle(data, [&](TreeBuilder& b) {
+    pugi::xml_node element = b.node.append_child(pugi::node_element);
+    element.set_name(qualifiedName(name).c_str());
+    for (const auto& [attr, uri] : b.namespaces) {
+      element.append_attribute(attr.c_str()).set_value(uri.c_str());
+    }
+    b.namespaces.clear();
+    for (; *attrs; attrs += 2) {
+      element.append_attribute(qualifiedName(attrs[0]).c_str()).set_value(attrs[1]);
+    }
+    b.add(element);
+    b.node = element;
+  });
+}
 
-void XMLCALL endCdata(void* data) { builder(data).inCdata = false; }
+void XMLCALL endElement(void* data, const XML_Char*) {
+  handle(data, [&](TreeBuilder& b) {
+    b.node = b.node.parent();
+    // XmlExtent::RootElement: past the root's end tag, expat reads no more.
+    if (b.extent == XmlExtent::RootElement && b.node.type() == pugi::node_document) {
+      XML_StopParser(b.parser, XML_FALSE);
+    }
+  });
+}
+
+void XMLCALL characters(void* data, const XML_Char* s, int length) {
+  handle(data, [&](TreeBuilder& b) {
+    pugi::xml_node text = b.node.append_child(b.inCdata ? pugi::node_cdata : pugi::node_pcdata);
+    text.set_value(s, static_cast<size_t>(length));
+    b.add(text);
+  });
+}
+
+void XMLCALL startCdata(void* data) {
+  handle(data, [](TreeBuilder& b) { b.inCdata = true; });
+}
+
+void XMLCALL endCdata(void* data) {
+  handle(data, [](TreeBuilder& b) { b.inCdata = false; });
+}
 
 }  // namespace
 
@@ -124,7 +150,9 @@ bool XmlDocument::load(std::string_view text, XmlExtent extent, std::string* err
   for (std::string_view rest = text;;) {
     const size_t size = std::min<size_t>(rest.size(), INT_MAX);
     const bool last = size == rest.size();
-    if (XML_Parse(parser.get(), rest.data(), static_cast<int>(size), last) != XML_STATUS_OK) {
+    const XML_Status status = XML_Parse(parser.get(), rest.data(), static_cast<int>(size), last);
+    if (builder.error) std::rethrow_exception(builder.error);
+    if (status != XML_STATUS_OK) {
       // XML_StopParser at the root's end tag.
       if (XML_GetErrorCode(parser.get()) == XML_ERROR_ABORTED) return true;
       *error = XML_ErrorString(XML_GetErrorCode(parser.get()));

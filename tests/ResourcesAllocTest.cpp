@@ -291,7 +291,44 @@ TEST(ResourcesAllocations, AFailedChoiceForAChangedTableLeavesItToTheNextCall) {
 #endif
 }
 
-// The C API (#203), for each allocation its calls make but those of loading a package (#256),
+// parseLocaleConfig, which reads one XML file, for each allocation it makes, failing it: what
+// fails as expat reads the file throws std::bad_alloc out of it (#256). Every handler of expat is
+// read: namespaces, elements with attributes, text and CDATA. It sees an exception that a handler
+// keeps and load() does not throw again; one let through expat as well, as the expat it is built
+// with unwinds, on MSVC and on CI's GCC alike. Not by addPackage, which on GCC ends the program as
+// it lists the folder, in libstdc++'s directory_iterator (#262).
+TEST(ResourcesAllocations, AFailedAllocationAsXmlIsReadThrows) {
+#if HYDROID_NOEXCEPT_ALLOCATES
+  GTEST_SKIP() << "the checked iterators allocate where they cannot throw";
+#else
+  TempDir dir;
+  dir.write("locales_config.xml",
+            "<locale-config xmlns:android=\"http://schemas.android.com/apk/res/android\" "
+            "android:defaultLocale=\"ko\">\n"
+            "  <locale android:name=\"en-US\"/> text <![CDATA[ <cdata> ]]>\n"
+            "  <locale android:name=\"ko\"/>\n"
+            "</locale-config>");
+  const std::filesystem::path file = dir.path() / "locales_config.xml";
+  std::optional<LocaleConfig> parsed;
+  const long all = allocationsOf([&] { parsed = parseLocaleConfig(file); });
+  ASSERT_TRUE(parsed);
+  EXPECT_EQ(parsed->supported.size(), 2u);
+  REQUIRE_COUNTED(all);
+  long threw = 0;
+  for (long failAt = 0; failAt < all; failAt++) {
+    SCOPED_TRACE(failAt);
+    try {
+      allocationsOf([&] { parseLocaleConfig(file); }, failAt);
+    } catch (const std::bad_alloc&) {
+      threw++;
+    }
+  }
+  // parseLocaleConfig recovers from none.
+  EXPECT_EQ(threw, all);
+#endif
+}
+
+// The C API (#203), for each allocation its calls make but those of loading a package (#262),
 // failing it: no exception leaves a C function, and one that fails says so and leaves what it would
 // have written as it was. The table changes before each call that reads the configuration, so that
 // each takes the change in.
@@ -317,8 +354,8 @@ TEST(ResourcesAllocations, NoExceptionLeavesTheCApi) {
       failures++;
       return;
     }
-    // Not while a package loads: an allocation that fails in a callback of expat ends the program
-    // on GCC, as it cannot unwind through expat's C (#256).
+    // Not while a package loads: an allocation that fails as libstdc++ lists the folder ends the
+    // program on GCC (#262).
     const auto add = [&](const std::string& res, const char* name, uint8_t id) {
       counting = false;
       if (hydroid_res_table_add_package(table, res.c_str(), name, id) != 1) failures++;
