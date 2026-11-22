@@ -1,0 +1,537 @@
+{
+  "condition": {
+    "densityDpi": 320,
+    "locale": "zh-CN",
+    "night": false,
+    "orientation": "port",
+    "smallestWidthDp": 320,
+    "screenWidthDp": 320,
+    "screenHeightDp": 568,
+    "sdkInt": 37,
+    "sdkIntFull": 3700000,
+    "requestedLocales": "zh-CN",
+    "configuration": {
+      "locales": "zh-CN",
+      "mcc": 310,
+      "mnc": 260,
+      "grammaticalGender": 0,
+      "screenLayout": 268435810,
+      "smallestScreenWidthDp": 320,
+      "screenWidthDp": 320,
+      "screenHeightDp": 568,
+      "colorMode": 5,
+      "orientation": 1,
+      "uiMode": 17,
+      "densityDpi": 320,
+      "touchscreen": 3,
+      "keyboardHidden": 1,
+      "hardKeyboardHidden": 1,
+      "keyboard": 2,
+      "navigationHidden": 2,
+      "navigation": 1,
+      "widthPixels": 1080,
+      "heightPixels": 2400
+    }
+  },
+  "metrics": {
+    "density": 2,
+    "scaledDensity": 2,
+    "xdpi": 420,
+    "fontScale": 1
+  },
+  "values": {
+    "string\/app_name": {
+      "id": "0x7f060000",
+      "type": 3,
+      "data": 1,
+      "string": "Hydroid Golden"
+    },
+    "string\/density_bucket": {
+      "id": "0x7f060001",
+      "type": 3,
+      "data": 70,
+      "string": "xhdpi"
+    },
+    "string\/greeting": {
+      "id": "0x7f060002",
+      "type": 3,
+      "data": 0,
+      "string": "Hello"
+    },
+    "string\/pick_ar": {
+      "id": "0x7f060003",
+      "type": 3,
+      "data": 2,
+      "string": "default"
+    },
+    "string\/pick_de": {
+      "id": "0x7f060004",
+      "type": 3,
+      "data": 2,
+      "string": "default"
+    },
+    "string\/pick_density": {
+      "id": "0x7f060005",
+      "type": 3,
+      "data": 70,
+      "string": "xhdpi"
+    },
+    "string\/pick_density_any": {
+      "id": "0x7f060006",
+      "type": 3,
+      "data": 74,
+      "string": "anydpi"
+    },
+    "string\/pick_density_none": {
+      "id": "0x7f060007",
+      "type": 3,
+      "data": 75,
+      "string": "nodpi"
+    },
+    "string\/pick_density_sparse": {
+      "id": "0x7f060008",
+      "type": 3,
+      "data": 70,
+      "string": "xhdpi"
+    },
+    "string\/pick_en": {
+      "id": "0x7f060009",
+      "type": 3,
+      "data": 2,
+      "string": "default"
+    },
+    "string\/pick_en_lang": {
+      "id": "0x7f06000a",
+      "type": 3,
+      "data": 2,
+      "string": "default"
+    },
+    "string\/pick_en_pseudo": {
+      "id": "0x7f06000b",
+      "type": 3,
+      "data": 2,
+      "string": "default"
+    },
+    "string\/pick_en_us": {
+      "id": "0x7f06000c",
+      "type": 3,
+      "data": 2,
+      "string": "default"
+    },
+    "string\/pick_es": {
+      "id": "0x7f06000d",
+      "type": 3,
+      "data": 2,
+      "string": "default"
+    },
+    "string\/pick_es_mx": {
+      "id": "0x7f06000e",
+      "type": 3,
+      "data": 2,
+      "string": "default"
+    },
+    "string\/pick_fil": {
+      "id": "0x7f06000f",
+      "type": 3,
+      "data": 2,
+      "string": "default"
+    },
+    "string\/pick_fr": {
+      "id": "0x7f060010",
+      "type": 3,
+      "data": 2,
+      "string": "default"
+    },
+    "string\/pick_gamut": {
+      "id": "0x7f060011",
+      "type": 3,
+      "data": 36,
+      "string": "nowidecg"
+    },
+    "string\/pick_gender": {
+      "id": "0x7f060012",
+      "type": 3,
+      "data": 29,
+      "string": "ldltr"
+    },
+    "string\/pick_hdr": {
+      "id": "0x7f060013",
+      "type": 3,
+      "data": 38,
+      "string": "lowdr"
+    },
+    "string\/pick_he": {
+      "id": "0x7f060014",
+      "type": 3,
+      "data": 2,
+      "string": "default"
+    },
+    "string\/pick_height": {
+      "id": "0x7f060015",
+      "type": 3,
+      "data": 2,
+      "string": "default"
+    },
+    "string\/pick_id": {
+      "id": "0x7f060016",
+      "type": 3,
+      "data": 2,
+      "string": "default"
+    },
+    "string\/pick_in": {
+      "id": "0x7f060017",
+      "type": 3,
+      "data": 2,
+      "string": "default"
+    },
+    "string\/pick_iw": {
+      "id": "0x7f060018",
+      "type": 3,
+      "data": 2,
+      "string": "default"
+    },
+    "string\/pick_keyboard": {
+      "id": "0x7f060019",
+      "type": 3,
+      "data": 50,
+      "string": "qwerty"
+    },
+    "string\/pick_keys_exposed": {
+      "id": "0x7f06001a",
+      "type": 3,
+      "data": 56,
+      "string": "keysexposed"
+    },
+    "string\/pick_keys_hidden": {
+      "id": "0x7f06001b",
+      "type": 3,
+      "data": 56,
+      "string": "keysexposed"
+    },
+    "string\/pick_layout_dir": {
+      "id": "0x7f06001c",
+      "type": 3,
+      "data": 29,
+      "string": "ldltr"
+    },
+    "string\/pick_locale_or_width": {
+      "id": "0x7f06001d",
+      "type": 3,
+      "data": 2,
+      "string": "default"
+    },
+    "string\/pick_long": {
+      "id": "0x7f06001e",
+      "type": 3,
+      "data": 9,
+      "string": "long"
+    },
+    "string\/pick_mcc": {
+      "id": "0x7f06001f",
+      "type": 3,
+      "data": 120,
+      "string": "mcc310-mnc260"
+    },
+    "string\/pick_minor_version": {
+      "id": "0x7f060020",
+      "type": 3,
+      "data": 42,
+      "string": "v36.1"
+    },
+    "string\/pick_nav_hidden": {
+      "id": "0x7f060021",
+      "type": 3,
+      "data": 2,
+      "string": "default"
+    },
+    "string\/pick_navigation": {
+      "id": "0x7f060022",
+      "type": 3,
+      "data": 52,
+      "string": "nonav"
+    },
+    "string\/pick_night": {
+      "id": "0x7f060023",
+      "type": 3,
+      "data": 12,
+      "string": "notnight"
+    },
+    "string\/pick_orientation": {
+      "id": "0x7f060024",
+      "type": 3,
+      "data": 61,
+      "string": "port"
+    },
+    "string\/pick_pixels": {
+      "id": "0x7f060025",
+      "type": 3,
+      "data": 47,
+      "string": "1920x1080"
+    },
+    "string\/pick_precedence": {
+      "id": "0x7f060026",
+      "type": 3,
+      "data": 70,
+      "string": "xhdpi"
+    },
+    "string\/pick_pt": {
+      "id": "0x7f060027",
+      "type": 3,
+      "data": 2,
+      "string": "default"
+    },
+    "string\/pick_qaa": {
+      "id": "0x7f060028",
+      "type": 3,
+      "data": 2,
+      "string": "default"
+    },
+    "string\/pick_round": {
+      "id": "0x7f060029",
+      "type": 3,
+      "data": 33,
+      "string": "notround"
+    },
+    "string\/pick_size": {
+      "id": "0x7f06002a",
+      "type": 3,
+      "data": 5,
+      "string": "normal"
+    },
+    "string\/pick_size_small": {
+      "id": "0x7f06002b",
+      "type": 3,
+      "data": 2,
+      "string": "default"
+    },
+    "string\/pick_sr": {
+      "id": "0x7f06002c",
+      "type": 3,
+      "data": 2,
+      "string": "default"
+    },
+    "string\/pick_sw": {
+      "id": "0x7f06002d",
+      "type": 3,
+      "data": 23,
+      "string": "sw320dp"
+    },
+    "string\/pick_tl": {
+      "id": "0x7f06002e",
+      "type": 3,
+      "data": 2,
+      "string": "default"
+    },
+    "string\/pick_tl_fil": {
+      "id": "0x7f06002f",
+      "type": 3,
+      "data": 2,
+      "string": "default"
+    },
+    "string\/pick_touch": {
+      "id": "0x7f060030",
+      "type": 3,
+      "data": 65,
+      "string": "finger"
+    },
+    "string\/pick_ui_mode": {
+      "id": "0x7f060031",
+      "type": 3,
+      "data": 2,
+      "string": "default"
+    },
+    "string\/pick_version": {
+      "id": "0x7f060032",
+      "type": 3,
+      "data": 43,
+      "string": "v37"
+    },
+    "string\/pick_width": {
+      "id": "0x7f060033",
+      "type": 3,
+      "data": 2,
+      "string": "default"
+    },
+    "string\/pick_width_height": {
+      "id": "0x7f060034",
+      "type": 3,
+      "data": 19,
+      "string": "h500dp"
+    },
+    "string\/pick_zh": {
+      "id": "0x7f060035",
+      "type": 3,
+      "data": 103,
+      "string": "zh-rCN"
+    },
+    "string\/qualifier_hint": {
+      "id": "0x7f060036",
+      "type": 3,
+      "data": 2,
+      "string": "default"
+    },
+    "color\/accent": {
+      "id": "0x7f020000",
+      "type": 29,
+      "data": -10354450,
+      "string": "#ff6200ee"
+    },
+    "color\/accent_alias": {
+      "id": "0x7f020001",
+      "type": 29,
+      "data": -10354450,
+      "string": "#ff6200ee"
+    },
+    "color\/on_surface": {
+      "id": "0x7f020002",
+      "type": 28,
+      "data": -14935265,
+      "string": "#ff1c1b1f"
+    },
+    "color\/surface": {
+      "id": "0x7f020003",
+      "type": 28,
+      "data": -1,
+      "string": "#ffffffff"
+    },
+    "dimen\/complex_fraction_dropped": {
+      "id": "0x7f030000",
+      "type": 5,
+      "data": 76800001,
+      "string": "300000.0dip",
+      "px": 600000
+    },
+    "dimen\/complex_in": {
+      "id": "0x7f030001",
+      "type": 5,
+      "data": 644245300,
+      "string": "0.30000007in",
+      "px": 126.00003051757812
+    },
+    "dimen\/complex_mixed": {
+      "id": "0x7f030002",
+      "type": 5,
+      "data": 40454161,
+      "string": "1234.5625dip",
+      "px": 2469.125
+    },
+    "dimen\/complex_mm": {
+      "id": "0x7f030003",
+      "type": 5,
+      "data": 14260517,
+      "string": "1.6999817mm",
+      "px": 28.109933853149414
+    },
+    "dimen\/complex_negative": {
+      "id": "0x7f030004",
+      "type": 5,
+      "data": -12582879,
+      "string": "-1.5dip",
+      "px": -3
+    },
+    "dimen\/complex_pt": {
+      "id": "0x7f030005",
+      "type": 5,
+      "data": 104857635,
+      "string": "12.5pt",
+      "px": 72.91666412353516
+    },
+    "dimen\/complex_px": {
+      "id": "0x7f030006",
+      "type": 5,
+      "data": 1073741872,
+      "string": "0.5px",
+      "px": 0.5
+    },
+    "dimen\/complex_sp": {
+      "id": "0x7f030007",
+      "type": 5,
+      "data": 114923810,
+      "string": "13.699982sp",
+      "px": 27.39996337890625
+    },
+    "dimen\/complex_tenth": {
+      "id": "0x7f030008",
+      "type": 5,
+      "data": 214748465,
+      "string": "0.100000024dip",
+      "px": 0.20000004768371582
+    },
+    "dimen\/complex_wrap": {
+      "id": "0x7f030009",
+      "type": 5,
+      "data": -1990967295,
+      "string": "-7777216.0dip",
+      "px": -15554432
+    },
+    "dimen\/hairline": {
+      "id": "0x7f03000a",
+      "type": 5,
+      "data": 256,
+      "string": "1.0px",
+      "px": 1
+    },
+    "dimen\/margin": {
+      "id": "0x7f03000b",
+      "type": 5,
+      "data": 4097,
+      "string": "16.0dip",
+      "px": 32
+    },
+    "dimen\/text_body": {
+      "id": "0x7f03000c",
+      "type": 5,
+      "data": 3586,
+      "string": "14.0sp",
+      "px": 28
+    },
+    "fraction\/complex_percent": {
+      "id": "0x7f040000",
+      "type": 6,
+      "data": 644245040,
+      "string": "29.999996%",
+      "base": 360,
+      "parentBase": 1234,
+      "fraction": 107.99998474121094
+    },
+    "fraction\/complex_percent_large": {
+      "id": "0x7f040001",
+      "type": 6,
+      "data": 20971553,
+      "string": "250.0%p",
+      "base": 360,
+      "parentBase": 1234,
+      "fraction": 3085
+    },
+    "fraction\/complex_percent_negative": {
+      "id": "0x7f040002",
+      "type": 6,
+      "data": -268435408,
+      "string": "-12.5%",
+      "base": 360,
+      "parentBase": 1234,
+      "fraction": -45
+    },
+    "fraction\/complex_percent_parent": {
+      "id": "0x7f040003",
+      "type": 6,
+      "data": 386546993,
+      "string": "17.999994%p",
+      "base": 360,
+      "parentBase": 1234,
+      "fraction": 222.11993408203125
+    },
+    "integer\/columns": {
+      "id": "0x7f050000",
+      "type": 16,
+      "data": 1,
+      "string": "1"
+    },
+    "bool\/is_tablet": {
+      "id": "0x7f010000",
+      "type": 18,
+      "data": 0,
+      "string": "false"
+    }
+  }
+}

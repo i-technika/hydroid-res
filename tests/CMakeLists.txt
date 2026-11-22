@@ -4,13 +4,18 @@ add_executable(hydroid-res-tests
   Aapt2ConfigTest.cpp
   Aapt2TableTest.cpp
   Aapt2ValueTest.cpp
+  CApiTest.cpp
   ComplexTest.cpp
+  ConfigMatchTest.cpp
   ConfigParserTest.cpp
-  GoldenColorTest.cpp
   GoldenComplexTest.cpp
+  GoldenLocaleConfigTest.cpp
+  GoldenMatchTest.cpp
+  GoldenNoLocaleTest.cpp
   PathUtf8Test.cpp
   PublicHeaderTest.cpp
   ResourceTableTest.cpp
+  ResourcesTest.cpp
   SdkBaselineTest.cpp
   SmokeTest.cpp
   Utf8Test.cpp
@@ -34,10 +39,19 @@ target_compile_definitions(hydroid-res-tests PRIVATE
   HYDROID_AOSP_RES_DIRS="${PROJECT_SOURCE_DIR}/golden/aosp/framework_res_dirs.txt"
   HYDROID_GOLDEN_APP_GRADLE="${PROJECT_SOURCE_DIR}/golden/app/build.gradle.kts"
   HYDROID_GOLDEN_DIR="${PROJECT_SOURCE_DIR}/golden/data"
+  HYDROID_GOLDEN_LOCALECONFIG_DIR="${PROJECT_SOURCE_DIR}/golden/localeconfig/data"
+  HYDROID_GOLDEN_LOCALECONFIG_GRADLE="${PROJECT_SOURCE_DIR}/golden/localeconfig/build.gradle.kts"
+  HYDROID_GOLDEN_NOLOCALE_DIR="${PROJECT_SOURCE_DIR}/golden/nolocale/data"
+  HYDROID_GOLDEN_NOLOCALE_GRADLE="${PROJECT_SOURCE_DIR}/golden/nolocale/build.gradle.kts"
+  HYDROID_LOCALE_SCRIPT="${PROJECT_SOURCE_DIR}/scripts/gen_locale_data.py"
+  HYDROID_LOCALE_TABLES="${PROJECT_SOURCE_DIR}/src/core/LocaleDataTables.inc"
+  HYDROID_LOCALECONFIG_RES_DIR="${PROJECT_SOURCE_DIR}/golden/localeconfig/src/main/res"
+  HYDROID_NOLOCALE_RES_DIR="${PROJECT_SOURCE_DIR}/golden/nolocale/src/main/res"
   HYDROID_NUMERIC_QUALIFIERS="${PROJECT_SOURCE_DIR}/scripts/golden/numeric_qualifiers.tsv"
   HYDROID_PROJECT_VERSION="${PROJECT_VERSION}"
   HYDROID_PUBLIC_INCLUDE_DIRS="${public_include_dirs}"
   HYDROID_README="${PROJECT_SOURCE_DIR}/README.md"
+  HYDROID_SOURCE_DIR="${PROJECT_SOURCE_DIR}"
   HYDROID_TABLE_RES_DIR="${PROJECT_SOURCE_DIR}/golden/table/res"
   HYDROID_TEST_RES_DIR="${PROJECT_SOURCE_DIR}/golden/app/src/main/res"
   HYDROID_VERSION_HEADER="${PROJECT_SOURCE_DIR}/include/hydroid/res/Version.h")
@@ -47,6 +61,28 @@ endif()
 hydroid_set_warnings(hydroid-res-tests)
 
 gtest_discover_tests(hydroid-res-tests DISCOVERY_MODE PRE_TEST)
+
+# The C API from a C program, which hydroid_res.h must compile in as C99 (#203).
+add_executable(hydroid-res-capi-c-test CApiCTest.c)
+target_link_libraries(hydroid-res-capi-c-test PRIVATE hydroid::res)
+set_target_properties(hydroid-res-capi-c-test PROPERTIES
+  C_STANDARD 99 C_STANDARD_REQUIRED ON C_EXTENSIONS OFF)
+hydroid_set_warnings(hydroid-res-capi-c-test)
+add_test(NAME CApi.WorksFromC
+  COMMAND hydroid-res-capi-c-test ${PROJECT_SOURCE_DIR}/golden/table/res)
+
+# What Resources allocates, counted by an operator new of the program's own (#240), so in a
+# program of its own: hydroid-res-tests keeps the sanitizers' operator new, which checks that each
+# delete is of a new. Not in the sanitizers' builds, as theirs would be replaced.
+if(NOT CMAKE_CXX_FLAGS MATCHES "-fsanitize=")
+  add_executable(hydroid-res-alloc-tests ResourcesAllocTest.cpp)
+  target_link_libraries(hydroid-res-alloc-tests PRIVATE hydroid::res pugixml::pugixml GTest::gtest_main)
+  # A DLL has its own operator new, so the tests skip what they cannot count there.
+  target_compile_definitions(hydroid-res-alloc-tests PRIVATE
+    "HYDROID_SHARED_LIBRARY=$<STREQUAL:$<TARGET_PROPERTY:hydroid-res,TYPE>,SHARED_LIBRARY>")
+  hydroid_set_warnings(hydroid-res-alloc-tests)
+  gtest_discover_tests(hydroid-res-alloc-tests DISCOVERY_MODE PRE_TEST)
+endif()
 
 # pugixml and expat are implementation details of hydroid::res, so its consumers must not see
 # them (#10).
@@ -108,6 +144,22 @@ if(TARGET hydroid-rc)
       "-DRC=$<TARGET_FILE:hydroid-rc>"
       "-DDIR=${CMAKE_CURRENT_BINARY_DIR}/rc-unicode-path"
       -P ${CMAKE_CURRENT_SOURCE_DIR}/CheckRcUnicodePath.cmake)
+  # hydroid-rc pick prints what Android picked of the golden app under a condition (#202).
+  add_test(NAME HydroidRc.PicksWhatAndroidPicked
+    COMMAND ${CMAKE_COMMAND}
+      "-DRC=$<TARGET_FILE:hydroid-rc>"
+      "-DRES=${PROJECT_SOURCE_DIR}/golden/app/src/main/res"
+      "-DGOLDEN=${PROJECT_SOURCE_DIR}/golden/data"
+      "-DTABLE=${PROJECT_SOURCE_DIR}/golden/table/res"
+      -P ${CMAKE_CURRENT_SOURCE_DIR}/CheckRcPick.cmake)
+  # And, given the app's LocaleConfig, what Android picked through each lifecycle of
+  # golden/localeconfig/data (#268).
+  add_test(NAME HydroidRc.PicksWhatAndroidPickedWithLocaleConfig
+    COMMAND ${CMAKE_COMMAND}
+      "-DRC=$<TARGET_FILE:hydroid-rc>"
+      "-DRES=${PROJECT_SOURCE_DIR}/golden/localeconfig/src/main/res"
+      "-DGOLDEN=${PROJECT_SOURCE_DIR}/golden/localeconfig/data"
+      -P ${CMAKE_CURRENT_SOURCE_DIR}/CheckRcLocaleConfig.cmake)
   # And ends with an error, not an abort, on an argument with no UTF-8, which only Windows passes.
   if(WIN32)
     add_test(NAME HydroidRc.FailsOnNonUnicodeArgument

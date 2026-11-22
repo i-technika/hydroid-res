@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Which folder Android takes a value from (issue #97). Each pick_ string has a value in
+     values/ and in some values-<qualifiers>/, which says the folder it is in, so the dump shows
+     the one Android picked under each condition. -->
+<resources>
+    <string name="pick_precedence">default</string>
+    <string name="pick_density">default</string>
+    <string name="pick_density_sparse">default</string>
+    <string name="pick_density_any">default</string>
+    <string name="pick_density_none">default</string>
+    <string name="pick_sw">default</string>
+    <string name="pick_width">default</string>
+    <string name="pick_height">default</string>
+    <string name="pick_width_height">default</string>
+    <string name="pick_size">default</string>
+    <string name="pick_size_small">default</string>
+    <string name="pick_long">default</string>
+    <string name="pick_round">default</string>
+    <string name="pick_gamut">default</string>
+    <string name="pick_hdr">default</string>
+    <string name="pick_orientation">default</string>
+    <string name="pick_layout_dir">default</string>
+    <string name="pick_ui_mode">default</string>
+    <string name="pick_night">default</string>
+    <string name="pick_pixels">default</string>
+    <string name="pick_touch">default</string>
+    <string name="pick_keys_hidden">default</string>
+    <string name="pick_keys_exposed">default</string>
+    <string name="pick_keyboard">default</string>
+    <string name="pick_nav_hidden">default</string>
+    <string name="pick_navigation">default</string>
+    <string name="pick_mcc">default</string>
+    <string name="pick_version">default</string>
+    <string name="pick_minor_version">default</string>
+    <string name="pick_gender">default</string>
+    <string name="pick_en">default</string>
+    <string name="pick_en_lang">default</string>
+    <string name="pick_en_pseudo">default</string>
+    <string name="pick_en_us">default</string>
+    <string name="pick_es">default</string>
+    <string name="pick_es_mx">default</string>
+    <string name="pick_zh">default</string>
+    <string name="pick_sr">default</string>
+    <string name="pick_pt">default</string>
+    <string name="pick_fr">default</string>
+    <string name="pick_ar">default</string>
+    <string name="pick_de">default</string>
+    <string name="pick_iw">default</string>
+    <string name="pick_he">default</string>
+    <string name="pick_in">default</string>
+    <string name="pick_id">default</string>
+    <string name="pick_tl">default</string>
+    <string name="pick_fil">default</string>
+    <string name="pick_tl_fil">default</string>
+    <string name="pick_qaa">default</string>
+    <string name="pick_locale_or_width">default</string>
+</resources>

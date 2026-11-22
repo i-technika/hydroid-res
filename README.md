@@ -12,14 +12,17 @@ resolves values exactly as Android does, for UIKit, GTK4 and WinUI 3. Design and
 | `include/hydroid_res.h` | Stable C API, used by the Swift adapter |
 | `src/core/` | Shared core: parsers, ResourceTable, Config matching, Theme/Style |
 | `src/capi/` | C API implementation |
-| `tools/hydroid-rc/` | `res/` → `.hrt` binary table compiler; for now `hydroid-rc dump <res>` |
+| `tools/hydroid-rc/` | `res/` → `.hrt` binary table compiler; for now `hydroid-rc dump <res>` and `hydroid-rc pick <res> <qualifiers>` |
 | `tests/` | GoogleTest unit and golden tests |
 | `golden/` | Android test app + instrumentation test that dumps Android's answers |
 | `golden/data/` | The dumped golden JSON the C++ tests compare against |
+| `golden/localeconfig/` | A second app, with a LocaleConfig and a default locale, and `data/`, what Android picked for it ([Golden data](#golden-data)) |
+| `golden/nolocale/` | A third app, with no locales but the pseudo-locales, and `data/`, what Android picked for it |
 | `golden/table/res/` | A `res/` folder with every kind of value and file, for the table tests |
 | `golden/aapt2/` | What the SDK's aapt2 makes of literal values, resource folder names, strings and whole `res/` folders |
 | `golden/aosp/` | The folder names of AOSP's framework `res/`, which must all parse |
 | `scripts/golden/` | Runs the dump on a device and pulls the JSON; runs aapt2 for `golden/aapt2/` |
+| `scripts/gen_locale_data.py` | Makes `src/core/LocaleDataTables.inc`, the locale tables matching goes by, from AOSP's `libs/androidfw/LocaleDataLookup.cpp` ([Locale tables](#locale-tables)) |
 
 ## Build and test
 
@@ -57,8 +60,13 @@ ctest --preset debug
 ```
 
 With GCC or Clang, the `sanitize` preset does the same under AddressSanitizer and
-UndefinedBehaviorSanitizer, and stops at the first error; CI runs it with Clang on Linux. It is
-not offered on Windows, where MSVC would ignore its flags.
+UndefinedBehaviorSanitizer, and stops at the first error; CI runs it with Clang on Linux. The
+`tsan` preset does it under ThreadSanitizer, which finds the data races of code that several
+threads call, as `Resources` is (#236); CI runs it with Clang on Linux in its full scope. On a
+kernel that randomizes mmap with more bits than 28, as CI's runners do, the ThreadSanitizer of
+some compiler releases stops every test with "unexpected memory mapping"; CI first runs
+`sudo sysctl vm.mmap_rnd_bits=28`, which does for a local run too. Neither preset is offered on
+Windows, where MSVC would ignore their flags.
 
 With an Android NDK and Python at hand, `ctest` also runs `AConfiguration.MatchesNdk`, which
 checks the values of `Config.h` against the NDK's `android/configuration.h`. It finds the NDK in
@@ -76,8 +84,10 @@ git ls-files -z -- '*.h' '*.cpp' | xargs -0 clang-format -i
 ## Golden data
 
 All of it comes from one API level, `kEmulatedSdkVersion` in `include/hydroid/res/Version.h`
-(37): the emulator, the golden app's `compileSdk` and `targetSdk`, and the build-tools and
-platform the aapt2 scripts pin. `SdkBaseline` tests fail when one of them moves without the rest,
+(37): the emulator, the golden app's `compileSdk` and `targetSdk`, the build-tools and platform
+the aapt2 scripts pin, the AOSP release and commit `golden/aosp` lists the framework folders of,
+and the same release and commit `scripts/gen_locale_data.py` pins for the matching code and the
+locale tables. `SdkBaseline` tests fail when one of them moves without the rest,
 or when the aapt2 files were not made with the build-tools, platform and OS (`GOLDEN_HOST`,
 Windows) that `scripts/golden/gen_aapt2_values.py` pins, or when this README names others.
 
@@ -89,8 +99,106 @@ Open `golden/` in Android Studio, or build it with `golden/gradlew`. Then:
 python scripts/golden/pull_golden.py
 ```
 
-This runs `GoldenDumpTest` over 252 conditions (7 densities × 3 languages × night × orientation ×
-3 smallest widths) and writes `golden/data/*.json`.
+This runs `GoldenDumpTest` over 380 conditions and writes `golden/data/*.json`: a matrix of 252
+(7 densities × 3 languages × night × orientation × 3 smallest widths), 125 more that each
+change one thing the matrix leaves alone, such as a locale of another region or script, a list
+of languages, the screen's size or shape, the UI mode, the input devices or the mcc, and one for
+each grammatical gender. The SDK sets that only for a whole app, with
+`GrammaticalInflectionManager`, so the test sets it for the golden app, dumps, and sets it back
+to none. aapt2 makes the gender folders `-v34`, so against `values/` the version alone would pick
+them; `pick_gender` is in `values-ldltr/` too, of the qualifier that comes after the gender,
+which only the gender beats. Each file
+records the `Configuration` the resources were resolved for and the value of every resource.
+`GoldenMatchTest` builds the same device from it and checks that hydroid picks the same values.
+To see by hand what hydroid picks for one device,
+`hydroid-rc pick <res> <qualifiers> [--locales <tag,...>] [<package>]` takes the device as the
+qualifiers of a folder name and its languages as BCP 47 tags, and prints the locale it chose and
+the value of each resource, with the configuration it comes from (an app's LocaleConfig and the
+devices after the first it takes too, as below):
+
+```sh
+hydroid-rc pick golden/app/src/main/res ko-rKR-land-night-xhdpi --locales ko-KR com.itechnika.hydroid.golden
+```
+
+A device whose qualifiers name no version is of `kEmulatedSdkVersion`, not the one `parseConfig`
+raises them to (night is night-v8), and one whose qualifiers name a version is of that one, even
+below it (night-v4 is of API 4, where values-night/ is not picked).
+`HydroidRc.PicksWhatAndroidPicked` checks it against three conditions of `golden/data`, two of
+them of two languages.
+
+The `pick_` strings of the app's `values*/match.xml` are there for that: each has a value in
+`values/` and in some `values-<qualifiers>/`, which says the folder it is in, so the dump shows
+which folder Android took it from. A folder added for one needs a condition that picks it, or a
+line in `GoldenMatch.EveryFolderIsPickedSomewhere` saying why none does. One thing has no
+folder there, because the app is built by the Android Gradle plugin: a locale with a variant
+and no script. A variant with a script the plugin keeps, so `values-b+sr+Latn+RS+ekavsk/` and
+`values-b+sr+Latn+RS/`, of the same region, are there for it: `sr-Latn-RS-ekavsk` takes the
+first, only because its variant matches. `sr-Latn-RS` and `sr-Latn-RS-ijekavsk` take the
+second, which they would take anyway as the first of two equal folders in the table, so that a
+device with no variant prefers a folder with none only `ConfigMatchTest` checks.
+
+An app whose LocaleConfig (`android:localeConfig`) has a default locale (`android:defaultLocale`,
+Android 15) may have its resources read in more than one locale, each resource taking the first
+that has a value, and which it is hangs on the calls a `Resources` has had before: Android gives
+the app's LocaleConfig to a `Resources` only after it has chosen its locales, and compares each
+update's locales with those it left. `golden/localeconfig` is an app of its own for that, its
+`res/xml/locales_config.xml` supporting en-US, fr and es with en-US the default, and values of
+fr, es, de and ja. Its `LocaleConfigDumpTest` dumps lifecycles, a `Resources` made for some
+languages, then turned, then given others, and the app's own `Resources` given languages of its
+own (`LocaleManager`), into `golden/localeconfig/data/`, which `GoldenLocaleConfigTest` replays
+through `setConfiguration` and `setLocaleConfig`:
+
+```sh
+python scripts/golden/pull_golden.py --app localeconfig
+```
+
+`hydroid-rc pick` replays such a lifecycle by hand: `--locale-config <file>` gives the
+`Resources` the app's LocaleConfig after the first device, as Android does, if that has more than
+one language, and each `--then <qualifiers> [--locales <tag,...>]` sets the same `Resources` to
+another device, of the languages of the one before, its `--locales` and the locale of its
+qualifiers, unless it names others: `--locales`, or a language in its qualifiers, which drops the
+`--locales` before too. It prints the
+lines of each device in turn, each starting with its locale. A `Resources` made for fr and es,
+then turned, reads `string/es` in es only at the turn:
+
+```sh
+hydroid-rc pick golden/localeconfig/src/main/res mcc310-port --locales fr-FR,es-ES --locale-config golden/localeconfig/src/main/res/xml/locales_config.xml --then mcc310-land
+```
+
+`HydroidRc.PicksWhatAndroidPickedWithLocaleConfig` checks it against every lifecycle of
+`golden/localeconfig/data`.
+
+Of a list of languages, Android reads an app's resources in the first that the app has, and
+takes it to have English, which it keeps in `values/`; the golden app has `values-en*/`, so
+neither is seen there. The first step of a `golden/localeconfig` lifecycle chooses so, without
+the LocaleConfig, and that app has no English: `ko-KR,en-GB,ja-JP` reads in en-GB, and
+`ko-KR,en-XA,ja-JP` in ja, as en-XA is a pseudo-locale and no English (#252). An app with no
+locales but the pseudo-locales Android reads in the first the system's resources have.
+`golden/nolocale` is an app of its own for that, with `values-en-rXA/` and `values-ar-rXB/`,
+whose `NoLocaleDumpTest` dumps lifecycles as `LocaleConfigDumpTest` does into
+`golden/nolocale/data/`, which `GoldenNoLocaleTest` replays: `cy-GB,ja-JP` reads in ja, as the
+system has no Welsh. It dumps the locales of the emulator's system resources too, into
+`golden/nolocale/data/system_locales.txt`, which has a few the AOSP folder list has not (en,
+en-XA, ar-XB) and has not some it has; both tests have in the table a package android of a
+folder for each, which hydroid must leave out of the app's locales. As the system has the
+pseudo-locales, whether the app's count with the system's the dump does not tell, only
+`ResourcesLocale.TheAppsPseudoLocalesCountWithTheSystems`:
+
+```sh
+python scripts/golden/pull_golden.py --app nolocale
+```
+
+The plugin (9.5.1) compiles values and most files (raw, layout, xml) with a compiler of its own,
+not aapt2, and that writes the variant of a locale with no script as empty (#198). An app it
+builds has `values-b+de+DE+1901` as `values-de`, `values-b+ca+ES+valencia` as `values-ca` and
+`raw-b+de+DE+1901/x.txt` as `res/raw-de/x.txt`, and it fails on `values-b+de+1901`;
+`values-b+sr+Latn+RS+ekavsk` keeps its variant. No option turns that compiler off. hydroid
+follows aapt2, which keeps the variant, so from such a folder it can pick another value than
+an app built by the plugin does. (aapt2 drops variants only after a region in a `b+` name of
+four subtags, and hydroid with it: `values-b+de+DE+1901+1996` is `de-rDE`, #225.) The
+`folder-locale-variant` case of `table_cases.json` checks what aapt2 makes of them, and
+`ConfigMatchTest` the rules for variants, from AOSP's tests; the golden app checks only that a
+matching variant wins, and only with a script.
 
 The aapt2 files need only the SDK (build-tools 37.0.0 and platform android-37.0), no device, but
 they must be made on Windows: aapt2 writes some rows otherwise on Linux and macOS (#62).
@@ -110,3 +218,23 @@ prints a folder the same way, from hydroid's `ResourceTable`, to compare by hand
 
 On another OS the scripts stop. With `--any-host` they run anyway and write
 `build/aapt2-<os>-<cpu>/` instead of `golden/aapt2/`, to compare with the golden files.
+
+A folder added to the golden app goes into `configs.tsv` and `app_table.txt` too, so both
+scripts run again after it.
+
+## Locale tables
+
+Android matches a locale by its script, and picks between regions by the parent of each locale
+(es-MX under es-419 under es), from tables AOSP generates from ICU's CLDR data.
+`src/core/LocaleDataTables.inc` holds the same tables, made from AOSP's
+`libs/androidfw/LocaleDataLookup.cpp` at the commit of `android17-release` the script pins:
+
+```sh
+python scripts/gen_locale_data.py
+```
+
+It downloads that file from android.googlesource.com, so no test makes the tables again;
+`SdkBaseline` checks only that their header names the release and commit the script pins.
+The `locale tables` job of the full CI makes them again and fails when they are not the file in
+the repository (#228): tables edited by hand, or a header moved to another commit without
+them.

@@ -4,6 +4,7 @@
 #include <ostream>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include "core/Parsed.h"
 #include "core/PathUtf8.h"
@@ -78,12 +79,26 @@ bool ResourceTable::addPackage(const std::filesystem::path& res, std::string_vie
     if (errors) errors->insert(errors->end(), diag.errors().begin(), diag.errors().end());
     return false;
   }
+  // What changes the table is undone if an allocation fails, so that a std::bad_alloc leaves it as
+  // it was too (#257): the names are made first, then put in, and the package is put in last, as
+  // a push_back that fails leaves packages_ where it was, and the pointers into it. None of the
+  // names is in byName_ yet, as the package's name is new, so that taking out those put in takes
+  // out nothing else.
+  std::vector<std::pair<std::string, ResId>> names;
   for (const TypeTable& type : loaded->types) {
     for (const Entry& e : type.entries) {
-      byName_[key(loaded->name, type.type, e.name)] = makeResId(id, type.id, e.id);
+      names.emplace_back(key(loaded->name, type.type, e.name), makeResId(id, type.id, e.id));
     }
   }
-  packages_.push_back(std::move(*loaded));
+  size_t added = 0;
+  try {
+    for (; added < names.size(); added++) byName_.insert(names[added]);
+    packages_.push_back(std::move(*loaded));
+  } catch (...) {
+    while (added > 0) byName_.erase(names[--added].first);
+    throw;
+  }
+  revision_.value++;
   return true;
 }
 

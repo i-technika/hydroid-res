@@ -16,4 +16,8 @@ namespace hydroid::res::detail {
 void scanResFolder(const std::filesystem::path& res, const std::string& package, ParsedFolder& out,
                    Diagnostics& diag);
 
+// The bytes of the file `path` into `text`, as scanResFolder reads each, or why they cannot be
+// had: "failed to open file" or "failed to read file".
+const char* readFile(const std::filesystem::path& path, std::string* text);
+
 }  // namespace hydroid::res::detail

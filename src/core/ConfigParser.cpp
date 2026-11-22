@@ -155,9 +155,15 @@ bool parseBcp47(std::string_view tag, Config& c) {
       (subtags[2].size() >= 4 ? variant : region) = subtags[2];
       break;
     case 4:
-      script = subtags[1];
-      region = subtags[2];
-      variant = subtags[3];
+      // A short second subtag is the region, and the two after it go, however long:
+      // b+de+DE+1901+1996 is de-rDE.
+      if (subtags[1].size() == 2 || subtags[1].size() == 3) {
+        region = subtags[1];
+      } else {
+        script = subtags[1];
+        region = subtags[2];
+        variant = subtags[3];
+      }
       break;
     default: return false;
   }
@@ -396,6 +402,39 @@ std::optional<ResDir> parseResDir(std::string_view name) {
       parseConfig(dash == std::string_view::npos ? std::string_view() : name.substr(dash + 1));
   if (!config) return std::nullopt;
   return ResDir{std::string(name.substr(0, dash)), *config};
+}
+
+std::optional<Config> parseLanguageTag(std::string_view tag) {
+  const std::vector<std::string> subtags = splitLower(tag, '-');
+  const auto letters = [](std::string_view s) { return allOf(s, isLower); };
+  const auto digits = [](std::string_view s) { return allOf(s, isDigit); };
+
+  size_t i = 0;
+  const std::string& lang = subtags[i++];
+  if (lang.size() < 2 || lang.size() > 3 || !letters(lang)) return std::nullopt;
+  std::string_view script, region;
+  if (i < subtags.size() && subtags[i].size() == 4 && letters(subtags[i])) script = subtags[i++];
+  if (i < subtags.size() && ((subtags[i].size() == 2 && letters(subtags[i])) ||
+                             (subtags[i].size() == 3 && digits(subtags[i])))) {
+    region = subtags[i++];
+  }
+  Config c;
+  for (; i < subtags.size(); i++) {
+    const std::string& s = subtags[i];
+    if (!allOf(s, isAlnum)) return std::nullopt;
+    // An extension or private use, which goes on to the end of the tag.
+    if (s.size() == 1) break;
+    if (s.size() > 8 || s.size() < 4 || (s.size() == 4 && !isDigit(s[0]))) return std::nullopt;
+    // setBcp47Locale writes each variant over the front of the one before, so the last is kept
+    // with the tail of a longer one before it: ca-ES-valencia-1996 has "1996ncia".
+    for (size_t k = 0; k < s.size(); k++) c.variant[k] = s[k];
+  }
+
+  setChars(c.lang, lang, keep);
+  setChars(c.script, script, keep);
+  c.script[0] = toUpper(c.script[0]);
+  setChars(c.region, region, toUpper);
+  return c;
 }
 
 }  // namespace hydroid::res

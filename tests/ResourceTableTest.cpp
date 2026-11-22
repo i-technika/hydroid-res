@@ -15,10 +15,13 @@
 #include <sys/stat.h>
 #endif
 
+#include <algorithm>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <iterator>
 #include <memory>
 #include <optional>
 #include <sstream>
@@ -96,6 +99,10 @@ TEST(ConfigOrder, ComparesPackedFields) {
   EXPECT_LT(compareConfigs(c("land"), c("ldpi")), 0);
   // The version comes before the screen layout: ldrtl (no version) before small-v4.
   EXPECT_LT(compareConfigs(c("ldrtl"), c("small")), 0);
+  // The version before the minor version, though Android packs the two in one union (#213).
+  EXPECT_LT(compareConfigs(c("v36"), c("v36.1")), 0);
+  EXPECT_LT(compareConfigs(c("v36.1"), c("v37")), 0);
+  EXPECT_LT(compareConfigs(c("v36.2"), c("v37.1")), 0);
 }
 
 TEST(ConfigOrder, IsATotalOrder) {
@@ -331,6 +338,58 @@ TEST(ResourceTable, FillsValuesAndPools) {
             "size(0x7f020001)=2.000000dp");
 }
 
+// A file says where it is in res/, which its path in the APK does not (#254): its folder and name
+// in UTF-8, the same however res/ was named, which opens the file joined to res/.
+TEST(ResourceTable, FileSaysWhereItIsInRes) {
+  namespace fs = std::filesystem;
+  const TempDir dir;
+  // Under a folder of a Unicode name, as are some files, which Windows gives in UTF-16.
+  const fs::path app = fs::u8path("\xec\x95\xb1");  // 앱
+  const fs::path res = dir.path() / app / "res";
+  struct File {
+    const char* name;    // of the resource
+    const char* folder;  // and file in res/
+    const char* apk;     // the path aapt2 link gives it
+  };
+  const std::vector<File> files = {
+      {"raw/a.b", "raw/a.b.txt", "res/raw/a.b.b.txt"},
+      {"drawable/icon", "drawable-hdpi/icon.png", "res/drawable-hdpi-v4/icon.png"},
+      {"raw/x", "raw-b+sr+Latn/x.txt", "res/raw-b+sr+Latn/x.txt"},
+      {"raw/\xea\xb0\x80", "raw/\xea\xb0\x80.txt", "res/raw/\xea\xb0\x80.txt"},  // 가
+  };
+  for (const File& f : files) {
+    const fs::path file = res / fs::u8path(f.folder);
+    fs::create_directories(file.parent_path());
+    std::ofstream(file, std::ios::binary) << f.folder;
+  }
+
+  // Named by an absolute path, and by one relative to the current folder.
+  const fs::path before = fs::current_path();
+  for (const bool relative : {false, true}) {
+    SCOPED_TRACE(relative ? "relative" : "absolute");
+    ResourceTable table;
+    std::vector<Diagnostic> errors;
+    if (relative) fs::current_path(dir.path());
+    const bool loaded =
+        table.addPackage(relative ? app / "res" : res, "com.example", kAppPackageId, &errors);
+    fs::current_path(before);
+    ASSERT_TRUE(loaded) << (errors.empty() ? "" : errors[0].message);
+    const Package& p = *table.package(kAppPackageId);
+    for (const File& f : files) {
+      SCOPED_TRACE(f.folder);
+      const Entry& entry = *table.entry(*table.find(std::string("com.example:") + f.name));
+      ASSERT_EQ(entry.candidates.size(), 1u);
+      const FileRef& file = p.files[entry.candidates[0].value.index()];
+      EXPECT_EQ(file.path, f.apk);
+      EXPECT_EQ(file.source, f.folder);
+      std::ifstream in(res / fs::u8path(file.source), std::ios::binary);
+      const std::string text((std::istreambuf_iterator<char>(in)),
+                             std::istreambuf_iterator<char>());
+      EXPECT_EQ(text, f.folder);
+    }
+  }
+}
+
 // A package may refer to one loaded before it, by its name, as an app does to android: to what
 // that package makes <public> (#141).
 TEST(ResourceTable, RefersIntoAnotherPackage) {
@@ -477,6 +536,7 @@ TEST(ResourceTable, FailureLeavesTheTableAsItWas) {
                       "</resources>"}},
                     "com.b", 0x7f, &errors));
   EXPECT_FALSE(errors.empty());
+  const uint64_t revision = table.revision();
   EXPECT_FALSE(load(table, dir, {}, "com.c", 0x7e));  // the id is taken
   EXPECT_FALSE(load(table, dir, {}, "com.a", 0x7d));  // and the name
   EXPECT_FALSE(load(table, dir, {}, "com.d", 0));
@@ -484,7 +544,51 @@ TEST(ResourceTable, FailureLeavesTheTableAsItWas) {
   ASSERT_EQ(table.packages().size(), 1u);
   EXPECT_EQ(table.packages()[0].name, "com.a");
   EXPECT_FALSE(table.find("com.b:color/c"));
+  EXPECT_EQ(table.revision(), revision);
   EXPECT_TRUE(load(table, dir, {}, "com.e", 0x7f));
+  EXPECT_NE(table.revision(), revision);
+}
+
+// The revision of a table changes with what it holds, and never comes back to one it had (#205).
+TEST(ResourceTable, RevisionChangesWithWhatItHolds) {
+  TempDir dir;
+  ResourceTable table;
+  std::vector<uint64_t> seen = {table.revision()};
+  const auto changed = [&] {
+    const bool isNew = std::find(seen.begin(), seen.end(), table.revision()) == seen.end();
+    seen.push_back(table.revision());
+    return isNew;
+  };
+  ASSERT_TRUE(load(table, dir, {}, "com.a", 0x7e));
+  EXPECT_TRUE(changed());
+
+  // A copy holds what the table does, and takes its revision.
+  ResourceTable copy = table;
+  EXPECT_EQ(copy.revision(), table.revision());
+  ASSERT_TRUE(load(copy, dir, {}, "com.b", 0x7f));
+  EXPECT_EQ(table.packages().size(), 1u);
+
+  // Assigned what it held before, or a table of as many packages, it changes all the same.
+  table = copy;
+  EXPECT_TRUE(changed());
+  ResourceTable other;
+  ASSERT_TRUE(load(other, dir, {}, "com.c", 0x7e));
+  ASSERT_TRUE(load(other, dir, {}, "com.d", 0x7f));
+  const uint64_t otherRevision = other.revision();
+  table = std::move(other);
+  EXPECT_TRUE(changed());
+  EXPECT_NE(other.revision(), otherRevision);  // moved from
+  EXPECT_EQ(table.packages()[0].name, "com.c");
+
+  // Moved from, it may have lost what it held.
+  ResourceTable taken = std::move(table);
+  EXPECT_TRUE(changed());
+  EXPECT_EQ(taken.packages()[0].name, "com.c");
+  ResourceTable empty;
+  table = std::move(empty);
+  EXPECT_TRUE(changed());
+  ASSERT_TRUE(load(table, dir, {}, "com.a", 0x7e));
+  EXPECT_TRUE(changed());
 }
 
 TEST(ResourceTable, ErrorsSayWhere) {

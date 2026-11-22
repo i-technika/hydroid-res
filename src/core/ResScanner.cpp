@@ -20,12 +20,64 @@
 
 #ifdef _WIN32
 #include <share.h>
+#else
+#include <dirent.h>
+#include <sys/stat.h>
+
+#include <cerrno>
 #endif
 
 namespace hydroid::res::detail {
 namespace {
 
 namespace fs = std::filesystem;
+
+enum class Listing { Read, CannotOpen, CannotRead };
+
+// Calls `f` with the path of each entry of `dir`, elsewhere than Windows "." and ".." among them,
+// and a function that tells whether it is a folder once links are followed, or sets why that
+// cannot be told. It is told only when asked, as most entries never are.
+// Elsewhere than Windows it reads the folder by opendir() and readdir(), not by a
+// directory_iterator, which in libstdc++ allocates where an exception cannot leave, so that a
+// failed allocation there ends the program (#262). What allocates here is hydroid's own, whose
+// std::bad_alloc leaves addPackage.
+template <typename F>
+Listing forEachEntry(const fs::path& dir, F f) {
+#ifdef _WIN32
+  std::error_code ec;
+  fs::directory_iterator it(dir, ec);
+  if (ec) return Listing::CannotOpen;
+  // increment(ec) rather than a range-for, whose ++ throws filesystem_error out of addPackage.
+  for (; !ec && it != fs::directory_iterator(); it.increment(ec)) {
+    const fs::directory_entry& e = *it;
+    f(e.path(), [&](std::error_code& kind) { return e.is_directory(kind); });
+  }
+  return ec ? Listing::CannotRead : Listing::Read;
+#else
+  const std::unique_ptr<DIR, int (*)(DIR*)> d(opendir(dir.c_str()), closedir);
+  if (!d) return Listing::CannotOpen;
+  for (;;) {
+    errno = 0;
+    const dirent* entry = readdir(d.get());
+    if (!entry) return errno != 0 ? Listing::CannotRead : Listing::Read;
+    const unsigned char type = entry->d_type;
+    fs::path path = dir / entry->d_name;
+    // The kind readdir() gives, but for a link, or where the file system gives none: then the
+    // kind of what the path leads to, as directory_entry::is_directory() follows links.
+    const auto isDirectory = [&](std::error_code& kind) {
+      kind.clear();
+      if (type != DT_LNK && type != DT_UNKNOWN) return type == DT_DIR;
+      struct stat st;
+      if (stat(path.c_str(), &st) != 0) {
+        kind.assign(errno, std::generic_category());
+        return false;
+      }
+      return S_ISDIR(st.st_mode);
+    };
+    f(path, isDirectory);
+  }
+#endif
+}
 
 // The entries of `dir` that are not hidden and are of the kind asked, by UTF-8 name. On Windows,
 // aapt2 lists names in the ANSI code page and opens each by that name read as UTF-8, so it does
@@ -45,33 +97,29 @@ namespace fs = std::filesystem;
 std::vector<std::pair<std::string, fs::path>> list(const fs::path& dir, bool directories,
                                                    Diagnostics& diag) {
   std::vector<std::pair<std::string, fs::path>> out;
-  std::error_code ec;
-  fs::directory_iterator it(dir, ec);
-  if (ec) {
+  const Listing listing = forEachEntry(dir, [&](fs::path path, const auto& isDirectory) {
+    std::string name = utf8(path.filename());
+    if (name.empty() || name[0] == '.') return;  // file::IsHidden
+    if (!isUnicode(path.filename())) {
+      if (!directories) diag.error({path, 0}, "file not found");
+      return;
+    }
+    std::error_code kind;
+    const bool directory = isDirectory(kind);
+    if (directories && !directory) {
+      if (kind && kind != std::errc::no_such_file_or_directory) {
+        diag.error({path, 0}, "failed to open directory");
+      }
+      return;
+    }
+    if (!directories && directory) return;
+    out.emplace_back(std::move(name), std::move(path));
+  });
+  if (listing == Listing::CannotOpen) {
     diag.error({dir, 0}, "failed to open directory");
     return out;
   }
-  // increment(ec) rather than a range-for, whose ++ throws filesystem_error out of addPackage.
-  for (; !ec && it != fs::directory_iterator(); it.increment(ec)) {
-    const fs::directory_entry& e = *it;
-    std::string name = utf8(e.path().filename());
-    if (name.empty() || name[0] == '.') continue;  // file::IsHidden
-    if (!isUnicode(e.path().filename())) {
-      if (!directories) diag.error({e.path(), 0}, "file not found");
-      continue;
-    }
-    std::error_code kind;
-    const bool directory = e.is_directory(kind);
-    if (directories && !directory) {
-      if (kind && kind != std::errc::no_such_file_or_directory) {
-        diag.error({e.path(), 0}, "failed to open directory");
-      }
-      continue;
-    }
-    if (!directories && directory) continue;
-    out.emplace_back(std::move(name), e.path());
-  }
-  if (ec) diag.error({dir, 0}, "failed to read directory");
+  if (listing == Listing::CannotRead) diag.error({dir, 0}, "failed to read directory");
   std::sort(out.begin(), out.end());
   return out;
 }
@@ -193,6 +241,8 @@ class XmlFileCollector {
 
 }  // namespace
 
+const char* readFile(const fs::path& path, std::string* text) { return read(path, text); }
+
 void scanResFolder(const fs::path& res, const std::string& package, ParsedFolder& out,
                    Diagnostics& diag) {
   std::error_code ec;
@@ -286,6 +336,8 @@ void scanResFolder(const fs::path& res, const std::string& package, ParsedFolder
     if (const size_t dot = fileName.find('.'); dot != std::string::npos) {
       ref.path += fileName.substr(dot);
     }
+    // Where it is in res/, as its folder and name were read: the same however res/ was named.
+    ref.source = path;
     if (xml) {
       ref.type = FileType::Xml;
       XmlDocument doc;

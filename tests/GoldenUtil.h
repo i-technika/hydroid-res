@@ -1,14 +1,20 @@
-// Walking golden/data and the golden app's values*/ resources, shared by the golden tests.
+// Walking golden/data, and the device of each golden condition, shared by the golden tests.
 
 #pragma once
 
+#include <gtest/gtest.h>
 #include <nlohmann/json.hpp>
-#include <pugixml.hpp>
 
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
+#include <optional>
 #include <string>
 #include <string_view>
+#include <vector>
+
+#include "hydroid/res/Config.h"
+#include "hydroid/res/ConfigParser.h"
 
 namespace hydroid::res::test {
 
@@ -23,26 +29,71 @@ void forEachGoldenCondition(Fn&& fn) {
   }
 }
 
-// Calls fn(file, node) for each element under <resources> in the golden app's values*/ XML.
-template <typename Fn>
-void forEachValuesNode(Fn&& fn) {
-  for (const auto& dir : std::filesystem::directory_iterator(HYDROID_TEST_RES_DIR)) {
-    if (dir.path().filename().string().rfind("values", 0) != 0) continue;
-    for (const auto& file : std::filesystem::directory_iterator(dir.path())) {
-      pugi::xml_document doc;
-      if (file.path().extension() != ".xml" || !doc.load_file(file.path().c_str())) continue;
-      for (pugi::xml_node node : doc.child("resources").children()) fn(file.path(), node);
-    }
-  }
-}
+// The device of a golden condition: its Config and the locales that were asked for, to give
+// Resources::setConfiguration.
+struct GoldenDevice {
+  Config config;
+  std::vector<Config> locales;
+};
 
-// The node's text without the surrounding whitespace, which aapt2 drops.
-inline std::string trimmedText(pugi::xml_node node) {
-  std::string_view s = node.child_value();
-  const auto first = s.find_first_not_of(" \t\r\n");
-  if (first == std::string_view::npos) return {};
-  const auto last = s.find_last_not_of(" \t\r\n");
-  return std::string(s.substr(first, last - first + 1));
+// The state of the device a condition records, as android.content.res.Configuration, cut into
+// ResTable_config's fields as NativeSetConfiguration (frameworks/base
+// core/jni/android_util_AssetManager.cpp) cuts them, with the version the condition was taken on
+// (sdkIntFull). Of what ResourcesImpl.updateConfiguration does on the way, only the soft keyboard
+// is done here; Resources::setConfiguration is left to choose the locale and give it its old
+// code, and to see to the pixels and navHidden (Config.h).
+inline GoldenDevice goldenDevice(const nlohmann::json& condition) {
+  const nlohmann::json& c = condition.at("configuration");
+  const auto at = [&](const char* key) { return c.at(key).get<int>(); };
+  GoldenDevice device;
+  Config& config = device.config;
+  config.mcc = static_cast<uint16_t>(at("mcc"));
+  config.mnc = static_cast<uint16_t>(at("mnc"));
+  config.grammaticalGender = static_cast<GrammaticalGender>(at("grammaticalGender"));
+  // Configuration.screenLayout: the size, long, the direction, and round in the next byte.
+  const int screenLayout = at("screenLayout");
+  config.screenSize = static_cast<ScreenSize>(screenLayout & 0x0f);
+  config.screenLong = static_cast<ScreenLong>((screenLayout & 0x30) >> 4);
+  config.layoutDir = static_cast<LayoutDir>((screenLayout & 0xc0) >> 6);
+  config.screenRound = static_cast<ScreenRound>((screenLayout & 0x300) >> 8);
+  config.smallestWidthDp = static_cast<uint16_t>(at("smallestScreenWidthDp"));
+  config.widthDp = static_cast<uint16_t>(at("screenWidthDp"));
+  config.heightDp = static_cast<uint16_t>(at("screenHeightDp"));
+  const int colorMode = at("colorMode");
+  config.wideColorGamut = static_cast<WideColorGamut>(colorMode & 0x3);
+  config.hdr = static_cast<Hdr>((colorMode & 0xc) >> 2);
+  config.orientation = static_cast<Orientation>(at("orientation"));
+  const int uiMode = at("uiMode");
+  config.uiModeType = static_cast<UiModeType>(uiMode & 0x0f);
+  config.uiModeNight = static_cast<UiModeNight>((uiMode & 0x30) >> 4);
+  config.density = static_cast<uint16_t>(at("densityDpi"));
+  config.touchscreen = static_cast<Touchscreen>(at("touchscreen"));
+  // KEYBOARDHIDDEN_NO with HARDKEYBOARDHIDDEN_YES is the soft keyboard.
+  config.keysHidden = at("keyboardHidden") == 1 && at("hardKeyboardHidden") == 2
+                          ? KeysHidden::Soft
+                          : static_cast<KeysHidden>(at("keyboardHidden"));
+  config.keyboard = static_cast<Keyboard>(at("keyboard"));
+  config.navigation = static_cast<Navigation>(at("navigation"));
+  // These two as the device has them, which Resources::setConfiguration must take as Android does:
+  // navHidden it drops, and of the display in pixels, it makes the longer side the width. The
+  // golden conditions check both: every one is 1080x2400, which takes values-1920x1080/ only as
+  // 2400x1080, and values-800x480/ otherwise (#223).
+  config.navHidden = static_cast<NavHidden>(at("navigationHidden"));
+  config.screenWidth = static_cast<uint16_t>(at("widthPixels"));
+  config.screenHeight = static_cast<uint16_t>(at("heightPixels"));
+  const int sdkIntFull = condition.at("sdkIntFull").get<int>();
+  config.sdkVersion = static_cast<uint16_t>(sdkIntFull / 100000);
+  config.minorVersion = static_cast<uint16_t>(sdkIntFull % 100000);
+
+  const std::string tags = condition.at("requestedLocales").get<std::string>();
+  for (size_t start = 0; start <= tags.size();) {
+    const size_t comma = std::min(tags.find(',', start), tags.size());
+    const std::optional<Config> locale = parseLanguageTag(tags.substr(start, comma - start));
+    EXPECT_TRUE(locale) << tags;
+    if (locale) device.locales.push_back(*locale);
+    start = comma + 1;
+  }
+  return device;
 }
 
 }  // namespace hydroid::res::test

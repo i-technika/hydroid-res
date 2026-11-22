@@ -327,6 +327,7 @@ Package name=com.itechnika.hydroid.table id=7f
       (lowdr-v26) "lowdr"
       (highdr-v26) "highdr"
       (v36.1) "v36.1"
+      (v37) "v37"
       (640x480) "640x480"
       (nokeys) "nokeys"
       (qwerty) "qwerty"

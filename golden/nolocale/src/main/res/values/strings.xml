@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Each string says the folder it is in, so the dump shows the one each was taken from. -->
+<resources>
+    <string name="app_name">hydroid golden no locale</string>
+    <string name="where">default</string>
+</resources>

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Resource-only app with no locales but the pseudo-locales, so the instrumentation test can dump
+     the locale Android picks for it of the system's (#252). -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application android:label="@string/app_name" />
+</manifest>

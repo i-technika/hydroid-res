@@ -14,7 +14,22 @@ namespace hydroid::res {
 // name, or not known on a device. A value added here needs its static_assert in Config.cpp.
 //
 // parseConfig (ConfigParser.h) makes one from a folder name, and toString prints it back as aapt2
-// does. Matching a resource's Config against the device's is step 5.
+// does. matches and isBetterThan below say which resources a device takes, and Resources
+// (Resources.h) picks them from a table.
+//
+// A device's Config gives its locale as Android gives one to its resources: the language as its
+// old code where it has one (iw, in, ji, not he, id, yi), and the script only where the tag
+// names one ("sr-Latn"); matching works out the script of the others. Its sdkVersion is
+// kEmulatedSdkVersion (Version.h), its keysHidden is KeysHidden::Soft where the keyboard is the
+// soft one, its screenWidth is the longer side of the screen in pixels, however the device is
+// held, and its navHidden is NavHidden::Any, as Android tells its resources nothing of it:
+// values-navexposed/ and values-navhidden/ are of no Android device.
+// Resources::setConfiguration sees to the language, the version, the pixels and navHidden.
+//
+// The numbering system of a device's locale (the nu-latn of ar-EG-u-nu-latn), which
+// ResTable_config keeps, has no field here (#51). A folder cannot name one, as aapt2 link
+// rejects b+ar+u+nu+latn, so no resource has any, and Android only uses the device's to tell
+// two resources apart by theirs.
 
 enum class GrammaticalGender : uint8_t { Any = 0, Neuter = 1, Feminine = 2, Masculine = 3 };
 enum class LayoutDir : uint8_t { Any = 0, Ltr = 1, Rtl = 2 };
@@ -97,8 +112,8 @@ inline bool operator!=(const Config& a, const Config& b) { return !(a == b); }
 // ResTable_config::compare, in which aapt2 keeps the values of a resource and
 // `aapt2 dump resources` lists them. It compares Android's packed fields as integers, so it is
 // not the order of the qualifiers in a folder name: the mnc before the mcc, the region before the
-// language and the second letter of each before the first, the density before the touchscreen
-// before the orientation, and the minor version before the version.
+// language and the second letter of each before the first, and the density before the
+// touchscreen before the orientation. The version comes before the minor version: v36, v36.1, v37.
 HYDROID_RES_API int compareConfigs(const Config& a, const Config& b);
 
 // The qualifiers as aapt2 writes them, which is how `aapt2 dump resources` prints a configuration:
@@ -117,5 +132,40 @@ HYDROID_RES_API std::string toString(const Config& config);
 // field by field, every byte: Config(region=KR), Config(lang=sr-variant=Latn). Two Configs that
 // differ never print the same (#50).
 HYDROID_RES_API std::ostream& operator<<(std::ostream& os, const Config& config);
+
+// Whether a resource of the configuration `config` can be used on `device`, as
+// ResTable_config::match says: every qualifier `config` gives must agree with the device's.
+//   - The same as the device's: mcc, mnc, grammatical gender, layout direction, long, round,
+//     wide color gamut, HDR, orientation, UI mode type, night mode, touchscreen, keyboard,
+//     navigation and their hidden states, but that keysexposed also matches keyssoft.
+//   - No more than the device's: smallest width, width and height in dp, screen size, the
+//     screen in pixels, and the version, with its minor version.
+//   - The density always matches: Android scales what it finds.
+//   - The locale: the same language (tl and fil are one), then the same script, each locale's
+//     being the one it names or else the one its language is most likely written in there
+//     (zh-rTW is Hant, so it matches a zh-HK device and zh-rCN does not; en-rGB matches en-AU).
+//     The region and the variant keep nothing out. Only where a script is not known, as of a
+//     private-use language, must a region the resource gives be the device's.
+HYDROID_RES_API bool matches(const Config& config, const Config& device);
+
+// Whether `a` is a better configuration than `b` for `device`, both of which match it, as
+// ResTable_config::isBetterThan says. The qualifiers are compared in the order of Config's
+// fields, but that both hidden states come before the keyboard and the navigation, and the first
+// that differs decides, where the device gives it:
+//   - Most: the configuration that gives the qualifier is better than the one that does not.
+//   - Smallest width, version: the larger. Width and height in dp, the screen in pixels: the
+//     closer to the device's, both together.
+//   - Screen size: the larger, none counting as normal on a screen that is at least normal.
+//   - Density, where none is mdpi: anydpi first; otherwise the higher, to scale down, unless
+//     both are at least the device's, and then the lower.
+//   - Locale: one with the language over one without, but for an en-US device, and one whose
+//     English is close to it, where no language is better than an English of another kind
+//     (en-rGB); then the region closer to the device's among the parents of its locale (es-r419
+//     for es-MX), then the same variant.
+// It is not an order: a better locale decides at once, but a worse one does not, so two
+// configurations can each be better than the other (ko and sw600dp, on a Korean tablet). What
+// Android picks then depends on the order it meets them in, which bestCandidate (Resources.h)
+// follows.
+HYDROID_RES_API bool isBetterThan(const Config& a, const Config& b, const Config& device);
 
 }  // namespace hydroid::res

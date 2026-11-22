@@ -21,6 +21,16 @@ $cases = @(
      Says = 'error: the package name is not Unicode text' },
   @{ Args = @('dump', $res); Exit = 1; Says = 'file not found' },
   @{ Args = @("dump$lone", $missing); Exit = 2; Says = 'usage:' },
+  @{ Args = @('pick', "$missing$lone", 'land'); Exit = 1; Says = 'not a folder' },
+  @{ Args = @('pick', $missing, "land$lone"); Exit = 1;
+     Says = 'error: an argument is not Unicode text' },
+  @{ Args = @('pick', $missing, 'land', '--locales', "ko$lone"); Exit = 1;
+     Says = 'error: an argument is not Unicode text' },
+  @{ Args = @('pick', $missing, 'land', "com.a$lone"); Exit = 1;
+     Says = 'error: an argument is not Unicode text' },
+  # The file of --locale-config is a path, as the folder is, and not text (#268).
+  @{ Args = @('pick', $missing, 'land', '--locale-config', "$missing$lone"); Exit = 1;
+     Says = 'failed to open file' },
   @{ Args = @("--version$lone"); Exit = 2; Says = 'usage:' }
 )
 $failed = $false

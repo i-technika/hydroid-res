@@ -19,3 +19,5 @@ dependencyResolutionManagement {
 
 rootProject.name = "hydroid-golden"
 include(":app")
+include(":localeconfig")
+include(":nolocale")

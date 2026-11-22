@@ -1,9 +1,9 @@
 // Golden check for dimensions and fractions: hydroid's complex encoding, getDimension() and
-// getFraction() against what Android stored and returned on the emulator (golden/data).
+// getFraction() against what Android stored and returned on the emulator (golden/data). That
+// hydroid picks the value Android picked under each condition is GoldenMatchTest's.
 
 #include <gtest/gtest.h>
 
-#include <map>
 #include <set>
 #include <string>
 #include <vector>
@@ -15,15 +15,10 @@
 namespace hydroid::res {
 namespace {
 
-namespace fs = std::filesystem;
 using test::forEachGoldenCondition;
-using test::forEachValuesNode;
 
 constexpr int kTypeDimension = 5;  // TypedValue.TYPE_DIMENSION
 constexpr int kTypeFraction = 6;   // TypedValue.TYPE_FRACTION
-
-// What <dimen> and <fraction> accept in aapt2.
-constexpr uint32_t kComplexTag = kFormatFloat | kFormatDimension | kFormatFraction;
 
 struct GoldenComplex {
   std::string where;    // "160dpi_en-US_notnight_port_sw320dp dimen/margin"
@@ -75,47 +70,18 @@ const Golden& golden() {
   return g;
 }
 
-using Sources = std::map<std::string, std::set<uint32_t>>;
-
-// Every <dimen> and <fraction> text in the golden app's values*/ folders, parsed by hydroid, by
-// "type/name". A source hydroid fails to parse is recorded as a failure.
-Sources loadSources() {
-  Sources out;
-  forEachValuesNode([&](const fs::path& file, pugi::xml_node node) {
-    const std::string tag = node.name();
-    if (tag != "dimen" && tag != "fraction") return;
-    const std::string key = tag + "/" + node.attribute("name").value();
-    auto v = parseLiteral(node.child_value(), kComplexTag);
-    if (!v || (v->kind() != ValueKind::Dimension && v->kind() != ValueKind::Fraction)) {
-      ADD_FAILURE() << file.string() << ": " << key << " \"" << node.child_value()
-                    << "\" does not parse to a dimension or fraction";
-      return;
-    }
-    out[key].insert(v->complexData());
-  });
-  return out;
-}
-
-const Sources& sources() {
-  static const Sources s = loadSources();
-  return s;
-}
-
-TEST(GoldenComplex, EveryConditionHasEverySource) {
-  EXPECT_EQ(golden().conditions, 252u);  // 7 densities × 3 languages × 2 × 2 × 3 widths
-  EXPECT_GT(sources().size(), 0u);
-  EXPECT_EQ(golden().values.size(), golden().conditions * sources().size());
-}
-
-TEST(GoldenComplex, SourceTextEncodesToAndroidData) {
+TEST(GoldenComplex, EveryConditionHasEveryDimensionAndFraction) {
+  // 7 densities x 3 languages x 2 x 2 x 3 widths, the extras of GoldenDumpTest.kt and the three
+  // grammatical genders.
+  EXPECT_EQ(golden().conditions, 252u + 125u + 3u);
+  std::set<std::string> keys;
   for (const GoldenComplex& g : golden().values) {
+    keys.insert(g.key);
     SCOPED_TRACE(g.where);
     EXPECT_EQ(g.type, g.key.rfind("dimen/", 0) == 0 ? kTypeDimension : kTypeFraction);
-    // Config matching comes later, so check that one of the resource's sources gives this data.
-    auto it = sources().find(g.key);
-    ASSERT_NE(it, sources().end());
-    EXPECT_EQ(it->second.count(g.data), 1u) << "data 0x" << std::hex << g.data;
   }
+  EXPECT_GT(keys.size(), 0u);
+  EXPECT_EQ(golden().values.size(), golden().conditions * keys.size());
 }
 
 TEST(GoldenComplex, CoercedStringParsesBackToData) {

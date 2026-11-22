@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Spanish, which the app supports. -->
+<resources>
+    <string name="all">es</string>
+    <string name="fr_es">es</string>
+    <string name="es_de">es</string>
+    <string name="es">es</string>
+</resources>

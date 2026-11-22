@@ -61,14 +61,31 @@ gh issue develop <N> --base <base> --name fix/<N>-<slug> --checkout
 
 1. 이슈의 재현 조건과 완료 기준을 코드에서 확인하고 고친다. 회귀를 막는 테스트를 함께 넣는다.
    주변 코드의 주석 밀도, 이름, 관용구를 따른다.
-2. 빌드와 테스트(CI의 `core` job과 같음):
+2. 빌드와 테스트(CI의 `core` job과 같은 preset. CI는 `-DHYDROID_RES_REQUIRE_NDK_TESTS=ON`도 붙인다):
    ```
    cmake --preset debug -DHYDROID_RES_REQUIRE_LOCALE_TESTS=ON
    cmake --build --preset debug --parallel
    ctest --preset debug
    ```
-   decimal-comma 로케일이 이 PC에 없어서 configure가 실패하면 `-DHYDROID_RES_REQUIRE_LOCALE_TESTS=ON`만
-   빼고 다시 하고, PR의 테스트 항목에 그렇게 적는다.
+   이어서 Release로 한 번 더(CI의 `release` job과 같은 preset. NDK 플래그는 위와 같다):
+   ```
+   cmake --preset release -DHYDROID_RES_REQUIRE_LOCALE_TESTS=ON
+   cmake --build --preset release --parallel
+   ctest --preset release
+   ```
+   quick 범위의 `core (ubuntu-24.04, release)`는 GCC만 보고, `core (windows-2022, release)`는 full 범위에서만
+   돈다. MSVC `/O2`에서만 나는 경고(C4702 등)도 `/WX`로 빌드를 멈추므로, 서브이슈 단계에서 그것을 볼 수 있는
+   곳은 이 PC(Windows, MSVC)의 Release 빌드뿐이다(#258, #267). 다만 이 PC의 MSVC는 CI의 windows-2022(VS 2022)와
+   버전이 다를 수 있어, CI의 VS 2022에서만 나는 경고는 여전히 단계 PR의 full CI에서야 드러날 수 있다. 이
+   PC의 MSVC에서만 나는 경고도 `/WX`로 빌드를 멈추므로 CI에서 나지 않더라도 고친다. 빌드
+   디렉터리가 다르므로(`build/debug`, `build/release`) 서로를 덮지 않는다.
+   `-DHYDROID_RES_REQUIRE_LOCALE_TESTS=ON`은 configure와 빌드를 멈추지 않는다. decimal-comma 로케일이 이
+   PC에 없으면, 그 로케일이 필요한 테스트(`HYDROID_NEED_DECIMAL_COMMA`를 쓰는 것)가 skip 대신 `ctest`에서
+   `no locale with a decimal comma is installed`로 실패한다(`tests/DecimalCommaLocale.h`). 그때는 Debug와
+   Release를 `-DHYDROID_RES_REQUIRE_LOCALE_TESTS=OFF`로 다시 configure하고(옵션을 빼기만 하면 CMake 캐시의
+   `ON`이 남는다) 빌드와 `ctest`를 다시 돌려 그 테스트가 skip되는지 보고, PR의 테스트 항목에 그렇게 적는다.
+   이후 이 PC에서 다시 돌릴 때는 언제나(이 스킬의 이후 단계와 `/open-ms`에서도) 위 블록의 `=ON` 대신
+   `=OFF`로 configure한다. `=ON`을 주면 캐시가 다시 `ON`이 되어 같은 테스트가 또 실패한다.
 3. 바꾼 `*.h`, `*.cpp`에 clang-format 23.1.5(`.clang-format`)로 `--dry-run --Werror`를 돌린다.
    서브이슈 PR의 CI(quick)도 `clang-format` job을 돌리지만, push하기 전에 여기서 먼저 확인한다. 23.1.5가
    없으면 건너뛰고 PR에 "clang-format은 이 PR의 CI에서 확인됩니다"라고 적는다.
@@ -95,6 +112,11 @@ gh pr create --base <base> --head <branch> --title "<한국어 제목> (#<N>)" -
   --assignee i-technika --label <이슈의 label마다 하나씩> --milestone "<이슈의 마일스톤 제목>" \
   --project "Hydroid Project"
 ```
+제목이 `/`로 시작할 수 있으면(예: `/fix-issue`로 시작) 공용 절차 **Git Bash에서 `gh`에 넘기는 인자**대로
+Bash에서 `MSYS_NO_PATHCONV=1`을 붙이고 작은따옴표로 넘긴다(PowerShell은 글 안의 `"`를 떼어 내거나 인자를
+가르므로, `"`가 없는 글만). 6~8단계의 답글(`-f body=...`)이나 코멘트
+(`--comment`, `--body`)도 `/`로 시작하면 같다.
+
 이어서:
 1. 프로젝트 필드: `hgh copy-fields <N> <M>` (단계·영역·플랫폼·res 릴리스를 이슈와 같게. Status는 자동화에 맡긴다).
 2. **Development 연결 확인**: `hgh links <M>`의 `linkedIssues`에 `<N>`이 있어야 한다. 없으면 GitHub API로는
@@ -105,8 +127,8 @@ PR 본문(한국어, 기존 PR과 같은 구성):
 - `## 요약`: 이슈 번호와 무엇이 문제였는지. base가 기본 브랜치가 아니면
   `> base가 기본 브랜치가 아니라서 머지해도 #<N>은 자동으로 닫히지 않습니다.`를 넣는다.
 - `## 변경`: 파일별로 무엇을 바꿨는지.
-- `## 테스트`: 실제로 돌린 것만 `- [x]`로. 돌리지 못한 것은 `- [ ]`와 이유. CI는 quick 범위(Linux의 GCC
-  static, shared, Clang ASan·UBSan, clang-format)만 돈다고 적는다.
+- `## 테스트`: 실제로 돌린 것만 `- [x]`로(로컬 Debug와 Release는 따로 적는다). 돌리지 못한 것은 `- [ ]`와
+  이유. CI는 quick 범위(Linux의 GCC static, shared, release, Clang ASan·UBSan, clang-format)만 돈다고 적는다.
 - 하네스가 알려 준 PR attribution 줄로 끝낸다.
 
 ### 질문 지점: 개발자 문의
@@ -181,13 +203,14 @@ Resolve는 `gh api graphql -f query='mutation($id:ID!){resolveReviewThread(input
 | 작업 트리 깨끗함 | `git status --porcelain` 비어 있음 |
 | push됨 | 로컬 `HEAD` == `gh pr view <M> --json headRefOid` |
 | base | PR base가 2단계의 base와 같음 |
+| PR 제목 | `gh pr view <M> --json title`에 `C:/`가 없음(Git Bash가 `/`로 시작하는 인자를 경로로 바꾼 흔적. 있으면 `gh pr edit <M> --title`을 같은 공용 절차대로 넘겨 고친다) |
 | base와 충돌 없음, 뒤처지지 않음 | `gh pr view <M> --json mergeable,mergeStateStatus`: `MERGEABLE`이고 `DIRTY`/`BEHIND` 아님 |
 | 미해결 스레드 0 | 위 GraphQL에서 `isResolved: false` 없음 |
 | PR 메타데이터 | `gh pr view <M> --json assignees,labels,milestone,projectItems`: `i-technika`, 이슈와 같은 label·마일스톤, `Hydroid Project` |
 | Development | `hgh links <M>`에 `<N>` 있음 (없으면 4단계의 안내를 다시 하고 표에 ❌로 둔다) |
 | 이슈 담당자 | `hgh kind <N>`의 `assignees`에 `i-technika` |
-| 로컬 빌드·테스트 | HEAD에서 3단계의 빌드와 `ctest` 통과 |
-| CI (quick) | `gh pr checks <M> --watch`(백그라운드). `core (ubuntu-24.04)`, `core (ubuntu-24.04, shared)`, `core (Clang, ASan and UBSan)`, `clang-format` 네 개 통과 |
+| 로컬 빌드·테스트 | HEAD에서 3단계의 Debug와 Release 빌드, 두 `ctest` 통과 |
+| CI (quick) | `gh pr checks <M> --watch`(백그라운드). `core (ubuntu-24.04)`, `core (ubuntu-24.04, shared)`, `core (ubuntu-24.04, release)`, `core (Clang, ASan and UBSan)`, `clang-format` 다섯 개 통과 |
 
 - CI가 실패하면 로그(`gh run view <id> --log-failed`)를 보고, 이 PR 때문이면 고쳐서 push하고 다시 확인한다.
   러너나 네트워크 같은 외부 원인으로 보이면 **질문 지점**: 다시 돌릴지(`gh run rerun --failed`), 중단할지 묻는다.
