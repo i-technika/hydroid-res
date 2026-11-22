@@ -9,6 +9,7 @@ add_executable(hydroid-res-tests
   ConfigMatchTest.cpp
   ConfigParserTest.cpp
   GoldenComplexTest.cpp
+  GoldenLocaleConfigTest.cpp
   GoldenMatchTest.cpp
   PathUtf8Test.cpp
   PublicHeaderTest.cpp
@@ -37,8 +38,11 @@ target_compile_definitions(hydroid-res-tests PRIVATE
   HYDROID_AOSP_RES_DIRS="${PROJECT_SOURCE_DIR}/golden/aosp/framework_res_dirs.txt"
   HYDROID_GOLDEN_APP_GRADLE="${PROJECT_SOURCE_DIR}/golden/app/build.gradle.kts"
   HYDROID_GOLDEN_DIR="${PROJECT_SOURCE_DIR}/golden/data"
+  HYDROID_GOLDEN_LOCALECONFIG_DIR="${PROJECT_SOURCE_DIR}/golden/localeconfig/data"
+  HYDROID_GOLDEN_LOCALECONFIG_GRADLE="${PROJECT_SOURCE_DIR}/golden/localeconfig/build.gradle.kts"
   HYDROID_LOCALE_SCRIPT="${PROJECT_SOURCE_DIR}/scripts/gen_locale_data.py"
   HYDROID_LOCALE_TABLES="${PROJECT_SOURCE_DIR}/src/core/LocaleDataTables.inc"
+  HYDROID_LOCALECONFIG_RES_DIR="${PROJECT_SOURCE_DIR}/golden/localeconfig/src/main/res"
   HYDROID_NUMERIC_QUALIFIERS="${PROJECT_SOURCE_DIR}/scripts/golden/numeric_qualifiers.tsv"
   HYDROID_PROJECT_VERSION="${PROJECT_VERSION}"
   HYDROID_PUBLIC_INCLUDE_DIRS="${public_include_dirs}"

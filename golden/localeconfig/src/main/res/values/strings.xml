@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Each string says the folder it is in, so the dump shows the one each was taken from. -->
+<resources>
+    <string name="app_name">hydroid golden locale config</string>
+    <string name="all">default</string>
+    <string name="fr_es">default</string>
+    <string name="es_de">default</string>
+    <string name="es">default</string>
+    <string name="de">default</string>
+    <string name="none">default</string>
+    <string name="mcc">default</string>
+</resources>

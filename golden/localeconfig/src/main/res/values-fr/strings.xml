@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- French, which the app supports. -->
+<resources>
+    <string name="all">fr</string>
+    <string name="fr_es">fr</string>
+    <string name="fr_strict">fr</string>
+    <string name="mcc">fr</string>
+</resources>

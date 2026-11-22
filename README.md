@@ -16,6 +16,7 @@ resolves values exactly as Android does, for UIKit, GTK4 and WinUI 3. Design and
 | `tests/` | GoogleTest unit and golden tests |
 | `golden/` | Android test app + instrumentation test that dumps Android's answers |
 | `golden/data/` | The dumped golden JSON the C++ tests compare against |
+| `golden/localeconfig/` | A second app, with a LocaleConfig and a default locale, and `data/`, what Android picked for it ([Golden data](#golden-data)) |
 | `golden/table/res/` | A `res/` folder with every kind of value and file, for the table tests |
 | `golden/aapt2/` | What the SDK's aapt2 makes of literal values, resource folder names, strings and whole `res/` folders |
 | `golden/aosp/` | The folder names of AOSP's framework `res/`, which must all parse |
@@ -133,6 +134,21 @@ and no script. A variant with a script the plugin keeps, so `values-b+sr+Latn+RS
 first, only because its variant matches. `sr-Latn-RS` and `sr-Latn-RS-ijekavsk` take the
 second, which they would take anyway as the first of two equal folders in the table, so that a
 device with no variant prefers a folder with none only `ConfigMatchTest` checks.
+
+An app whose LocaleConfig (`android:localeConfig`) has a default locale (`android:defaultLocale`,
+Android 15) may have its resources read in more than one locale, each resource taking the first
+that has a value, and which it is hangs on the calls a `Resources` has had before: Android gives
+the app's LocaleConfig to a `Resources` only after it has chosen its locales, and compares each
+update's locales with those it left. `golden/localeconfig` is an app of its own for that, its
+`res/xml/locales_config.xml` supporting en-US, fr and es with en-US the default, and values of
+fr, es, de and ja. Its `LocaleConfigDumpTest` dumps lifecycles, a `Resources` made for some
+languages, then turned, then given others, and the app's own `Resources` given languages of its
+own (`LocaleManager`), into `golden/localeconfig/data/`, which `GoldenLocaleConfigTest` replays
+through `setConfiguration` and `setLocaleConfig`:
+
+```sh
+python scripts/golden/pull_golden.py --app localeconfig
+```
 
 The plugin (9.5.1) compiles values and most files (raw, layout, xml) with a compiler of its own,
 not aapt2, and that writes the variant of a locale with no script as empty (#198). An app it

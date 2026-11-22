@@ -6,6 +6,7 @@
 
 #include <gtest/gtest.h>
 
+#include <filesystem>
 #include <fstream>
 #include <map>
 #include <regex>
@@ -36,19 +37,38 @@ TEST(SdkBaseline, GoldenDumpRanOnEmulatedLevel) {
     EXPECT_EQ(c.at("sdkIntFull").get<int>(), kEmulatedSdkVersion * 100000) << condition;
   });
   EXPECT_GT(conditions, 0) << "no golden JSON in " << HYDROID_GOLDEN_DIR;
+
+  // And each step of the app with a LocaleConfig (#249).
+  int steps = 0;
+  for (const auto& file : std::filesystem::directory_iterator(HYDROID_GOLDEN_LOCALECONFIG_DIR)) {
+    if (file.path().extension() != ".json") continue;
+    std::ifstream in(file.path());
+    const nlohmann::json lifecycle = nlohmann::json::parse(in);
+    for (const nlohmann::json& step : lifecycle.at("steps")) {
+      ++steps;
+      const nlohmann::json& c = step.at("condition");
+      EXPECT_EQ(c.at("sdkInt").get<int>(), kEmulatedSdkVersion) << file.path().filename();
+      EXPECT_EQ(c.at("sdkIntFull").get<int>(), kEmulatedSdkVersion * 100000)
+          << file.path().filename();
+    }
+  }
+  EXPECT_GT(steps, 0) << "no golden JSON in " << HYDROID_GOLDEN_LOCALECONFIG_DIR;
 }
 
 TEST(SdkBaseline, GoldenAppBuildsForEmulatedLevel) {
-  std::ifstream in(HYDROID_GOLDEN_APP_GRADLE);
-  ASSERT_TRUE(in) << "cannot open " << HYDROID_GOLDEN_APP_GRADLE;
-  std::stringstream gradle;
-  gradle << in.rdbuf();
-  for (const char* key : {"compileSdk", "targetSdk"}) {
-    std::smatch m;
-    const std::string text = gradle.str();
-    ASSERT_TRUE(std::regex_search(text, m, std::regex(std::string(key) + R"(\s*=\s*(\d+))")))
-        << key << " not found in " << HYDROID_GOLDEN_APP_GRADLE;
-    EXPECT_EQ(m[1].str(), kLevel) << key;
+  for (const char* file : {HYDROID_GOLDEN_APP_GRADLE, HYDROID_GOLDEN_LOCALECONFIG_GRADLE}) {
+    SCOPED_TRACE(file);
+    std::ifstream in(file);
+    ASSERT_TRUE(in) << "cannot open " << file;
+    std::stringstream gradle;
+    gradle << in.rdbuf();
+    for (const char* key : {"compileSdk", "targetSdk"}) {
+      std::smatch m;
+      const std::string text = gradle.str();
+      ASSERT_TRUE(std::regex_search(text, m, std::regex(std::string(key) + R"(\s*=\s*(\d+))")))
+          << key << " not found in " << file;
+      EXPECT_EQ(m[1].str(), kLevel) << key;
+    }
   }
 }
 
