@@ -34,9 +34,9 @@ namespace fs = std::filesystem;
 
 enum class Listing { Read, CannotOpen, CannotRead };
 
-// Calls `f` with the path of each entry of `dir`, "." and ".." among them, and a function that
-// tells whether it is a folder once links are followed, or sets why that cannot be told. It is
-// told only when asked, as most entries never are.
+// Calls `f` with the path of each entry of `dir`, elsewhere than Windows "." and ".." among them,
+// and a function that tells whether it is a folder once links are followed, or sets why that
+// cannot be told. It is told only when asked, as most entries never are.
 // Elsewhere than Windows it reads the folder by opendir() and readdir(), not by a
 // directory_iterator, which in libstdc++ allocates where an exception cannot leave, so that a
 // failed allocation there ends the program (#262). What allocates here is hydroid's own, whose

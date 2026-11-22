@@ -45,6 +45,11 @@ HYDROID_OUT_OF_LINE void* operator new(std::size_t size) {
   if (void* p = std::malloc(size == 0 ? 1 : size)) return p;
   throw std::bad_alloc();
 }
+// Not counted: what asks for memory so does without it where there is none, as std::stable_sort
+// does for its buffer in libstdc++, sorting in place instead, so that failing it fails nothing.
+HYDROID_OUT_OF_LINE void* operator new(std::size_t size, const std::nothrow_t&) noexcept {
+  return std::malloc(size == 0 ? 1 : size);
+}
 HYDROID_OUT_OF_LINE void operator delete(void* p) noexcept { std::free(p); }
 HYDROID_OUT_OF_LINE void operator delete(void* p, std::size_t) noexcept { std::free(p); }
 
