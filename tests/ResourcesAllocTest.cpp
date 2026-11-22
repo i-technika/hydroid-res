@@ -283,10 +283,11 @@ TEST(ResourcesAllocations, AFailedChoiceForAChangedTableLeavesItToTheNextCall) {
 }
 
 // parseLocaleConfig, which reads one XML file, for each allocation it makes, failing it: what
-// fails as expat reads the file throws std::bad_alloc out of it, rather than through expat, which
-// is C, and on GCC ended the program there (#256). Every handler of expat is read: namespaces,
-// elements with attributes, text and CDATA. Not by addPackage, which on GCC ends the program as it
-// lists the folder, in libstdc++'s directory_iterator (#262).
+// fails as expat reads the file throws std::bad_alloc out of it (#256). Every handler of expat is
+// read: namespaces, elements with attributes, text and CDATA. It sees an exception that a handler
+// keeps and load() does not throw again; one let through expat as well, as the expat it is built
+// with unwinds, on MSVC and on CI's GCC alike. Not by addPackage, which on GCC ends the program as
+// it lists the folder, in libstdc++'s directory_iterator (#262).
 TEST(ResourcesAllocations, AFailedAllocationAsXmlIsReadThrows) {
 #if HYDROID_NOEXCEPT_ALLOCATES
   GTEST_SKIP() << "the checked iterators allocate where they cannot throw";

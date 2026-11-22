@@ -61,10 +61,11 @@ struct TreeBuilder {
   }
 };
 
-// Runs `f` on the TreeBuilder of a handler. No exception may leave a handler, as it would have to
-// unwind through expat, which is C: GCC gives its frames nothing to unwind with, and ends the
-// program (#256). What `f` throws, as std::bad_alloc, is kept, and the parser stopped; a handler
-// that expat still calls after that does nothing.
+// Runs `f` on the TreeBuilder of a handler. No exception leaves a handler, as it would have to
+// unwind through expat, which is C and says nothing of C++ exceptions: an expat built without
+// unwind tables, as a system one may be, would end the program there. The expat of CI's GCC builds
+// has them, and let them through before as well (#256). What `f` throws, as std::bad_alloc, is
+// kept, and the parser stopped; a handler that expat still calls after that does nothing.
 template <typename F>
 void handle(void* data, F&& f) {
   TreeBuilder& b = *static_cast<TreeBuilder*>(data);
