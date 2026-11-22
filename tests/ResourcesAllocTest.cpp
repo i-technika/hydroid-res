@@ -64,6 +64,11 @@ HYDROID_OUT_OF_LINE void* operator new(std::size_t size) {
   if (void* p = std::malloc(size == 0 ? 1 : size)) return p;
   throw std::bad_alloc();
 }
+// Not counted: what asks for memory so does without it where there is none, as std::stable_sort
+// does for its buffer in libstdc++, sorting in place instead, so that failing it fails nothing.
+HYDROID_OUT_OF_LINE void* operator new(std::size_t size, const std::nothrow_t&) noexcept {
+  return std::malloc(size == 0 ? 1 : size);
+}
 HYDROID_OUT_OF_LINE void operator delete(void* p) noexcept { std::free(p); }
 HYDROID_OUT_OF_LINE void operator delete(void* p, std::size_t) noexcept { std::free(p); }
 
@@ -363,8 +368,8 @@ TEST(ResourcesAllocations, AFailedChoiceForAChangedTableLeavesItToTheNextCall) {
 // fails as expat reads the file throws std::bad_alloc out of it (#256). Every handler of expat is
 // read: namespaces, elements with attributes, text and CDATA. It sees an exception that a handler
 // keeps and load() does not throw again; one let through expat as well, as the expat it is built
-// with unwinds, on MSVC and on CI's GCC alike. Not by addPackage, which on GCC ends the program as
-// it lists the folder, in libstdc++'s directory_iterator (#262).
+// with unwinds, on MSVC and on CI's GCC alike. addPackage, which reads XML too, has a test of its
+// own below.
 TEST(ResourcesAllocations, AFailedAllocationAsXmlIsReadThrows) {
 #if HYDROID_NOEXCEPT_ALLOCATES
   GTEST_SKIP() << "the checked iterators allocate where they cannot throw";
@@ -396,6 +401,46 @@ TEST(ResourcesAllocations, AFailedAllocationAsXmlIsReadThrows) {
 #endif
 }
 
+// addPackage, for each allocation it makes, failing it: the std::bad_alloc leaves it, on GCC as
+// well, where an allocation that failed in libstdc++'s directory_iterator, as the folders of res/
+// were listed, ended the program (#262). The package has values, an XML file whose ids are read
+// and a file copied as it is. Each call is to a table of its own, as one that fails may yet leave
+// a name in the table (#257).
+TEST(ResourcesAllocations, AFailedAllocationAsAPackageLoadsThrows) {
+#if HYDROID_NOEXCEPT_ALLOCATES
+  GTEST_SKIP() << "the checked iterators allocate where they cannot throw";
+#else
+  TempDir dir;
+  const std::filesystem::path res = writePackage(dir, {"ko", "night"}, "com.example");
+  std::filesystem::create_directories(res / "layout");
+  std::ofstream(res / "layout" / "main.xml", std::ios::binary)
+      << "<LinearLayout xmlns:android=\"http://schemas.android.com/apk/res/android\" "
+         "android:id=\"@+id/root\" android:text=\"@string/where\"/>";
+  std::filesystem::create_directories(res / "raw");
+  std::ofstream(res / "raw" / "data.bin", std::ios::binary) << "data";
+  bool added = false;
+  long all = 0;
+  {
+    ResourceTable table;
+    all = allocationsOf([&] { added = table.addPackage(res, "com.example", kAppPackageId); });
+  }
+  ASSERT_TRUE(added);
+  REQUIRE_COUNTED(all);
+  long threw = 0;
+  for (long failAt = 0; failAt < all; failAt++) {
+    SCOPED_TRACE(failAt);
+    ResourceTable table;
+    try {
+      allocationsOf([&] { table.addPackage(res, "com.example", kAppPackageId); }, failAt);
+    } catch (const std::bad_alloc&) {
+      threw++;
+    }
+  }
+  // addPackage recovers from none.
+  EXPECT_EQ(threw, all);
+#endif
+}
+
 // What pugixml has no memory for as expat reads a file, which it says by an empty node or false,
 // throws std::bad_alloc out of parseLocaleConfig too (#263), rather than give what it read of a
 // tree with an element or an attribute left out. A long element name, attribute name, attribute
@@ -423,8 +468,7 @@ TEST(ResourcesAllocations, PugixmlWithoutMemoryAsXmlIsReadThrows) {
 }
 
 // And addPackage does not take such a tree as the file (#263): a layout whose @+id are read out of
-// its attributes fails, rather than load without them. libstdc++ lists the folder with operator
-// new, which pugixml's allocations leave alone (#262).
+// its attributes fails, rather than load without them.
 TEST(ResourcesAllocations, PugixmlWithoutMemoryFailsAddPackage) {
   TempDir dir;
   const std::string filler(40000, 'x');
@@ -457,7 +501,7 @@ TEST(ResourcesAllocations, PugixmlWithoutMemoryFailsAddPackage) {
   }
 }
 
-// The C API (#203), for each allocation its calls make but those of loading a package (#262),
+// The C API (#203), for each allocation its calls make but those of loading a package (#257),
 // failing it: no exception leaves a C function, and one that fails says so and leaves what it would
 // have written as it was. The table changes before each call that reads the configuration, so that
 // each takes the change in.
@@ -483,8 +527,8 @@ TEST(ResourcesAllocations, NoExceptionLeavesTheCApi) {
       failures++;
       return;
     }
-    // Not while a package loads: an allocation that fails as libstdc++ lists the folder ends the
-    // program on GCC (#262).
+    // Not while a package loads: one that fails may leave the name of a package that is not there
+    // in the table (#257), which the calls after it would look in.
     const auto add = [&](const std::string& res, const char* name, uint8_t id) {
       counting = false;
       if (hydroid_res_table_add_package(table, res.c_str(), name, id) != 1) failures++;
